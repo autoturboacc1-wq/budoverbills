@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Mic, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChatMessageBubble, Message } from "./ChatMessageBubble";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { VoiceRecorder } from "./VoiceRecorder";
 
 /**
  * ChatRoom - เจ้าของ logic ทั้งหมด
@@ -48,6 +49,7 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
   const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // ==============================
@@ -70,7 +72,7 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
       const isDirectChat = thread.chat_type === "direct";
       let query = supabase
         .from("messages")
-        .select("id, content, sender_id, created_at")
+        .select("id, content, sender_id, created_at, voice_url, voice_duration")
         .order("created_at", { ascending: true });
 
       if (isDirectChat) {
@@ -91,6 +93,8 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
         text: m.content,
         sender_id: m.sender_id,
         created_at: m.created_at,
+        voice_url: (m as { voice_url?: string | null }).voice_url ?? null,
+        voice_duration: (m as { voice_duration?: number | null }).voice_duration ?? null,
       }));
 
       setMessages(mappedMessages);
@@ -148,12 +152,21 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
           filter: `${filterColumn}=eq.${filterId}`,
         },
         (payload) => {
-          const newMsg = payload.new as { id: string; content: string; sender_id: string; created_at: string };
+          const newMsg = payload.new as {
+            id: string;
+            content: string;
+            sender_id: string;
+            created_at: string;
+            voice_url?: string | null;
+            voice_duration?: number | null;
+          };
           const mapped: Message = {
             id: newMsg.id,
             text: newMsg.content,
             sender_id: newMsg.sender_id,
             created_at: newMsg.created_at,
+            voice_url: newMsg.voice_url ?? null,
+            voice_duration: newMsg.voice_duration ?? null,
           };
           setMessages((prev) => {
             if (prev.some((m) => m.id === mapped.id)) return prev;
@@ -189,6 +202,34 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
       setInputText("");
     } catch (error) {
       console.error("Error sending message:", error);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleVoiceReady = async (voicePath: string, duration: number) => {
+    if (!user || !thread) return;
+
+    setSending(true);
+
+    try {
+      const isDirectChat = thread.chat_type === "direct";
+      const voiceMessageData = {
+        sender_id: user.id,
+        content: "🎤 ข้อความเสียง",
+        agreement_id: isDirectChat ? null : thread.agreement_id,
+        direct_chat_id: isDirectChat ? thread.direct_chat_id : null,
+        voice_url: voicePath,
+        voice_duration: duration,
+      };
+
+      const { error } = await supabase.from("messages").insert([voiceMessageData]);
+
+      if (error) throw error;
+
+      setShowVoiceRecorder(false);
+    } catch (error) {
+      console.error("Error sending voice note:", error);
     } finally {
       setSending(false);
     }
@@ -276,21 +317,41 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
 
       {/* Input */}
       <div className="flex items-center gap-2 px-4 py-3 border-t border-border bg-background">
-        <Input
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          placeholder="พิมพ์ข้อความ..."
-          className="flex-1"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSend();
-            }
-          }}
-        />
-        <Button onClick={handleSend} disabled={!inputText.trim() || sending} size="icon">
-          <Send className="w-5 h-5" />
-        </Button>
+        {showVoiceRecorder ? (
+          <VoiceRecorder
+            chatId={thread.chat_id}
+            onCancel={() => setShowVoiceRecorder(false)}
+            onVoiceReady={handleVoiceReady}
+            ownerId={user.id}
+          />
+        ) : (
+          <>
+            <Button
+              disabled={sending}
+              onClick={() => setShowVoiceRecorder(true)}
+              size="icon"
+              type="button"
+              variant="ghost"
+            >
+              <Mic className="w-5 h-5" />
+            </Button>
+            <Input
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="พิมพ์ข้อความ..."
+              className="flex-1"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+            />
+            <Button onClick={handleSend} disabled={!inputText.trim() || sending} size="icon">
+              <Send className="w-5 h-5" />
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

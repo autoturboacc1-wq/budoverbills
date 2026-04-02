@@ -1530,3 +1530,9 @@ export const Constants = {
     },
   },
 } as const
+          voice_duration: number | null
+          voice_url: string | null
+          voice_duration?: number | null
+          voice_url?: string | null
+          voice_duration?: number | null
+          voice_url?: string | null

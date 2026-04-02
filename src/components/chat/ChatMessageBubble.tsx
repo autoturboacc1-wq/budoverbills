@@ -8,11 +8,15 @@
  * รับ props แล้ว render อย่างเดียว
  */
 
+import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
+
 export interface Message {
   id: string;
   text: string;
   sender_id: string;
   created_at: string;
+  voice_url?: string | null;
+  voice_duration?: number | null;
 }
 
 interface ChatMessageBubbleProps {
@@ -21,6 +25,16 @@ interface ChatMessageBubbleProps {
 }
 
 export const ChatMessageBubble = ({ message, isMe }: ChatMessageBubbleProps) => {
+  if (message.voice_url) {
+    return (
+      <VoiceMessagePlayer
+        duration={message.voice_duration ?? 0}
+        isSender={isMe}
+        voicePath={message.voice_url}
+      />
+    );
+  }
+
   return (
     <div
       className={`
