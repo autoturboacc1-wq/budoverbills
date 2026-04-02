@@ -794,6 +794,7 @@ export type Database = {
         }
         Insert: {
           agreement_credits?: number
+          theme_preference: string
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -809,6 +810,7 @@ export type Database = {
         }
         Update: {
           agreement_credits?: number
+          theme_preference?: string
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -824,6 +826,7 @@ export type Database = {
         }
         Relationships: []
       }
+          theme_preference?: string
       push_subscriptions: {
         Row: {
           auth: string
