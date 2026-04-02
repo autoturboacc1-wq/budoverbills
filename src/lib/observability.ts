@@ -1,4 +1,7 @@
-type SentryModule = typeof import('@sentry/react');
+interface SentryModule {
+  init: (options: { dsn: string; environment: string; tracesSampleRate: number }) => void;
+  captureException: (error: unknown, context?: { extra?: Record<string, unknown> }) => void;
+}
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
 let sentryModulePromise: Promise<SentryModule | null> | null = null;
