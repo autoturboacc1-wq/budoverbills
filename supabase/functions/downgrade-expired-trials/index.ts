@@ -10,8 +10,17 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }),
+      {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
+    );
+  }
+
   try {
-    // Verify the request is from a trusted source using service role key
     const authHeader = req.headers.get("authorization");
     const expectedToken = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
@@ -28,10 +37,8 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Call the downgrade function
     const { data, error } = await supabase.rpc("downgrade_expired_trials");
 
     if (error) {
@@ -44,8 +51,6 @@ Deno.serve(async (req) => {
         }
       );
     }
-
-    console.log(`Downgraded ${data} expired trials`);
 
     return new Response(
       JSON.stringify({ 
