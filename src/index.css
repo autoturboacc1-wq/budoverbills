@@ -1,0 +1,217 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm Luxury Minimal Palette */
+    --background: 40 33% 98%;
+    --foreground: 30 10% 20%;
+
+    --card: 40 30% 97%;
+    --card-foreground: 30 10% 20%;
+
+    --popover: 40 33% 99%;
+    --popover-foreground: 30 10% 20%;
+
+    /* Warm Amber Primary */
+    --primary: 35 85% 55%;
+    --primary-foreground: 40 33% 99%;
+
+    /* Soft Sand Secondary */
+    --secondary: 35 25% 92%;
+    --secondary-foreground: 30 10% 25%;
+
+    /* Muted Warm Gray */
+    --muted: 35 15% 94%;
+    --muted-foreground: 30 10% 45%;
+
+    /* Gentle Sage Accent */
+    --accent: 150 25% 88%;
+    --accent-foreground: 150 30% 25%;
+
+    --destructive: 25 70% 55%;
+    --destructive-foreground: 40 33% 99%;
+
+    --border: 35 20% 88%;
+    --input: 35 20% 90%;
+    --ring: 35 85% 55%;
+
+    --radius: 1rem;
+
+    /* Status Colors - Warm & Friendly */
+    --status-paid: 150 45% 50%;
+    --status-pending: 45 90% 55%;
+    --status-overdue: 25 75% 55%;
+    --status-negotiating: 200 60% 55%;
+
+    /* Chat Bubble Colors */
+    --chat-bubble-me: 35 85% 55%;
+    --chat-bubble-me-foreground: 40 33% 99%;
+    --chat-bubble-other: 35 20% 92%;
+    --chat-bubble-other-foreground: 30 10% 20%;
+    --chat-bubble-money: 150 50% 45%;
+    --chat-bubble-money-foreground: 40 33% 99%;
+
+    /* Gradients */
+    --gradient-warm: linear-gradient(135deg, hsl(40 33% 98%) 0%, hsl(35 30% 95%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(40 35% 99%) 0%, hsl(35 25% 96%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(35 85% 55%) 0%, hsl(30 80% 50%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(35 40% 96%) 0%, hsl(40 33% 98%) 50%, hsl(35 25% 94%) 100%);
+
+    /* Shadows */
+    --shadow-soft: 0 4px 20px -4px hsl(30 20% 20% / 0.08);
+    --shadow-card: 0 2px 12px -2px hsl(30 20% 20% / 0.06);
+    --shadow-elevated: 0 8px 30px -8px hsl(30 20% 20% / 0.12);
+
+    /* Sidebar */
+    --sidebar-background: 40 30% 97%;
+    --sidebar-foreground: 30 10% 30%;
+    --sidebar-primary: 35 85% 55%;
+    --sidebar-primary-foreground: 40 33% 99%;
+    --sidebar-accent: 35 25% 92%;
+    --sidebar-accent-foreground: 30 10% 25%;
+    --sidebar-border: 35 20% 88%;
+    --sidebar-ring: 35 85% 55%;
+  }
+
+  .dark {
+    --background: 30 15% 10%;
+    --foreground: 35 20% 92%;
+
+    --card: 30 12% 12%;
+    --card-foreground: 35 20% 92%;
+
+    --popover: 30 12% 11%;
+    --popover-foreground: 35 20% 92%;
+
+    --primary: 35 80% 55%;
+    --primary-foreground: 30 15% 10%;
+
+    --secondary: 30 10% 18%;
+    --secondary-foreground: 35 20% 88%;
+
+    --muted: 30 10% 16%;
+    --muted-foreground: 35 15% 55%;
+
+    --accent: 150 20% 20%;
+    --accent-foreground: 150 30% 75%;
+
+    --destructive: 25 65% 45%;
+    --destructive-foreground: 35 20% 92%;
+
+    --border: 30 10% 18%;
+    --input: 30 10% 18%;
+    --ring: 35 80% 55%;
+
+    --status-paid: 150 40% 45%;
+    --status-pending: 45 80% 50%;
+    --status-overdue: 25 65% 50%;
+    --status-negotiating: 200 55% 50%;
+
+    /* Chat Bubble Colors - Dark Mode */
+    --chat-bubble-me: 35 75% 50%;
+    --chat-bubble-me-foreground: 30 15% 10%;
+    --chat-bubble-other: 30 12% 22%;
+    --chat-bubble-other-foreground: 35 20% 92%;
+    --chat-bubble-money: 150 45% 40%;
+    --chat-bubble-money-foreground: 35 20% 92%;
+
+    --gradient-warm: linear-gradient(135deg, hsl(30 15% 10%) 0%, hsl(30 12% 12%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(30 12% 13%) 0%, hsl(30 10% 11%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(35 80% 55%) 0%, hsl(30 75% 50%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(30 12% 11%) 0%, hsl(30 15% 10%) 50%, hsl(30 10% 9%) 100%);
+
+    --shadow-soft: 0 4px 20px -4px hsl(0 0% 0% / 0.3);
+    --shadow-card: 0 2px 12px -2px hsl(0 0% 0% / 0.25);
+    --shadow-elevated: 0 8px 30px -8px hsl(0 0% 0% / 0.4);
+
+    --sidebar-background: 30 12% 12%;
+    --sidebar-foreground: 35 20% 88%;
+    --sidebar-primary: 35 80% 55%;
+    --sidebar-primary-foreground: 30 15% 10%;
+    --sidebar-accent: 30 10% 18%;
+    --sidebar-accent-foreground: 35 20% 88%;
+    --sidebar-border: 30 10% 18%;
+    --sidebar-ring: 35 80% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Sarabun', 'Outfit', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', 'Sarabun', system-ui, sans-serif;
+    @apply tracking-tight;
+  }
+}
+
+@layer utilities {
+  .text-gradient-primary {
+    background: linear-gradient(135deg, hsl(35 85% 55%) 0%, hsl(30 80% 50%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-gradient-warm {
+    background: var(--gradient-warm);
+  }
+
+  .bg-gradient-card {
+    background: var(--gradient-card);
+  }
+
+  .bg-gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .animate-fade-up {
+    animation: fadeUp 0.6s ease-out forwards;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}

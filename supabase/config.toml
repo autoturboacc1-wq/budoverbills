@@ -1,0 +1,4 @@
+project_id = "taihdoldpcbovubzjjah"
+
+[functions.notify-unconfirmed-transfers]
+verify_jwt = false
