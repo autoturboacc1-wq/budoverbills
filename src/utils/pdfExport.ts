@@ -1,9 +1,7 @@
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
-import { th } from "date-fns/locale";
 
 interface AgreementPDFData {
-  // Agreement info
   agreementId: string;
   principalAmount: number;
   totalAmount: number;
@@ -13,20 +11,14 @@ interface AgreementPDFData {
   frequency: string;
   startDate: string;
   description?: string;
-  
-  // Lender info
   lenderName: string;
   lenderConfirmedAt?: string;
   lenderConfirmedIP?: string;
   lenderConfirmedDevice?: string;
-  
-  // Borrower info
   borrowerName: string;
   borrowerConfirmedAt?: string;
   borrowerConfirmedIP?: string;
   borrowerConfirmedDevice?: string;
-  
-  // Installments
   installments: Array<{
     installmentNumber: number;
     dueDate: string;
@@ -36,15 +28,57 @@ interface AgreementPDFData {
   }>;
 }
 
-// Thai text support - we'll use romanized text to avoid font issues
-function romanizeThai(text: string): string {
-  // For now, keep Thai as-is - jsPDF can handle basic Thai with proper font
-  return text;
+const FREQUENCY_LABELS: Record<string, string> = {
+  daily: "Daily",
+  weekly: "Weekly",
+  monthly: "Monthly",
+};
+
+const INTEREST_TYPE_LABELS: Record<string, string> = {
+  none: "No interest",
+  flat: "Flat rate",
+  effective: "Effective rate",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  paid: "Paid",
+  pending: "Pending",
+  overdue: "Overdue",
+  rescheduled: "Rescheduled",
+};
+
+function formatMoney(amount: number): string {
+  return `${Number(amount).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} THB`;
+}
+
+function formatDateOnly(value: string | undefined): string {
+  if (!value) {
+    return "-";
+  }
+
+  return format(new Date(value), "d MMM yyyy");
+}
+
+function formatDateTime(value: string | undefined): string {
+  if (!value) {
+    return "-";
+  }
+
+  return format(new Date(value), "d MMM yyyy HH:mm:ss");
+}
+
+function truncateText(value: string | undefined, maxLength = 90): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return value.length > maxLength ? `${value.slice(0, maxLength - 3)}...` : value;
 }
 
 export async function generateAgreementPDF(data: AgreementPDFData): Promise<Blob> {
-  // Create PDF with default font (Helvetica supports basic Latin)
-  // For Thai text, we'll include it but it may not render perfectly without custom fonts
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
@@ -52,196 +86,295 @@ export async function generateAgreementPDF(data: AgreementPDFData): Promise<Blob
   });
 
   const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 20;
-  let y = 20;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 16;
+  const contentWidth = pageWidth - margin * 2;
+  const bottomLimit = pageHeight - 20;
+  let y = 18;
 
-  // Helper function to add text
-  const addText = (text: string, x: number, yPos: number, options?: { fontSize?: number; fontStyle?: string; align?: "left" | "center" | "right" }) => {
-    doc.setFontSize(options?.fontSize || 10);
-    if (options?.fontStyle === "bold") {
-      doc.setFont("helvetica", "bold");
-    } else {
-      doc.setFont("helvetica", "normal");
-    }
-    
-    if (options?.align === "center") {
-      doc.text(text, pageWidth / 2, yPos, { align: "center" });
-    } else if (options?.align === "right") {
-      doc.text(text, pageWidth - margin, yPos, { align: "right" });
-    } else {
-      doc.text(text, x, yPos);
-    }
+  const setFont = (style: "normal" | "bold", size: number, color = 20) => {
+    doc.setFont("helvetica", style);
+    doc.setFontSize(size);
+    doc.setTextColor(color);
   };
 
-  // Title
-  addText("LOAN AGREEMENT RECORD", margin, y, { fontSize: 16, fontStyle: "bold", align: "center" });
-  y += 5;
-  addText("Budoverbills - Electronic Agreement", margin, y, { fontSize: 10, align: "center" });
-  y += 10;
-
-  // Separator line
-  doc.setDrawColor(200);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 10;
-
-  // Agreement ID and Date
-  addText(`Agreement ID: ${data.agreementId}`, margin, y, { fontSize: 9 });
-  y += 5;
-  addText(`Generated: ${format(new Date(), "d MMM yyyy HH:mm")}`, margin, y, { fontSize: 9 });
-  y += 10;
-
-  // Parties Section
-  addText("PARTIES", margin, y, { fontSize: 12, fontStyle: "bold" });
-  y += 7;
-
-  // Lender
-  addText("Lender:", margin, y, { fontStyle: "bold" });
-  addText(data.lenderName || "Not specified", margin + 40, y);
-  y += 5;
-  if (data.lenderConfirmedAt) {
-    addText(`  Confirmed: ${format(new Date(data.lenderConfirmedAt), "d MMM yyyy HH:mm:ss")}`, margin, y, { fontSize: 8 });
-    y += 4;
-  }
-  if (data.lenderConfirmedIP) {
-    addText(`  IP: ${data.lenderConfirmedIP}`, margin, y, { fontSize: 8 });
-    y += 4;
-  }
-  if (data.lenderConfirmedDevice) {
-    addText(`  Device: ${data.lenderConfirmedDevice.substring(0, 50)}...`, margin, y, { fontSize: 8 });
-    y += 4;
-  }
-  y += 3;
-
-  // Borrower
-  addText("Borrower:", margin, y, { fontStyle: "bold" });
-  addText(data.borrowerName || "Not specified", margin + 40, y);
-  y += 5;
-  if (data.borrowerConfirmedAt) {
-    addText(`  Confirmed: ${format(new Date(data.borrowerConfirmedAt), "d MMM yyyy HH:mm:ss")}`, margin, y, { fontSize: 8 });
-    y += 4;
-  }
-  if (data.borrowerConfirmedIP) {
-    addText(`  IP: ${data.borrowerConfirmedIP}`, margin, y, { fontSize: 8 });
-    y += 4;
-  }
-  if (data.borrowerConfirmedDevice) {
-    addText(`  Device: ${data.borrowerConfirmedDevice.substring(0, 50)}...`, margin, y, { fontSize: 8 });
-    y += 4;
-  }
-  y += 10;
-
-  // Loan Details Section
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 7;
-  addText("LOAN DETAILS", margin, y, { fontSize: 12, fontStyle: "bold" });
-  y += 7;
-
-  const frequencyLabels: Record<string, string> = {
-    daily: "Daily",
-    weekly: "Weekly",
-    monthly: "Monthly",
-  };
-
-  const interestTypeLabels: Record<string, string> = {
-    none: "No Interest",
-    flat: "Flat Rate",
-    effective: "Effective Rate",
-  };
-
-  const details = [
-    ["Principal Amount:", `${data.principalAmount.toLocaleString()} THB`],
-    ["Total Amount:", `${data.totalAmount.toLocaleString()} THB`],
-    ["Interest Rate:", `${data.interestRate}%`],
-    ["Interest Type:", interestTypeLabels[data.interestType] || data.interestType],
-    ["Number of Installments:", data.numInstallments.toString()],
-    ["Payment Frequency:", frequencyLabels[data.frequency] || data.frequency],
-    ["First Payment Date:", format(new Date(data.startDate), "d MMM yyyy")],
-  ];
-
-  if (data.description) {
-    details.push(["Description:", data.description]);
-  }
-
-  details.forEach(([label, value]) => {
-    addText(label, margin, y, { fontStyle: "bold" });
-    addText(value, margin + 50, y);
-    y += 5;
-  });
-
-  y += 5;
-
-  // Payment Schedule Section
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 7;
-  addText("PAYMENT SCHEDULE", margin, y, { fontSize: 12, fontStyle: "bold" });
-  y += 7;
-
-  // Table header
-  const colWidths = [20, 35, 35, 30, 50];
-  const tableX = margin;
-  
-  doc.setFillColor(240, 240, 240);
-  doc.rect(tableX, y - 4, pageWidth - margin * 2, 7, "F");
-  
-  addText("#", tableX + 2, y, { fontStyle: "bold", fontSize: 9 });
-  addText("Due Date", tableX + colWidths[0], y, { fontStyle: "bold", fontSize: 9 });
-  addText("Amount", tableX + colWidths[0] + colWidths[1], y, { fontStyle: "bold", fontSize: 9 });
-  addText("Status", tableX + colWidths[0] + colWidths[1] + colWidths[2], y, { fontStyle: "bold", fontSize: 9 });
-  addText("Paid At", tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], y, { fontStyle: "bold", fontSize: 9 });
-  y += 7;
-
-  // Table rows
-  data.installments.forEach((inst, index) => {
-    if (y > 270) {
-      doc.addPage();
-      y = 20;
+  const ensureSpace = (requiredHeight: number) => {
+    if (y + requiredHeight <= bottomLimit) {
+      return;
     }
-    
-    const statusText = inst.status === "paid" ? "PAID" : inst.status === "pending" ? "PENDING" : "UPCOMING";
-    
-    addText(inst.installmentNumber.toString(), tableX + 2, y, { fontSize: 9 });
-    addText(format(new Date(inst.dueDate), "d MMM yyyy"), tableX + colWidths[0], y, { fontSize: 9 });
-    addText(`${inst.amount.toLocaleString()} THB`, tableX + colWidths[0] + colWidths[1], y, { fontSize: 9 });
-    addText(statusText, tableX + colWidths[0] + colWidths[1] + colWidths[2], y, { fontSize: 9 });
-    addText(inst.paidAt ? format(new Date(inst.paidAt), "d MMM yy HH:mm") : "-", tableX + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3], y, { fontSize: 9 });
-    y += 5;
-    
-    // Light separator line
-    if (index < data.installments.length - 1) {
-      doc.setDrawColor(230);
-      doc.line(tableX, y - 1, pageWidth - margin, y - 1);
-    }
-  });
 
-  y += 10;
-
-  // Footer / Disclaimer
-  if (y > 250) {
     doc.addPage();
-    y = 20;
+    y = 18;
+  };
+
+  const addText = (
+    text: string,
+    x: number,
+    yPosition: number,
+    options?: {
+      align?: "left" | "center" | "right";
+      size?: number;
+      style?: "normal" | "bold";
+      color?: number;
+    },
+  ) => {
+    setFont(options?.style ?? "normal", options?.size ?? 10, options?.color ?? 20);
+
+    if (options?.align === "center") {
+      doc.text(text, pageWidth / 2, yPosition, { align: "center" });
+      return;
+    }
+
+    if (options?.align === "right") {
+      doc.text(text, pageWidth - margin, yPosition, { align: "right" });
+      return;
+    }
+
+    doc.text(text, x, yPosition);
+  };
+
+  const addWrappedText = (
+    text: string,
+    x: number,
+    yPosition: number,
+    maxWidth: number,
+    options?: {
+      size?: number;
+      style?: "normal" | "bold";
+      color?: number;
+      lineHeight?: number;
+    },
+  ) => {
+    const lines = doc.splitTextToSize(text, maxWidth);
+    const lineHeight = options?.lineHeight ?? 4.2;
+
+    setFont(options?.style ?? "normal", options?.size ?? 9, options?.color ?? 20);
+    doc.text(lines, x, yPosition);
+
+    return lines.length * lineHeight;
+  };
+
+  const drawRule = () => {
+    doc.setDrawColor(220, 224, 230);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 6;
+  };
+
+  const drawSectionTitle = (title: string, subtitle?: string) => {
+    ensureSpace(subtitle ? 16 : 10);
+    addText(title, margin, y, { size: 12, style: "bold" });
+    y += 5;
+
+    if (subtitle) {
+      addText(subtitle, margin, y, { size: 8, color: 110 });
+      y += 4;
+    }
+  };
+
+  const drawMetricCard = (
+    x: number,
+    cardWidth: number,
+    label: string,
+    value: string,
+    accent: [number, number, number],
+  ) => {
+    doc.setFillColor(accent[0], accent[1], accent[2]);
+    doc.roundedRect(x, y, cardWidth, 18, 3, 3, "F");
+    setFont("normal", 8, 255);
+    doc.text(label.toUpperCase(), x + 3, y + 5.5);
+    setFont("bold", 11, 255);
+    doc.text(value, x + 3, y + 12.5);
+  };
+
+  const drawLabeledValue = (label: string, value: string, valueWidth = contentWidth - 38) => {
+    ensureSpace(8);
+    addText(label, margin, y, { size: 8, style: "bold", color: 90 });
+    const consumedHeight = addWrappedText(value, margin + 38, y, valueWidth, {
+      size: 9,
+      lineHeight: 4.4,
+    });
+    y += Math.max(consumedHeight, 4.4) + 1.5;
+  };
+
+  const drawPartyCard = (
+    x: number,
+    width: number,
+    title: string,
+    name: string,
+    details: string[],
+  ) => {
+    const cardY = y;
+
+    doc.setFillColor(247, 248, 250);
+    doc.roundedRect(x, cardY, width, 34, 3, 3, "F");
+
+    setFont("bold", 8, 90);
+    doc.text(title.toUpperCase(), x + 3, cardY + 5.5);
+
+    setFont("bold", 11, 20);
+    const displayName = truncateText(name, 32) ?? "Not specified";
+    doc.text(displayName, x + 3, cardY + 12);
+
+    setFont("normal", 8, 80);
+    let detailY = cardY + 17;
+    details.forEach((detail) => {
+      const wrapped = doc.splitTextToSize(detail, width - 6);
+      doc.text(wrapped, x + 3, detailY);
+      detailY += wrapped.length * 3.8;
+    });
+  };
+
+  const drawTableHeader = () => {
+    doc.setFillColor(32, 42, 68);
+    doc.rect(margin, y, contentWidth, 7, "F");
+    addText("#", margin + 3, y + 4.7, { size: 8, style: "bold", color: 255 });
+    addText("Due date", margin + 14, y + 4.7, { size: 8, style: "bold", color: 255 });
+    addText("Amount", margin + 58, y + 4.7, { size: 8, style: "bold", color: 255 });
+    addText("Status", margin + 100, y + 4.7, { size: 8, style: "bold", color: 255 });
+    addText("Paid at", margin + 136, y + 4.7, { size: 8, style: "bold", color: 255 });
+    y += 9;
+  };
+
+  const drawFooter = () => {
+    const pageCount = doc.getNumberOfPages();
+
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      doc.setPage(pageNumber);
+      doc.setDrawColor(225, 228, 232);
+      doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+      addText("BudOverBills agreement record", margin, pageHeight - 7, {
+        size: 7,
+        color: 120,
+      });
+      addText(`Page ${pageNumber} / ${pageCount}`, margin, pageHeight - 7, {
+        align: "right",
+        size: 7,
+        color: 120,
+      });
+    }
+  };
+
+  const paidInstallments = data.installments.filter((installment) => installment.status === "paid");
+  const unpaidInstallments = data.installments.filter((installment) => installment.status !== "paid");
+  const remainingBalance = unpaidInstallments.reduce((sum, installment) => sum + installment.amount, 0);
+
+  doc.setFillColor(24, 54, 96);
+  doc.roundedRect(margin, y - 6, contentWidth, 24, 4, 4, "F");
+  addText("BUDOVERBILLS AGREEMENT RECORD", margin + 4, y + 2, {
+    size: 16,
+    style: "bold",
+    color: 255,
+  });
+  addText("Electronic loan summary with repayment trail", margin + 4, y + 8, {
+    size: 9,
+    color: 230,
+  });
+  addText(`Agreement ID: ${data.agreementId.slice(0, 8).toUpperCase()}`, margin + 4, y + 15, {
+    size: 8,
+    color: 215,
+  });
+  addText(`Generated: ${format(new Date(), "d MMM yyyy HH:mm")}`, margin, y + 15, {
+    align: "right",
+    size: 8,
+    color: 215,
+  });
+  y += 24;
+
+  drawSectionTitle("Snapshot", "Key commercial terms and repayment position");
+  const gap = 3;
+  const cardWidth = (contentWidth - gap * 3) / 4;
+  drawMetricCard(margin, cardWidth, "Principal", formatMoney(data.principalAmount), [40, 111, 180]);
+  drawMetricCard(margin + cardWidth + gap, cardWidth, "Total", formatMoney(data.totalAmount), [16, 185, 129]);
+  drawMetricCard(
+    margin + (cardWidth + gap) * 2,
+    cardWidth,
+    "Remaining",
+    formatMoney(remainingBalance),
+    [234, 88, 12],
+  );
+  drawMetricCard(
+    margin + (cardWidth + gap) * 3,
+    cardWidth,
+    "Installments",
+    `${paidInstallments.length}/${data.installments.length} paid`,
+    [97, 76, 175],
+  );
+  y += 24;
+
+  drawRule();
+  drawSectionTitle("Parties & Confirmation", "Digital evidence captured at agreement confirmation");
+
+  const partyCardWidth = (contentWidth - 4) / 2;
+  drawPartyCard(margin, partyCardWidth, "Lender", data.lenderName, [
+    `Confirmed at: ${formatDateTime(data.lenderConfirmedAt)}`,
+    `IP: ${data.lenderConfirmedIP ?? "-"}`,
+    `Device: ${truncateText(data.lenderConfirmedDevice) ?? "-"}`,
+  ]);
+  drawPartyCard(margin + partyCardWidth + 4, partyCardWidth, "Borrower", data.borrowerName, [
+    `Confirmed at: ${formatDateTime(data.borrowerConfirmedAt)}`,
+    `IP: ${data.borrowerConfirmedIP ?? "-"}`,
+    `Device: ${truncateText(data.borrowerConfirmedDevice) ?? "-"}`,
+  ]);
+  y += 39;
+
+  drawRule();
+  drawSectionTitle("Commercial Terms");
+  drawLabeledValue("Interest", `${data.interestRate}% (${INTEREST_TYPE_LABELS[data.interestType] ?? data.interestType})`);
+  drawLabeledValue("Payment frequency", FREQUENCY_LABELS[data.frequency] ?? data.frequency);
+  drawLabeledValue("First payment date", formatDateOnly(data.startDate));
+  drawLabeledValue("Scheduled installments", `${data.numInstallments}`);
+  if (data.description) {
+    drawLabeledValue("Description", data.description);
   }
 
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 7;
+  drawRule();
+  drawSectionTitle("Repayment Schedule", "Status per installment at the time of export");
+  drawTableHeader();
 
-  doc.setFontSize(8);
-  doc.setTextColor(100);
-  const disclaimer = [
-    "DISCLAIMER",
-    "This document is generated by Budoverbills (https://budoverbills.app) and serves as a record of",
-    "the electronic agreement between the parties. Budoverbills is a recording tool, not a contracting",
-    "party, and is not responsible for debt repayment. This document may be used as legal evidence",
-    "in accordance with the Electronic Transactions Act B.E. 2544 (2001) of Thailand.",
-    "",
-    `Document generated on: ${format(new Date(), "d MMMM yyyy HH:mm:ss OOOO")}`,
-  ];
+  data.installments.forEach((installment, index) => {
+    ensureSpace(8);
+    if (y > bottomLimit - 12) {
+      doc.addPage();
+      y = 18;
+      drawSectionTitle("Repayment Schedule (cont.)");
+      drawTableHeader();
+    }
 
-  disclaimer.forEach((line) => {
-    addText(line, margin, y, { fontSize: 7 });
-    y += 4;
+    if (index % 2 === 0) {
+      doc.setFillColor(247, 248, 250);
+      doc.rect(margin, y - 4.5, contentWidth, 7, "F");
+    }
+
+    addText(String(installment.installmentNumber), margin + 3, y, { size: 8 });
+    addText(formatDateOnly(installment.dueDate), margin + 14, y, { size: 8 });
+    addText(formatMoney(installment.amount), margin + 58, y, { size: 8 });
+    addText(STATUS_LABELS[installment.status] ?? installment.status, margin + 100, y, {
+      size: 8,
+      style: installment.status === "paid" ? "bold" : "normal",
+    });
+    addText(formatDateTime(installment.paidAt), margin + 136, y, { size: 8 });
+    y += 7;
   });
 
-  // Return as blob
+  drawRule();
+  drawSectionTitle("Legal Note");
+  const legalText =
+    "This PDF is generated by BudOverBills as an electronic record of the agreement and its payment schedule. " +
+    "The platform records the parties' activity trail but is not itself a contracting party or debt guarantor. " +
+    "Use this together with the in-app agreement page and payment evidence when reviewing repayment history.";
+  y += addWrappedText(legalText, margin, y, contentWidth, {
+    size: 8,
+    color: 95,
+    lineHeight: 4,
+  });
+  y += 4;
+  addText(`Exported on ${format(new Date(), "d MMMM yyyy HH:mm:ss")}`, margin, y, {
+    size: 7,
+    color: 120,
+  });
+
+  drawFooter();
+
   return doc.output("blob");
 }
 
