@@ -39,6 +39,7 @@ const Support = lazy(() => import("./pages/Support"));
 const Help = lazy(() => import("./pages/Help"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PersonalInfoOnboarding = lazy(() => import("./pages/PersonalInfoOnboarding"));
+const DebtConsolidation = lazy(() => import("./pages/DebtConsolidation"));
 
 function RouteFallback() {
   return (
@@ -97,6 +98,7 @@ const App = () => {
                           <Route path="/settings" element={<Settings />} />
                           <Route path="/badges" element={<Badges />} />
                           <Route path="/history" element={<History />} />
+                          <Route path="/history/debt-consolidation" element={<DebtConsolidation />} />
                           <Route path="/debt/:id" element={<DebtDetail />} />
                           <Route path="/pdpa-consent" element={<PDPAConsent />} />
                           <Route path="/personal-info" element={<PersonalInfoOnboarding />} />
