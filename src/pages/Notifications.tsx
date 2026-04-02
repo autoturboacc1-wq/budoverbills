@@ -60,7 +60,11 @@ const Notifications = () => {
     handleMarkAsRead(notification.id);
 
     // Navigate based on type
-    if (notification.related_type === "agreement" && notification.related_id) {
+    if (
+      (notification.related_type === "agreement" ||
+        notification.related_type === "debt_agreement") &&
+      notification.related_id
+    ) {
       navigate(`/debt/${notification.related_id}`);
     } else if (notification.related_type === "friend_request") {
       navigate("/friends");

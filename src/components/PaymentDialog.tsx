@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Upload, 
@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Installment, DebtAgreement } from "@/hooks/useDebtAgreements";
@@ -36,6 +37,7 @@ import {
   uploadPaymentSlip,
   validatePaymentSlipFile,
 } from "@/utils/paymentSlipStorage";
+import { PromptPayQR } from "@/components/PromptPayQR";
 
 interface PaymentDialogProps {
   open: boolean;
@@ -109,7 +111,7 @@ export function PaymentDialog({
     fetchUrl();
   }, [slipUrl, pendingVerification?.slip_url, installment?.payment_proof_url, open]);
 
-  const fetchVerificationHistory = async () => {
+  const fetchVerificationHistory = useCallback(async () => {
     if (!installment) return;
     
     setLoadingHistory(true);
@@ -138,7 +140,7 @@ export function PaymentDialog({
     } finally {
       setLoadingHistory(false);
     }
-  };
+  }, [installment, isLender]);
 
   const numericAmount = useMemo(() => {
     const num = parseFloat(paymentAmount);
@@ -410,6 +412,8 @@ export function PaymentDialog({
 
   const hasSlip = !!slipUrl || !!installment.payment_proof_url;
   const displaySlipUrl = slipUrl || pendingVerification?.slip_url || installment.payment_proof_url;
+  const showPromptPayQrTab =
+    !isLender && agreement.bank_name === "promptpay" && !!agreement.account_number;
   
   // Check if this is a fee installment (reschedule fee)
   const isFeeInstallment = installment.principal_portion === 0 && installment.amount > 0;
@@ -684,97 +688,195 @@ export function PaymentDialog({
             )}
           </AnimatePresence>
 
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
           {/* Upload Slip Section */}
-          <div>
-            <label className="text-sm font-medium text-foreground mb-2 block">
-              สลิปการโอนเงิน
-            </label>
-            
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
+          {showPromptPayQrTab ? (
+            <Tabs defaultValue="promptpay" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="promptpay">PromptPay QR</TabsTrigger>
+                <TabsTrigger value="slip">อัปโหลดสลิป</TabsTrigger>
+              </TabsList>
 
-            {!hasSlip && !isLender && !pendingVerification && (
-              <Button
-                variant="outline"
-                className="w-full h-24 border-dashed flex flex-col gap-2"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading || numericAmount <= 0}
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                    <span>กำลังอัปโหลด...</span>
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-6 h-6" />
-                    <span>เลือกไฟล์สลิป</span>
-                  </>
-                )}
-              </Button>
-            )}
+              <TabsContent value="promptpay" className="mt-0">
+                <PromptPayQR
+                  amount={numericAmount > 0 ? numericAmount : installment.amount}
+                  promptPayId={agreement.account_number ?? ""}
+                  recipientName={agreement.account_name}
+                />
+              </TabsContent>
 
-            {/* Slip Preview */}
-            {(hasSlip || displaySlipUrl) && (
-              <div className="relative">
-                {loadingSignedUrl ? (
-                  <div className="flex items-center justify-center h-24 bg-secondary/50 rounded-xl">
-                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                  </div>
-                ) : signedSlipUrl && !displaySlipUrl?.toLowerCase().endsWith('.pdf') ? (
-                  <div 
-                    className="relative rounded-xl overflow-hidden border border-border cursor-pointer"
-                    onClick={() => setShowPreview(true)}
-                  >
-                    <img
-                      src={signedSlipUrl}
-                      alt="Payment slip"
-                      className="w-full max-h-48 object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                      <Eye className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                ) : signedSlipUrl ? (
-                  <div className="flex items-center justify-center h-24 bg-secondary/50 rounded-xl">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(signedSlipUrl!, '_blank')}
-                    >
-                      เปิดดู PDF
-                    </Button>
-                  </div>
-                ) : displaySlipUrl ? (
-                  <div className="flex items-center justify-center h-24 bg-secondary/50 rounded-xl">
-                    <p className="text-sm text-muted-foreground">ไม่สามารถโหลดสลิปได้</p>
-                  </div>
-                ) : null}
+              <TabsContent value="slip" className="mt-0 space-y-3">
+                <label className="text-sm font-medium text-foreground block">
+                  สลิปการโอนเงิน
+                </label>
 
-                {/* Re-upload button (Borrower only, before confirmation) */}
-                {!isLender && !installment.confirmed_by_lender && !pendingVerification && (
+                {!hasSlip && !pendingVerification && (
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    className="absolute top-2 right-2"
+                    variant="outline"
+                    className="w-full h-24 border-dashed flex flex-col gap-2"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
+                    disabled={isUploading || numericAmount <= 0}
                   >
                     {isUploading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <>
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                        <span>กำลังอัปโหลด...</span>
+                      </>
                     ) : (
-                      <Camera className="w-4 h-4" />
+                      <>
+                        <Upload className="w-6 h-6" />
+                        <span>เลือกไฟล์สลิป</span>
+                      </>
                     )}
                   </Button>
                 )}
-              </div>
-            )}
-          </div>
+
+                {(hasSlip || displaySlipUrl) && (
+                  <div className="relative">
+                    {loadingSignedUrl ? (
+                      <div className="flex items-center justify-center h-24 bg-secondary/50 rounded-xl">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                      </div>
+                    ) : signedSlipUrl && !displaySlipUrl?.toLowerCase().endsWith('.pdf') ? (
+                      <div 
+                        className="relative rounded-xl overflow-hidden border border-border cursor-pointer"
+                        onClick={() => setShowPreview(true)}
+                      >
+                        <img
+                          src={signedSlipUrl}
+                          alt="Payment slip"
+                          className="w-full max-h-48 object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                          <Eye className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                    ) : signedSlipUrl ? (
+                      <div className="flex items-center justify-center h-24 bg-secondary/50 rounded-xl">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(signedSlipUrl!, '_blank')}
+                        >
+                          เปิดดู PDF
+                        </Button>
+                      </div>
+                    ) : displaySlipUrl ? (
+                      <div className="flex items-center justify-center h-24 bg-secondary/50 rounded-xl">
+                        <p className="text-sm text-muted-foreground">ไม่สามารถโหลดสลิปได้</p>
+                      </div>
+                    ) : null}
+
+                    {!installment.confirmed_by_lender && !pendingVerification && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                      >
+                        {isUploading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Camera className="w-4 h-4" />
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">
+                สลิปการโอนเงิน
+              </label>
+
+              {!hasSlip && !isLender && !pendingVerification && (
+                <Button
+                  variant="outline"
+                  className="w-full h-24 border-dashed flex flex-col gap-2"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading || numericAmount <= 0}
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                      <span>กำลังอัปโหลด...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-6 h-6" />
+                      <span>เลือกไฟล์สลิป</span>
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {/* Slip Preview */}
+              {(hasSlip || displaySlipUrl) && (
+                <div className="relative">
+                  {loadingSignedUrl ? (
+                    <div className="flex items-center justify-center h-24 bg-secondary/50 rounded-xl">
+                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                  ) : signedSlipUrl && !displaySlipUrl?.toLowerCase().endsWith('.pdf') ? (
+                    <div 
+                      className="relative rounded-xl overflow-hidden border border-border cursor-pointer"
+                      onClick={() => setShowPreview(true)}
+                    >
+                      <img
+                        src={signedSlipUrl}
+                        alt="Payment slip"
+                        className="w-full max-h-48 object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                        <Eye className="w-6 h-6 text-white" />
+                      </div>
+                    </div>
+                  ) : signedSlipUrl ? (
+                    <div className="flex items-center justify-center h-24 bg-secondary/50 rounded-xl">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(signedSlipUrl!, '_blank')}
+                      >
+                        เปิดดู PDF
+                      </Button>
+                    </div>
+                  ) : displaySlipUrl ? (
+                    <div className="flex items-center justify-center h-24 bg-secondary/50 rounded-xl">
+                      <p className="text-sm text-muted-foreground">ไม่สามารถโหลดสลิปได้</p>
+                    </div>
+                  ) : null}
+
+                  {/* Re-upload button (Borrower only, before confirmation) */}
+                  {!isLender && !installment.confirmed_by_lender && !pendingVerification && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Camera className="w-4 h-4" />
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Lender Verification Section */}
           {isLender && pendingVerification && (
