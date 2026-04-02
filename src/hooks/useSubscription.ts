@@ -124,6 +124,28 @@ export function useSubscription() {
     },
   });
 
+  // Use one purchased agreement credit
+  const useAgreementCreditMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase.rpc("use_agreement_credit", {
+        p_user_id: user.id,
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (success) => {
+      if (success) {
+        queryClient.invalidateQueries({ queryKey: ["agreement-quota"] });
+      }
+    },
+    onError: (error) => {
+      console.error("Error using agreement credit:", error);
+    },
+  });
+
   // Record agreement payment
   const recordPaymentMutation = useMutation({
     mutationFn: async (params: { agreementId: string; amount: number; currency?: string }) => {
@@ -176,6 +198,7 @@ export function useSubscription() {
     feeAmount,
     feeCurrency,
     useFreeSlot: useFreeSlotMutation.mutateAsync,
+    useAgreementCredit: useAgreementCreditMutation.mutateAsync,
     recordPayment: recordPaymentMutation.mutateAsync,
     
     // Legacy compatibility

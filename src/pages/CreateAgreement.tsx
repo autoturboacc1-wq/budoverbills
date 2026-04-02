@@ -54,7 +54,16 @@ export default function CreateAgreement() {
   const { user } = useAuth();
   const { createAgreement } = useDebtAgreements();
   const { friends } = useDbFriends();
-  const { quota, canCreateFree, freeRemaining, feeAmount, feeCurrency, useFreeSlot, refetch: refetchLimits } = useSubscription();
+  const {
+    quota,
+    freeRemaining,
+    feeAmount,
+    feeCurrency,
+    useFreeSlot: consumeFreeSlot,
+    useAgreementCredit: consumeAgreementCredit,
+    isLoading: subscriptionLoading,
+    refetch: refetchLimits,
+  } = useSubscription();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showFriendPicker, setShowFriendPicker] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
@@ -173,6 +182,23 @@ export default function CreateAgreement() {
       return;
     }
 
+    if (subscriptionLoading) {
+      toast.error("กำลังตรวจสอบสิทธิ์สร้างข้อตกลง กรุณาลองใหม่อีกครั้ง");
+      return;
+    }
+
+    if (!quota) {
+      toast.error("ไม่สามารถตรวจสอบสิทธิ์สร้างข้อตกลงได้ กรุณาลองใหม่อีกครั้ง");
+      return;
+    }
+
+    if ((quota.free_remaining ?? 0) <= 0 && (quota.credits ?? 0) <= 0) {
+      toast.error(
+        `สิทธิ์สร้างข้อตกลงไม่เพียงพอ (${feeAmount.toLocaleString()} ${feeCurrency}) กรุณาไปหน้าเลี้ยงกาแฟเพื่อซื้อสิทธิ์เพิ่ม`,
+      );
+      return;
+    }
+
     // VALIDATION: Lender cannot be the same as borrower
     if (selectedFriend.friend_user_id === user.id) {
       toast.error("ไม่สามารถสร้างข้อตกลงกับตัวเองได้");
@@ -188,6 +214,12 @@ export default function CreateAgreement() {
     setIsSubmitting(true);
     
     try {
+      const currentQuota = quota;
+      if (!currentQuota) {
+        toast.error("ไม่สามารถตรวจสอบสิทธิ์สร้างข้อตกลงได้ กรุณาลองใหม่อีกครั้ง");
+        return;
+      }
+
       const input: CreateAgreementInput = {
         borrower_id: selectedFriend?.friend_user_id || undefined,
         borrower_phone: formData.partnerPhone || undefined,
@@ -218,17 +250,20 @@ export default function CreateAgreement() {
       const result = await createAgreement(input);
       
       if (result) {
-        // Use free slot if available
-        if (canCreateFree) {
-          await useFreeSlot();
+        if ((currentQuota.free_remaining ?? 0) > 0) {
+          await consumeFreeSlot();
+        } else if ((currentQuota.credits ?? 0) > 0) {
+          await consumeAgreementCredit();
+        } else {
+          toast.error("สิทธิ์สร้างข้อตกลงไม่เพียงพอ");
+          return;
         }
-        // TODO: If not canCreateFree, handle payment flow
         
         refetchLimits(); // Refresh limits after creating
         toast.success("ส่งคำขอข้อตกลงสำเร็จ!", {
-          description: canCreateFree 
+          description: (currentQuota.free_remaining ?? 0) > 0
             ? `เหลือสิทธิ์ฟรีอีก ${freeRemaining - 1} ครั้ง` 
-            : "รอคู่สัญญายืนยัน",
+            : `ใช้สิทธิ์ที่ซื้อไว้แล้ว เหลืออีก ${Math.max(0, (currentQuota.credits ?? 0) - 1)} ครั้ง`,
         });
         navigate("/");
       }
@@ -380,7 +415,7 @@ export default function CreateAgreement() {
     if (formData.frequency === "weekly") {
       const targetDay = Number(formData.weeklyDay);
       const today = new Date();
-      let current = new Date(today);
+      const current = new Date(today);
       
       // Find the first occurrence of targetDay from today
       while (current.getDay() !== targetDay) {
@@ -594,7 +629,7 @@ export default function CreateAgreement() {
                       const targetDay = Number(formData.weeklyDay);
                       const today = new Date();
                       const dates: Date[] = [];
-                      let current = new Date(today);
+                      const current = new Date(today);
                       
                       // Find the first occurrence of targetDay from today
                       while (current.getDay() !== targetDay) {
@@ -1213,10 +1248,15 @@ export default function CreateAgreement() {
 
           {/* Submit */}
           <Button 
-            type="submit" 
-            className="w-full h-12 text-base rounded-xl"
-            disabled={isSubmitting || (!formData.partnerName && !formData.partnerPhone) || !formData.amount}
-          >
+          type="submit" 
+          className="w-full h-12 text-base rounded-xl"
+          disabled={
+            isSubmitting ||
+            subscriptionLoading ||
+            (!formData.partnerName && !formData.partnerPhone) ||
+            !formData.amount
+          }
+        >
             {isSubmitting ? "กำลังสร้าง..." : "ส่งคำขอข้อตกลง"}
           </Button>
           <p className="text-xs text-center text-muted-foreground">คู่สัญญาจะได้รับแจ้งเตือนเพื่อยืนยัน</p>
