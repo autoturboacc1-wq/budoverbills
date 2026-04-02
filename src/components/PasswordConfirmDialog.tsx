@@ -56,7 +56,7 @@ export function PasswordConfirmDialog({
           const hasOAuthIdentity = user.app_metadata?.provider === 'google' ||
             user.identities?.some(identity => identity.provider === 'google');
           
-          setIsOAuthUser(hasOAuthIdentity);
+          setIsOAuthUser(Boolean(hasOAuthIdentity));
           
           if (hasOAuthIdentity) {
             setStep('text-confirm');

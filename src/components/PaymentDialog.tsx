@@ -482,6 +482,7 @@ export function PaymentDialog({
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
+                        aria-label="คัดลอกเลขบัญชี"
                         onClick={() => {
                           navigator.clipboard.writeText(agreement.account_number || "");
                           toast.success("คัดลอกแล้ว");

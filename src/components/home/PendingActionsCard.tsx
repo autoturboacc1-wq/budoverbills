@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 interface PendingAction {
   id: string;
@@ -45,6 +46,7 @@ const actionIcons = {
 export const PendingActionsCard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   // Fetch pending actions from chat_rooms with has_pending_action = true
   const { data: pendingActions, isLoading } = useQuery({
@@ -76,8 +78,8 @@ export const PendingActionsCard = () => {
 
       // Get agreement details for each room
       const agreementIds = rooms
-        .filter(r => r.agreement_id)
-        .map(r => r.agreement_id);
+        .map((room) => room.agreement_id)
+        .filter((agreementId): agreementId is string => Boolean(agreementId));
 
       if (agreementIds.length === 0) return [];
 
@@ -108,9 +110,9 @@ export const PendingActionsCard = () => {
         .order("due_date", { ascending: true });
 
       // Get counterparty profiles
-      const counterpartyIds = agreements?.map(a => 
-        a.lender_id === user.id ? a.borrower_id : a.lender_id
-      ).filter(Boolean) as string[];
+      const counterpartyIds = (agreements ?? [])
+        .map((agreement) => (agreement.lender_id === user.id ? agreement.borrower_id : agreement.lender_id))
+        .filter((counterpartyId): counterpartyId is string => Boolean(counterpartyId));
 
       const { data: profiles } = await supabase
         .from("profiles")
@@ -170,8 +172,30 @@ export const PendingActionsCard = () => {
       });
     },
     enabled: !!user,
-    refetchInterval: 30000, // Refresh every 30 seconds
   });
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const invalidatePendingActions = () => {
+      void queryClient.invalidateQueries({ queryKey: ["pending-actions", user.id] });
+    };
+
+    const channel = supabase
+      .channel(`pending-actions-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_rooms" }, invalidatePendingActions)
+      .on("postgres_changes", { event: "*", schema: "public", table: "installments" }, invalidatePendingActions)
+      .on("postgres_changes", { event: "*", schema: "public", table: "debt_agreements" }, invalidatePendingActions)
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          invalidatePendingActions();
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, user?.id]);
 
   if (isLoading) {
     return (

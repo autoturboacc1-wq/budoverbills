@@ -125,6 +125,7 @@ export default function Settings() {
           <button
             onClick={() => navigate(-1)}
             className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
+            aria-label="ย้อนกลับ"
           >
             <ArrowLeft className="w-5 h-5 text-secondary-foreground" />
           </button>
