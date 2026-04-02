@@ -97,7 +97,10 @@ export function PWAInstallPrompt() {
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-foreground">ติดตั้งแอป BOB</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  เข้าถึงได้เร็วขึ้นจากหน้าจอหลัก ใช้งานได้แม้ไม่มีเน็ต
+                  เข้าถึงได้เร็วขึ้นจากหน้าจอหลัก และบางหน้าสามารถเปิดจากแคชได้หลังเคยใช้งาน
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground/80">
+                  ข้อมูลสดและการทำรายการส่วนใหญ่ยังต้องต่อเน็ต
                 </p>
 
                 {isIOS ? (

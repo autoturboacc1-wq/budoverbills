@@ -23,9 +23,8 @@ export function ThemePicker() {
       return;
     }
 
-    applyColorTheme(themeId);
-
     if (!user) {
+      applyColorTheme(themeId);
       return;
     }
 
@@ -36,10 +35,11 @@ export function ThemePicker() {
 
     if (error) {
       console.error("Error saving theme preference:", error);
-      toast.error("บันทึก theme ไม่สำเร็จ แต่ใช้งานในเครื่องนี้ต่อได้");
+      toast.error("บันทึก theme ไม่สำเร็จ");
       return;
     }
 
+    applyColorTheme(themeId);
     await refreshProfile();
   };
 

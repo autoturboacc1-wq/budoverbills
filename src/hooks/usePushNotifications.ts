@@ -26,28 +26,29 @@ export function usePushNotifications() {
     setIsSupported('serviceWorker' in navigator && 'PushManager' in window);
   }, []);
 
-  useEffect(() => {
-    if (isSupported && user) {
-      checkSubscription();
-    }
-  }, [isSupported, user]);
-
   const checkSubscription = useCallback(async () => {
     try {
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await (registration as any).pushManager.getSubscription();
+      const subscription = await registration.pushManager.getSubscription();
       setIsSubscribed(!!subscription);
     } catch (error) {
       console.error('Error checking subscription:', error);
     }
   }, []);
 
+  useEffect(() => {
+    if (isSupported && user) {
+      void checkSubscription();
+    }
+  }, [checkSubscription, isSupported, user]);
+
   const subscribe = useCallback(async () => {
     if (!user || !isSupported) return;
     
     setIsLoading(true);
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
+      const existingRegistration = await navigator.serviceWorker.getRegistration();
+      const registration = existingRegistration ?? await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
 
       const permission = await Notification.requestPermission();
@@ -56,7 +57,7 @@ export function usePushNotifications() {
         return;
       }
 
-      const subscription = await (registration as any).pushManager.subscribe({
+      const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
@@ -90,7 +91,7 @@ export function usePushNotifications() {
     setIsLoading(true);
     try {
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await (registration as any).pushManager.getSubscription();
+      const subscription = await registration.pushManager.getSubscription();
       
       if (subscription) {
         await subscription.unsubscribe();
