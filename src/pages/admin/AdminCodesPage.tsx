@@ -83,8 +83,8 @@ const AdminCodesPage = () => {
     mutationFn: async (codeId: string) => {
       const { data, error } = await supabase.rpc("update_admin_code", {
         p_code_id: codeId,
-        p_code_name: editCodeName || null,
-        p_expires_at: editExpiresAt ? new Date(editExpiresAt).toISOString() : null,
+        p_code_name: editCodeName || undefined,
+        p_expires_at: editExpiresAt ? new Date(editExpiresAt).toISOString() : undefined,
         p_clear_expiry: editClearExpiry,
       });
       

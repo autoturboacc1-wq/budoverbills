@@ -43,6 +43,11 @@ export default function Support() {
   };
 
   const handleSubmit = async () => {
+    if (!user?.id) {
+      toast.error("กรุณาเข้าสู่ระบบก่อน");
+      return;
+    }
+
     if (!selectedAmount || Number(selectedAmount) <= 0) {
       toast.error("กรุณาเลือกหรือใส่จำนวนเงิน");
       return;
@@ -53,11 +58,11 @@ export default function Support() {
     try {
       // Record tip in database
       const { error } = await supabase.rpc("record_tip", {
-        p_user_id: user?.id || null,
+        p_user_id: user.id,
         p_amount: Number(selectedAmount),
         p_currency: currency,
-        p_message: message || null,
-        p_display_name: displayName || null,
+        p_message: message || undefined,
+        p_display_name: displayName || undefined,
         p_is_anonymous: isAnonymous,
       });
 

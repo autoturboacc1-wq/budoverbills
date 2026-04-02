@@ -113,7 +113,7 @@ export default function Subscription() {
         p_amount: selectedCoffee.price,
         p_currency: "THB",
         p_message: tipMessage || `ซื้อ${selectedCoffee.name}`,
-        p_display_name: null,
+        p_display_name: undefined,
         p_is_anonymous: false,
       });
 

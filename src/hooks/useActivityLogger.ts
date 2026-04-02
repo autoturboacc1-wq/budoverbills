@@ -60,8 +60,9 @@ export function useActivityLogger() {
     userId
   }: LogActivityParams): Promise<string | null> => {
     try {
+      const rpcUserId = (userId || user?.id || null) as unknown as string;
       const { data, error } = await supabase.rpc('log_activity', {
-        p_user_id: userId || user?.id || null,
+        p_user_id: rpcUserId,
         p_action_type: actionType,
         p_action_category: actionCategory,
         p_metadata: metadata as Json,
@@ -188,8 +189,9 @@ export function useActivityLogger() {
 // Standalone function for logging without hook (e.g., in auth context)
 export async function logActivityDirect(params: LogActivityParams & { userId?: string }): Promise<string | null> {
   try {
+    const rpcUserId = (params.userId || null) as unknown as string;
     const { data, error } = await supabase.rpc('log_activity', {
-      p_user_id: params.userId || null,
+      p_user_id: rpcUserId,
       p_action_type: params.actionType,
       p_action_category: params.actionCategory || 'general',
       p_metadata: (params.metadata || {}) as Json,

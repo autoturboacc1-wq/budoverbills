@@ -113,7 +113,9 @@ export default function AdminHub() {
       // Get unique user IDs (actors and targets)
       const userIds = new Set<string>();
       logs?.forEach(log => {
-        userIds.add(log.user_id);
+        if (log.user_id) {
+          userIds.add(log.user_id);
+        }
         const metadata = log.metadata as { target_user_id?: string };
         if (metadata?.target_user_id) {
           userIds.add(metadata.target_user_id);
@@ -136,7 +138,7 @@ export default function AdminHub() {
         return {
           ...log,
           metadata,
-          actor_name: profileMap.get(log.user_id) || "Unknown",
+          actor_name: log.user_id ? profileMap.get(log.user_id) || "Unknown" : "Unknown",
           target_name: metadata?.target_user_id 
             ? profileMap.get(metadata.target_user_id) || "Unknown"
             : "Unknown"

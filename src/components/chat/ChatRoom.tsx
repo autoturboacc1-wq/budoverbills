@@ -74,8 +74,10 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
         .order("created_at", { ascending: true });
 
       if (isDirectChat) {
+        if (!thread.direct_chat_id) return;
         query = query.eq("direct_chat_id", thread.direct_chat_id);
       } else {
+        if (!thread.agreement_id) return;
         query = query.eq("agreement_id", thread.agreement_id);
       }
 
@@ -101,8 +103,10 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
         .is("read_at", null);
 
       if (isDirectChat) {
+        if (!thread.direct_chat_id) return;
         await updateQuery.eq("direct_chat_id", thread.direct_chat_id);
       } else {
+        if (!thread.agreement_id) return;
         await updateQuery.eq("agreement_id", thread.agreement_id);
       }
     } catch (error) {
@@ -130,6 +134,8 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
     const isDirectChat = thread.chat_type === "direct";
     const filterColumn = isDirectChat ? "direct_chat_id" : "agreement_id";
     const filterId = isDirectChat ? thread.direct_chat_id : thread.agreement_id;
+
+    if (!filterId) return;
 
     const channel = supabase
       .channel(`chat-${thread.chat_id}`)

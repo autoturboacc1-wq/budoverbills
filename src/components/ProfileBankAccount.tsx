@@ -80,6 +80,11 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
   }, [user?.id]);
 
   const handleSave = async () => {
+    if (!user?.id) {
+      toast.error("กรุณาเข้าสู่ระบบก่อน");
+      return;
+    }
+
     if (!formData.bankName || !formData.accountNumber || !formData.accountName) {
       toast.error("กรุณากรอกข้อมูลให้ครบ");
       return;
@@ -95,7 +100,7 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
           account_number: formData.accountNumber,
           account_name: formData.accountName,
         })
-        .eq("lender_id", user?.id);
+        .eq("lender_id", user.id);
 
       if (error) throw error;
 

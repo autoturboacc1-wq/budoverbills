@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import type { TablesInsert } from '@/integrations/supabase/types';
 
 export interface RescheduleRequest {
   id: string;
@@ -130,7 +131,7 @@ export function useRescheduleRequests() {
       
       if (error) throw error;
       setRequests((data || []) as RescheduleRequest[]);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching reschedule requests:', error);
     } finally {
       setLoading(false);
@@ -151,9 +152,7 @@ export function useRescheduleRequests() {
         input.customFeeRate
       );
       
-      const { error } = await supabase
-        .from('reschedule_requests')
-        .insert({
+      const requestInsert: TablesInsert<'reschedule_requests'> = {
           installment_id: input.installmentId,
           agreement_id: input.agreementId,
           requested_by: user.id,
@@ -162,20 +161,24 @@ export function useRescheduleRequests() {
           reschedule_fee: feeCalc.totalFee,
           fee_installments: 1, // Always 1 now - pay upfront
           fee_per_installment: feeCalc.totalFee,
-          original_fee_rate: feeCalc.baseFeeRate,
-          applied_fee_rate: feeCalc.appliedFeeRate,
+          original_fee_rate: feeCalc.baseFeeRate ?? 0,
+          applied_fee_rate: feeCalc.appliedFeeRate ?? 0,
           safeguard_applied: feeCalc.safeguardApplied,
           custom_fee_rate: input.customFeeRate || null,
           slip_url: input.slipUrl || null,
           submitted_amount: input.submittedAmount || null,
           status: 'pending'
-        });
+      };
+
+      const { error } = await supabase
+        .from('reschedule_requests')
+        .insert(requestInsert);
       
       if (error) throw error;
       
       toast.success('ส่งคำขอเลื่อนงวดเรียบร้อย');
       return true;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating reschedule request:', error);
       toast.error('ไม่สามารถส่งคำขอได้');
       return false;

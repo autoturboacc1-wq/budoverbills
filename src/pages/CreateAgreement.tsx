@@ -41,6 +41,14 @@ interface CalculationResult {
   schedule: { installment: number; principal: number; interest: number; total: number }[];
 }
 
+interface PaymentScheduleItem {
+  installment: number;
+  date: Date;
+  amount: number;
+  principal: number;
+  interest: number;
+}
+
 export default function CreateAgreement() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -362,11 +370,11 @@ export default function CreateAgreement() {
   };
 
   // Generate payment schedule dates
-  const paymentSchedule = useMemo(() => {
+  const paymentSchedule = useMemo<PaymentScheduleItem[]>(() => {
     if (!selectedCalculation) return [];
     
     const numInstallments = installmentCount;
-    const schedule = [];
+    const schedule: PaymentScheduleItem[] = [];
     
     // For weekly: calculate from selected day of week
     if (formData.frequency === "weekly") {

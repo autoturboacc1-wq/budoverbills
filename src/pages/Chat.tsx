@@ -328,7 +328,7 @@ const Chat = () => {
             threads={threads}
             loading={loading}
             onSelectThread={handleSelectThread}
-            selectedThreadId={selectedThread?.chat_id}
+            selectedThreadId={chatId}
           />
         ) : (
           <FriendsList onStartChat={(thread) => {
