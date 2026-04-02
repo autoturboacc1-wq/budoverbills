@@ -5,6 +5,7 @@ import { NotificationSheet } from "./NotificationSheet";
 import { SearchDialog } from "./SearchDialog";
 import { useNotifications } from "@/hooks/useNotifications";
 import { BobLogo } from "./BobLogo";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface HeaderProps {
   userName: string;
@@ -14,6 +15,15 @@ export function Header({ userName }: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const { unreadCount } = useNotifications();
+  const { user, profile } = useAuth();
+  const authMetadata = user?.user_metadata as Record<string, unknown> | undefined;
+  const authAvatarUrl =
+    typeof authMetadata?.avatar_url === "string" && authMetadata.avatar_url.trim()
+      ? authMetadata.avatar_url
+      : typeof authMetadata?.picture === "string" && authMetadata.picture.trim()
+        ? authMetadata.picture
+        : null;
+  const displayAvatarUrl = profile?.avatar_url || authAvatarUrl;
 
   return (
     <>
@@ -24,7 +34,16 @@ export function Header({ userName }: HeaderProps) {
         className="flex items-center justify-between py-4"
       >
         <div className="flex items-center gap-3">
-          <BobLogo size="sm" />
+          {displayAvatarUrl ? (
+            <img
+              src={displayAvatarUrl}
+              alt={userName}
+              className="w-10 h-10 rounded-full object-cover bg-secondary"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <BobLogo size="sm" />
+          )}
           <div>
             <p className="text-sm text-muted-foreground">สวัสดี,</p>
             <h1 className="text-xl font-heading font-semibold text-foreground">{userName}</h1>
