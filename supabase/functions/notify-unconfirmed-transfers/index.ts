@@ -2,8 +2,23 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-secret',
 };
+
+function getInternalSecret(req: Request): string | null {
+  const headerSecret = req.headers.get('x-internal-secret');
+  if (headerSecret) {
+    return headerSecret;
+  }
+
+  const authorization = req.headers.get('authorization');
+  if (!authorization) {
+    return null;
+  }
+
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] ?? null;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -11,6 +26,28 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const internalSecret = Deno.env.get('INTERNAL_FUNCTION_SECRET');
+    if (!internalSecret) {
+      return new Response(
+        JSON.stringify({ error: 'Internal function secret is not configured' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
+
+    const requestSecret = getInternalSecret(req);
+    if (!requestSecret || requestSecret !== internalSecret) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     

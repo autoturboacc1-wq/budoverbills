@@ -1,4 +1,7 @@
 project_id = "taihdoldpcbovubzjjah"
 
 [functions.notify-unconfirmed-transfers]
+# Internal cron/invocation only.
+# Caller must send `Authorization: Bearer $INTERNAL_FUNCTION_SECRET`
+# or `x-internal-secret: $INTERNAL_FUNCTION_SECRET`.
 verify_jwt = false

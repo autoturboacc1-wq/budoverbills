@@ -16,6 +16,16 @@ interface WebPushPayload {
   data?: Record<string, unknown>;
 }
 
+function getBearerToken(req: Request): string | null {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return null;
+  }
+
+  const token = authHeader.slice("Bearer ".length).trim();
+  return token.length > 0 ? token : null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -32,6 +42,24 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const bearerToken = getBearerToken(req);
+
+    if (!bearerToken) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(bearerToken);
+    const callerId = userData.user?.id ?? null;
+
+    if (userError || !callerId) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const body = await req.json().catch(() => null);
 
@@ -75,6 +103,59 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (typeof agreementId === "string") {
+      const { data: agreement, error: agreementError } = await supabase
+        .from("debt_agreements")
+        .select("lender_id, borrower_id")
+        .eq("id", agreementId)
+        .maybeSingle();
+
+      if (agreementError) {
+        console.error("Error fetching agreement for push auth:", agreementError);
+        throw agreementError;
+      }
+
+      if (!agreement) {
+        return new Response(JSON.stringify({ error: "Agreement not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const participantIds = [agreement.lender_id, agreement.borrower_id].filter(
+        (id): id is string => typeof id === "string"
+      );
+
+      if (!participantIds.includes(callerId) || !participantIds.includes(String(recipientId))) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      const participantPair = [callerId, String(recipientId)].sort();
+      const [user1Id, user2Id] = participantPair;
+
+      const { data: directChat, error: directChatError } = await supabase
+        .from("direct_chats")
+        .select("id")
+        .eq("user1_id", user1Id)
+        .eq("user2_id", user2Id)
+        .maybeSingle();
+
+      if (directChatError) {
+        console.error("Error fetching direct chat for push auth:", directChatError);
+        throw directChatError;
+      }
+
+      if (!directChat) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const { data: subscriptions, error: subError } = await supabase
