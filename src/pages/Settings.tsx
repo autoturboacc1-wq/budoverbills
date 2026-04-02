@@ -36,6 +36,7 @@ import {
 import { useSubscription } from "@/hooks/useSubscription";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { ThemePicker } from "@/components/ThemePicker";
 
 interface SettingsState {
   notifications: {
@@ -281,6 +282,10 @@ export default function Settings() {
                 checked={isDarkMode}
                 onCheckedChange={toggleDarkMode}
               />
+            </div>
+
+            <div className="p-4">
+              <ThemePicker />
             </div>
           </div>
         </motion.section>

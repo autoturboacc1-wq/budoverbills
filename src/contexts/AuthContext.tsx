@@ -12,6 +12,7 @@ interface Profile {
   pdpa_accepted_at: string | null;
   first_name: string | null;
   last_name: string | null;
+  theme_preference: string | null;
 }
 
 interface AuthContextType {
