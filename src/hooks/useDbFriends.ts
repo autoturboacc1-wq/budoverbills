@@ -35,7 +35,7 @@ export function useDbFriends() {
 
       if (error) throw error;
       setFriends(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching friends:', error);
     } finally {
       setIsLoading(false);
@@ -74,7 +74,7 @@ export function useDbFriends() {
       await fetchFriends();
       toast.success('เพิ่มเพื่อนเรียบร้อย');
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding friend:', error);
       toast.error('ไม่สามารถเพิ่มเพื่อนได้');
       return null;
@@ -92,7 +92,7 @@ export function useDbFriends() {
       await fetchFriends();
       toast.success('ลบเพื่อนเรียบร้อย');
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error removing friend:', error);
       toast.error('ไม่สามารถลบเพื่อนได้');
       return false;
@@ -113,7 +113,7 @@ export function useDbFriends() {
       if (error) throw error;
       await fetchFriends();
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating friend:', error);
       toast.error('ไม่สามารถอัปเดตได้');
       return false;

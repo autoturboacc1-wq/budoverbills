@@ -10,10 +10,25 @@ export interface SearchResult {
   status?: string;
 }
 
+interface AgreementSearchRow {
+  id: string;
+  borrower_name: string | null;
+  principal_amount: number;
+  total_amount: number;
+  status: string;
+}
+
+interface FriendSearchRow {
+  id: string;
+  friend_name: string | null;
+  nickname: string | null;
+  friend_phone: string | null;
+}
+
 export function useSearch(query: string) {
   const { user } = useAuth();
-  const [agreements, setAgreements] = useState<any[]>([]);
-  const [friends, setFriends] = useState<any[]>([]);
+  const [agreements, setAgreements] = useState<AgreementSearchRow[]>([]);
+  const [friends, setFriends] = useState<FriendSearchRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Fetch data once
@@ -35,8 +50,8 @@ export function useSearch(query: string) {
             .eq("user_id", user.id),
         ]);
 
-        if (agreementsRes.data) setAgreements(agreementsRes.data);
-        if (friendsRes.data) setFriends(friendsRes.data);
+        if (agreementsRes.data) setAgreements(agreementsRes.data as AgreementSearchRow[]);
+        if (friendsRes.data) setFriends(friendsRes.data as FriendSearchRow[]);
       } catch (error) {
         console.error("Error fetching search data:", error);
       } finally {
@@ -58,7 +73,6 @@ export function useSearch(query: string) {
     agreements.forEach((agreement) => {
       const name = agreement.borrower_name || "";
       if (name.toLowerCase().includes(normalizedQuery)) {
-        const remaining = agreement.total_amount - agreement.principal_amount * 0.5; // Simplified
         searchResults.push({
           id: agreement.id,
           type: "agreement",

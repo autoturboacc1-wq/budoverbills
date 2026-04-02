@@ -60,6 +60,13 @@ export function useRescheduleRequests() {
   const { user } = useAuth();
   const [requests, setRequests] = useState<RescheduleRequest[]>([]);
   const [loading, setLoading] = useState(false);
+  const getErrorMessage = useCallback((error: unknown, fallback: string) => {
+    if (error instanceof Error) {
+      return error.message || fallback;
+    }
+
+    return fallback;
+  }, []);
 
   // Calculate fee based on interest type
   // - none: ใช้ % ของค่างวด (customFeeRate 1-20%)
@@ -269,12 +276,12 @@ export function useRescheduleRequests() {
       const shiftedCount = (installmentsToShift || []).length;
       toast.success(`อนุมัติเรียบร้อย! เลื่อนงวดที่ขอและงวดถัดไปอีก ${shiftedCount - 1} งวด`);
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error approving request:', error);
-      toast.error(error.message || 'ไม่สามารถอนุมัติได้');
+      toast.error(getErrorMessage(error, 'ไม่สามารถอนุมัติได้'));
       return false;
     }
-  }, [user]);
+  }, [user, getErrorMessage]);
 
   // Reject a request (lender only)
   const rejectRequest = useCallback(async (requestId: string, reason?: string): Promise<boolean> => {
@@ -295,7 +302,7 @@ export function useRescheduleRequests() {
       
       toast.success('ปฏิเสธคำขอเลื่อนงวดเรียบร้อย');
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error rejecting request:', error);
       toast.error('ไม่สามารถปฏิเสธได้');
       return false;
@@ -318,7 +325,7 @@ export function useRescheduleRequests() {
       
       toast.success('ยกเลิกคำขอเรียบร้อย');
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error canceling request:', error);
       toast.error('ไม่สามารถยกเลิกได้');
       return false;

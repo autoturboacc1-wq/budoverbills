@@ -21,6 +21,10 @@ export interface UserPoints {
   daily_earned_today: number;
 }
 
+interface UserPointsRow extends UserPoints {
+  last_daily_reset: string | null;
+}
+
 export interface PointTransaction {
   id: string;
   points: number;
@@ -46,6 +50,67 @@ export function useUserPoints() {
   const [badges, setBadges] = useState<EngagementBadge[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const checkBadgeProgress = useCallback(async (actionType: keyof typeof POINT_VALUES) => {
+    if (!user) return;
+
+    const badgeTypeMap: Record<string, string> = {
+      read_article: "avid_reader",
+      save_article: "collector",
+      on_time_payment: "on_time_payer",
+      quality_comment: "contributor",
+    };
+
+    const badgeType = badgeTypeMap[actionType];
+    if (!badgeType) return;
+
+    // Count actions of this type
+    const { count } = await supabase
+      .from("point_transactions")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("action_type", actionType);
+
+    if (!count) return;
+
+    const thresholds = ENGAGEMENT_BADGES[badgeType as keyof typeof ENGAGEMENT_BADGES]?.thresholds || [];
+    let newTier = 0;
+    for (let i = 0; i < thresholds.length; i++) {
+      if (count >= thresholds[i]) {
+        newTier = i + 1;
+      }
+    }
+
+    if (newTier === 0) return;
+
+    // Check current badge tier
+    const existingBadge = badges.find(b => b.badge_type === badgeType);
+    if (existingBadge && existingBadge.badge_tier >= newTier) return;
+
+    // Upsert badge
+    const { data: newBadge } = await supabase
+      .from("engagement_badges")
+      .upsert({
+        user_id: user.id,
+        badge_type: badgeType,
+        badge_tier: newTier,
+      }, { onConflict: "user_id,badge_type" })
+      .select()
+      .single();
+
+    if (newBadge) {
+      setBadges(prev => {
+        const filtered = prev.filter(b => b.badge_type !== badgeType);
+        return [...filtered, newBadge];
+      });
+
+      const badgeInfo = ENGAGEMENT_BADGES[badgeType as keyof typeof ENGAGEMENT_BADGES];
+      const tierName = ["", "🥉 Bronze", "🥈 Silver", "🥇 Gold"][newTier];
+      toast.success(`🎉 ได้รับ Badge ใหม่!`, {
+        description: `${badgeInfo.icon} ${badgeInfo.label} ${tierName}`,
+      });
+    }
+  }, [user, badges]);
+
   const fetchPoints = useCallback(async () => {
     if (!user) {
       setPoints(null);
@@ -55,11 +120,14 @@ export function useUserPoints() {
 
     try {
       // Fetch or create user points
-      let { data, error } = await supabase
+      let data: UserPointsRow | null = null;
+      const { data: existingData, error } = await supabase
         .from("user_points")
         .select("*")
         .eq("user_id", user.id)
         .single();
+
+      data = existingData as UserPointsRow | null;
 
       if (error && error.code === "PGRST116") {
         // No record found, create one
@@ -204,68 +272,7 @@ export function useUserPoints() {
       console.error("Error earning points:", error);
       return false;
     }
-  }, [user, points, canEarnToday]);
-
-  const checkBadgeProgress = useCallback(async (actionType: keyof typeof POINT_VALUES) => {
-    if (!user) return;
-
-    const badgeTypeMap: Record<string, string> = {
-      read_article: "avid_reader",
-      save_article: "collector",
-      on_time_payment: "on_time_payer",
-      quality_comment: "contributor",
-    };
-
-    const badgeType = badgeTypeMap[actionType];
-    if (!badgeType) return;
-
-    // Count actions of this type
-    const { count } = await supabase
-      .from("point_transactions")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("action_type", actionType);
-
-    if (!count) return;
-
-    const thresholds = ENGAGEMENT_BADGES[badgeType as keyof typeof ENGAGEMENT_BADGES]?.thresholds || [];
-    let newTier = 0;
-    for (let i = 0; i < thresholds.length; i++) {
-      if (count >= thresholds[i]) {
-        newTier = i + 1;
-      }
-    }
-
-    if (newTier === 0) return;
-
-    // Check current badge tier
-    const existingBadge = badges.find(b => b.badge_type === badgeType);
-    if (existingBadge && existingBadge.badge_tier >= newTier) return;
-
-    // Upsert badge
-    const { data: newBadge } = await supabase
-      .from("engagement_badges")
-      .upsert({
-        user_id: user.id,
-        badge_type: badgeType,
-        badge_tier: newTier,
-      }, { onConflict: "user_id,badge_type" })
-      .select()
-      .single();
-
-    if (newBadge) {
-      setBadges(prev => {
-        const filtered = prev.filter(b => b.badge_type !== badgeType);
-        return [...filtered, newBadge];
-      });
-
-      const badgeInfo = ENGAGEMENT_BADGES[badgeType as keyof typeof ENGAGEMENT_BADGES];
-      const tierName = ["", "🥉 Bronze", "🥈 Silver", "🥇 Gold"][newTier];
-      toast.success(`🎉 ได้รับ Badge ใหม่!`, {
-        description: `${badgeInfo.icon} ${badgeInfo.label} ${tierName}`,
-      });
-    }
-  }, [user, badges]);
+  }, [user, points, canEarnToday, checkBadgeProgress]);
 
   const redeemPoints = useCallback(async (
     pointsToSpend: number,

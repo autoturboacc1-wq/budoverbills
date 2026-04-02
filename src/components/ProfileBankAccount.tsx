@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef } from "react";
+import { useState, useEffect, useCallback, forwardRef } from "react";
 import { Building, Pencil, Check, X, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,17 +40,10 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
   });
 
   // Fetch bank account from the most recent agreement where user is lender
-  const fetchBankAccount = async () => {
+  const fetchBankAccount = useCallback(async () => {
     if (!user?.id) return;
     
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-
-      // For now, we'll store in local state or get from most recent agreement
       const { data: agreement, error: agrError } = await supabase
         .from("debt_agreements")
         .select("bank_name, account_number, account_name")
@@ -59,6 +52,10 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+
+      if (agrError) {
+        throw agrError;
+      }
 
       if (agreement) {
         setBankData(agreement);
@@ -73,11 +70,11 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     fetchBankAccount();
-  }, [user?.id]);
+  }, [fetchBankAccount]);
 
   const handleSave = async () => {
     if (!user?.id) {

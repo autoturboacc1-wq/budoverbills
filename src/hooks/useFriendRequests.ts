@@ -85,7 +85,7 @@ export function useFriendRequests() {
 
       setIncomingRequests(incomingWithProfiles);
       setOutgoingRequests(outgoingWithProfiles);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching friend requests:', error);
     } finally {
       setIsLoading(false);
@@ -186,9 +186,9 @@ export function useFriendRequests() {
       await fetchRequests();
       toast.success('ส่งคำขอเป็นเพื่อนแล้ว');
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error sending friend request:', error);
-      if (error.code === '23505') {
+      if (error instanceof Error && (error as { code?: string }).code === '23505') {
         toast.error('มีคำขอเป็นเพื่อนอยู่แล้ว');
       } else {
         toast.error('ไม่สามารถส่งคำขอได้');
@@ -253,7 +253,7 @@ export function useFriendRequests() {
       await fetchRequests();
       toast.success('ยอมรับคำขอเป็นเพื่อนแล้ว');
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error accepting friend request:', error);
       toast.error('ไม่สามารถยอมรับคำขอได้');
       return false;
@@ -272,7 +272,7 @@ export function useFriendRequests() {
       await fetchRequests();
       toast.success('ปฏิเสธคำขอแล้ว');
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error rejecting friend request:', error);
       toast.error('ไม่สามารถปฏิเสธคำขอได้');
       return false;
@@ -291,7 +291,7 @@ export function useFriendRequests() {
       await fetchRequests();
       toast.success('ยกเลิกคำขอแล้ว');
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error canceling friend request:', error);
       toast.error('ไม่สามารถยกเลิกคำขอได้');
       return false;

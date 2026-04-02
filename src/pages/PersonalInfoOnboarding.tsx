@@ -70,7 +70,7 @@ export default function PersonalInfoOnboarding() {
       
       // Continue to PDPA consent or home
       navigate("/pdpa-consent", { replace: true });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error saving personal info:", error);
       toast.error("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
     } finally {

@@ -111,7 +111,7 @@ export function AddFriendSection() {
       // Send friend request instead of adding directly
       await sendRequest(data.user_id);
       setShowScanner(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("QR scan add friend error:", error);
       toast.error("เกิดข้อผิดพลาด");
     }
@@ -156,7 +156,7 @@ export function AddFriendSection() {
       }
 
       setFoundUser(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Search error:", error);
       toast.error("เกิดข้อผิดพลาดในการค้นหา");
     } finally {
@@ -174,7 +174,7 @@ export function AddFriendSection() {
         setSearchCode("");
         setFoundUser(null);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Send request error:", error);
       toast.error("เกิดข้อผิดพลาดในการส่งคำขอ");
     }

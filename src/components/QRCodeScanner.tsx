@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import {
   Dialog,
@@ -21,7 +21,20 @@ export function QRCodeScanner({ open, onClose, onScan }: QRCodeScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const mountId = "qr-reader";
 
-  const startScanner = async () => {
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+      } catch (err) {
+        console.error("Error stopping scanner:", err);
+      }
+      scannerRef.current = null;
+    }
+    setIsScanning(false);
+  }, []);
+
+  const startScanner = useCallback(async () => {
     setError(null);
     setIsScanning(true);
 
@@ -44,29 +57,17 @@ export function QRCodeScanner({ open, onClose, onScan }: QRCodeScannerProps) {
           // Ignore scan errors (no QR found)
         }
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("QR Scanner error:", err);
+      const errorMessage = err instanceof Error ? err.message : "";
       setError(
-        err.message?.includes("Permission") 
+        errorMessage.includes("Permission")
           ? "ไม่ได้รับอนุญาตให้ใช้กล้อง กรุณาอนุญาตการเข้าถึงกล้องในเบราว์เซอร์" 
           : "ไม่สามารถเปิดกล้องได้ กรุณาลองใหม่อีกครั้ง"
       );
       setIsScanning(false);
     }
-  };
-
-  const stopScanner = async () => {
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current.clear();
-      } catch (err) {
-        console.error("Error stopping scanner:", err);
-      }
-      scannerRef.current = null;
-    }
-    setIsScanning(false);
-  };
+  }, [onClose, onScan, stopScanner]);
 
   useEffect(() => {
     if (open) {
@@ -78,7 +79,7 @@ export function QRCodeScanner({ open, onClose, onScan }: QRCodeScannerProps) {
     } else {
       stopScanner();
     }
-  }, [open]);
+  }, [open, startScanner, stopScanner]);
 
   const handleClose = () => {
     stopScanner();

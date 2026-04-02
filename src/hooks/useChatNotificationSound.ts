@@ -2,7 +2,15 @@ import { useEffect, useRef, useCallback } from "react";
 
 // Create a simple notification sound using Web Audio API
 const createNotificationSound = () => {
-  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const audioContextCtor =
+    window.AudioContext ??
+    (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+  if (!audioContextCtor) {
+    throw new Error("Web Audio API is not supported");
+  }
+
+  const audioContext = new audioContextCtor();
   
   return () => {
     // Resume audio context if suspended (mobile browsers)
