@@ -613,6 +613,8 @@ export type Database = {
           read_at: string | null
           reply_to_id: string | null
           sender_id: string
+          voice_duration: number | null
+          voice_url: string | null
         }
         Insert: {
           agreement_id?: string | null
@@ -626,6 +628,8 @@ export type Database = {
           read_at?: string | null
           reply_to_id?: string | null
           sender_id: string
+          voice_duration?: number | null
+          voice_url?: string | null
         }
         Update: {
           agreement_id?: string | null
@@ -639,6 +643,8 @@ export type Database = {
           read_at?: string | null
           reply_to_id?: string | null
           sender_id?: string
+          voice_duration?: number | null
+          voice_url?: string | null
         }
         Relationships: [
           {
@@ -788,13 +794,13 @@ export type Database = {
           last_name: string | null
           pdpa_accepted_at: string | null
           phone: string | null
+          theme_preference: string
           updated_at: string
           user_code: string | null
           user_id: string
         }
         Insert: {
           agreement_credits?: number
-          theme_preference: string
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -804,13 +810,13 @@ export type Database = {
           last_name?: string | null
           pdpa_accepted_at?: string | null
           phone?: string | null
+          theme_preference?: string
           updated_at?: string
           user_code?: string | null
           user_id: string
         }
         Update: {
           agreement_credits?: number
-          theme_preference?: string
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -820,13 +826,13 @@ export type Database = {
           last_name?: string | null
           pdpa_accepted_at?: string | null
           phone?: string | null
+          theme_preference?: string
           updated_at?: string
           user_code?: string | null
           user_id?: string
         }
         Relationships: []
       }
-          theme_preference?: string
       push_subscriptions: {
         Row: {
           auth: string
@@ -1533,9 +1539,3 @@ export const Constants = {
     },
   },
 } as const
-          voice_duration: number | null
-          voice_url: string | null
-          voice_duration?: number | null
-          voice_url?: string | null
-          voice_duration?: number | null
-          voice_url?: string | null
