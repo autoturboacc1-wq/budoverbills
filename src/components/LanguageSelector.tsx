@@ -1,11 +1,12 @@
 import { Globe } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLanguage, languages, Language } from "@/contexts/LanguageContext";
 
 export function LanguageSelector() {
   const { language, setLanguage, t, currentLanguage } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const listboxId = "language-selector-options";
 
   const handleSelect = (code: Language) => {
@@ -13,15 +14,39 @@ export function LanguageSelector() {
     setIsOpen(false);
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={listboxId}
-        aria-label={t("profile.language")}
+        aria-label={`${t("profile.language")}: ${currentLanguage.nativeName}`}
         className="w-full flex items-center justify-between p-4 hover:bg-secondary/50 transition-colors"
       >
         <div className="flex items-center gap-3">
@@ -53,6 +78,7 @@ export function LanguageSelector() {
                   onClick={() => handleSelect(lang.code)}
                   role="option"
                   aria-selected={language === lang.code}
+                  aria-label={`${lang.nativeName} ${lang.name}`}
                   className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
                     language === lang.code
                       ? 'bg-primary/10 text-primary'

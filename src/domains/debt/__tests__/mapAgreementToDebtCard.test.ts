@@ -44,6 +44,23 @@ describe('mapAgreementToDebtCard', () => {
     expect(mapToCompletedAgreements([active, completed], 'lender-id')).toHaveLength(1);
   });
 
+  it('maps partially paid agreements with remaining unpaid balance', () => {
+    const agreement = createAgreement({
+      installments: [
+        createInstallment({ id: 'paid', amount: 1200, status: 'paid', paid_at: '2026-04-10T00:00:00.000Z' }),
+        createInstallment({ id: 'pending', due_date: '2026-04-20', amount: 900, status: 'pending' }),
+        createInstallment({ id: 'rescheduled', due_date: '2026-05-20', amount: 800, status: 'rescheduled' }),
+      ],
+    });
+
+    const card = mapAgreementToDebtCard(agreement, 'lender-id');
+
+    expect(card.remainingAmount).toBe(900);
+    expect(card.amount).toBe(900);
+    expect(card.installmentProgress).toEqual({ current: 1, total: 3 });
+    expect(card.nextPaymentDate).not.toBe('-');
+  });
+
   it('maps upcoming installments sorted by urgency', () => {
     const agreement = createAgreement({
       installments: [

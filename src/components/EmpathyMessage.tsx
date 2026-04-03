@@ -1,18 +1,13 @@
 import { Heart, Sparkles, Clock, HandHeart, PartyPopper, MessageCircleHeart } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Status } from "@/components/ui/StatusBadge";
 
 interface EmpathyMessageProps {
   status: Status;
-  role?: "lender" | "borrower";
   className?: string;
 }
 
-const empathyConfig: Record<Status, { 
-  message: string; 
-  subMessage?: string;
-  icon: React.ElementType; 
-  colorClass: string;
-}> = {
+const empathyConfig = {
   paid: {
     message: "ยอดเยี่ยมมาก! ขอบคุณนะ 🎉",
     subMessage: "มิตรภาพดีๆ เริ่มจากความไว้วางใจ",
@@ -85,9 +80,14 @@ const empathyConfig: Record<Status, {
     icon: HandHeart,
     colorClass: "text-muted-foreground",
   },
-};
+} satisfies Record<Status, {
+  message: string; 
+  subMessage?: string;
+  icon: React.ElementType; 
+  colorClass: string;
+}>;
 
-export function EmpathyMessage({ status, role, className }: EmpathyMessageProps) {
+export function EmpathyMessage({ status, className }: EmpathyMessageProps) {
   const config = empathyConfig[status];
   
   if (!config) return null;
@@ -95,7 +95,7 @@ export function EmpathyMessage({ status, role, className }: EmpathyMessageProps)
   const Icon = config.icon;
 
   return (
-    <div className={`flex items-start gap-3 p-3 rounded-xl bg-secondary/50 ${className}`}>
+    <div className={cn("flex items-start gap-3 rounded-xl bg-secondary/50 p-3", className)}>
       <div className={`w-8 h-8 rounded-full bg-background flex items-center justify-center flex-shrink-0 ${config.colorClass}`}>
         <Icon className="w-4 h-4" />
       </div>

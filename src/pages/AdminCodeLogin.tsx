@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
-import { clearAdminSession, issueAdminCodeSession, setAdminSession } from "@/utils/adminSession";
+import { clearAdminSession, getValidatedAdminSession, issueAdminCodeSession, setAdminSession } from "@/utils/adminSession";
 
 const AdminCodeLogin = () => {
   const navigate = useNavigate();
@@ -24,10 +24,35 @@ const AdminCodeLogin = () => {
       toast.error("กรุณาเข้าสู่ระบบก่อน");
       navigate("/auth", { state: { returnTo: "/admin/code" } });
     }
+
+    let cancelled = false;
+
+    const checkExistingSession = async () => {
+      if (!user || authLoading || roleLoading || !hasAdminAccess) {
+        return;
+      }
+
+      const validatedSession = await getValidatedAdminSession(user.id);
+      if (cancelled) {
+        return;
+      }
+
+      if (validatedSession) {
+        navigate("/admin", { replace: true });
+      }
+    };
+
     if (!authLoading && !roleLoading && user && !hasAdminAccess) {
-      toast.error("ไม่มีสิทธิ์เข้าถึง");
+      toast.error("ไม่มีสิทธิ์เข้าถึงหน้านี้");
       navigate("/profile", { replace: true });
+      return;
     }
+
+    void checkExistingSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user, authLoading, roleLoading, hasAdminAccess, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,7 +69,7 @@ const AdminCodeLogin = () => {
     }
 
     if (!hasAdminAccess) {
-      toast.error("ไม่มีสิทธิ์เข้าถึง");
+      toast.error("ไม่มีสิทธิ์เข้าถึงหน้านี้");
       navigate("/profile", { replace: true });
       return;
     }
@@ -56,21 +81,23 @@ const AdminCodeLogin = () => {
 
       if (result.success) {
         if (result.code_role !== "admin" && result.code_role !== "moderator") {
-          throw new Error("รหัสนี้ไม่มีสิทธิ์เข้าถึงแอดมิน");
+          throw new Error("รหัสนี้ไม่มีสิทธิ์เข้าถึงหน้าผู้ดูแลระบบ");
         }
         if (!result.session_token) {
-          throw new Error("ไม่สามารถสร้าง admin session ได้");
+          throw new Error("ไม่สามารถสร้างเซสชันผู้ดูแลระบบได้");
         }
 
         // Store verification in session
         clearAdminSession();
         setAdminSession({
-          userId: user.id,
           sessionToken: result.session_token,
-          codeVerified: true,
-          codeName: result.code_name || "",
-          codeRole: result.code_role || "moderator",
         });
+
+        const validatedSession = await getValidatedAdminSession(user.id);
+        if (!validatedSession) {
+          clearAdminSession();
+          throw new Error("ไม่สามารถยืนยันเซสชันผู้ดูแลระบบได้");
+        }
         
         toast.success(`ยินดีต้อนรับ ${result.code_name}`);
         
@@ -90,7 +117,7 @@ const AdminCodeLogin = () => {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary" aria-hidden="true" />
       </div>
     );
   }
@@ -98,7 +125,7 @@ const AdminCodeLogin = () => {
   if (roleLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary" aria-hidden="true" />
       </div>
     );
   }
@@ -123,7 +150,7 @@ const AdminCodeLogin = () => {
         <Card className="border-primary/20 shadow-xl">
           <CardHeader className="text-center space-y-4">
             <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Shield className="w-8 h-8 text-primary" />
+              <Shield className="w-8 h-8 text-primary" aria-hidden="true" />
             </div>
             <div>
               <CardTitle className="text-2xl">ปลดล็อกสิทธิ์แอดมิน</CardTitle>
@@ -143,7 +170,7 @@ const AdminCodeLogin = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" aria-hidden="true" />
                   <Input
                     type="password"
                     placeholder="กรอกรหัสเข้าใช้งาน"
@@ -151,6 +178,7 @@ const AdminCodeLogin = () => {
                     onChange={(e) => setCode(e.target.value)}
                     className="pl-10 h-12 text-lg"
                     autoFocus
+                    autoComplete="one-time-code"
                   />
                 </div>
               </div>
@@ -162,12 +190,12 @@ const AdminCodeLogin = () => {
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" aria-hidden="true" />
                     กำลังตรวจสอบ...
                   </>
                 ) : (
                   <>
-                    <Shield className="w-5 h-5 mr-2" />
+                    <Shield className="w-5 h-5 mr-2" aria-hidden="true" />
                     ปลดล็อกสิทธิ์
                   </>
                 )}
@@ -179,8 +207,9 @@ const AdminCodeLogin = () => {
                 variant="ghost"
                 className="w-full"
                 onClick={() => navigate("/")}
+                type="button"
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
+                <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
                 กลับหน้าหลัก
               </Button>
             </div>

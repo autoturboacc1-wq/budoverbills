@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getDisplayNameError, getThaiPhoneError, normalizeDigits, normalizeDisplayName } from "@/lib/validation";
 
 interface EditNameDialogProps {
   displayName: string;
@@ -36,25 +37,13 @@ export function EditNameDialog({
   const [newLastName, setNewLastName] = useState(lastName || "");
   const [newPhone, setNewPhone] = useState(phone || "");
   const [isSaving, setIsSaving] = useState(false);
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
-  // Validate phone number (10 digits only)
-  const validatePhone = (value: string): boolean => {
-    if (!value) return true; // Empty is allowed
-    const digitsOnly = value.replace(/\D/g, '');
-    if (digitsOnly.length !== 10) {
-      setPhoneError("เบอร์โทรศัพท์ต้องมี 10 หลัก");
-      return false;
-    }
-    setPhoneError(null);
-    return true;
-  };
-
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, ''); // Keep only digits
+    const value = normalizeDigits(e.target.value).slice(0, 10);
     setNewPhone(value);
-    if (value) validatePhone(value);
-    else setPhoneError(null);
+    setPhoneError(value ? getThaiPhoneError(value) : null);
   };
 
   // Sync state when props change
@@ -64,14 +53,25 @@ export function EditNameDialog({
       setNewFirstName(firstName || "");
       setNewLastName(lastName || "");
       setNewPhone(phone || "");
+      setDisplayNameError(null);
+      setPhoneError(null);
     }
   }, [open, displayName, firstName, lastName, phone]);
 
   const handleSave = async () => {
-    if (!user?.id || !newName.trim()) return;
+    if (!user?.id) return;
+
+    const normalizedDisplayName = normalizeDisplayName(newName);
+    const nextDisplayNameError = getDisplayNameError(normalizedDisplayName);
+    setDisplayNameError(nextDisplayNameError);
+    if (nextDisplayNameError) {
+      return;
+    }
     
     // Validate phone before saving
-    if (newPhone && !validatePhone(newPhone)) {
+    const nextPhoneError = newPhone ? getThaiPhoneError(newPhone) : null;
+    setPhoneError(nextPhoneError);
+    if (nextPhoneError) {
       return;
     }
 
@@ -80,10 +80,10 @@ export function EditNameDialog({
       const { error } = await supabase
         .from('profiles')
         .update({ 
-          display_name: newName.trim(),
+          display_name: normalizedDisplayName,
           first_name: newFirstName.trim() || null,
           last_name: newLastName.trim() || null,
-          phone: newPhone.trim() || null,
+          phone: normalizeDigits(newPhone) || null,
         })
         .eq('user_id', user.id);
 
@@ -125,10 +125,22 @@ export function EditNameDialog({
             <Input
               id="displayName"
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+              onChange={(e) => {
+                setNewName(e.target.value);
+                if (displayNameError) setDisplayNameError(null);
+              }}
               placeholder="ใส่ชื่อของคุณ"
               maxLength={50}
+              autoComplete="nickname"
+              aria-invalid={Boolean(displayNameError)}
             />
+            {displayNameError ? (
+              <p className="text-xs text-destructive">{displayNameError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                ใช้ได้เฉพาะตัวอักษร ตัวเลข ช่องว่าง และ . _ -
+              </p>
+            )}
           </div>
 
           {/* First Name */}
@@ -169,11 +181,12 @@ export function EditNameDialog({
               placeholder="0812345678"
               maxLength={10}
               autoComplete="tel"
+              aria-invalid={Boolean(phoneError)}
               className={phoneError ? "border-destructive" : ""}
             />
-            {phoneError && (
+            {phoneError ? (
               <p className="text-xs text-destructive">{phoneError}</p>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -188,7 +201,7 @@ export function EditNameDialog({
           <Button
             className="flex-1"
             onClick={handleSave}
-            disabled={isSaving || !newName.trim() || !!phoneError}
+            disabled={isSaving || !normalizeDisplayName(newName) || Boolean(displayNameError) || Boolean(phoneError)}
           >
             {isSaving ? (
               <>

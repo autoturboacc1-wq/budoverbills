@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Shield, Loader2 } from "lucide-react";
@@ -8,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { hasAdminCodeSession, hasAdminSession } from "@/utils/adminSession";
+import { clearAdminSession, getValidatedAdminSession, type AdminSessionDetails } from "@/utils/adminSession";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -21,16 +22,48 @@ export function AdminLayout({ children, requireAdmin = false }: AdminLayoutProps
   const { isAdmin, isModerator, loading: roleLoading } = useUserRole();
   const isMobile = useIsMobile();
   const hasAdminAccess = isAdmin || isModerator;
-  
-  // Check for admin code login state, but only after role-based access is confirmed.
-  const isVerified = hasAdminSession(user?.id);
-  const isCodeVerified = hasAdminCodeSession(user?.id);
-  const codeRole = sessionStorage.getItem("admin_code_role");
-  const isCodeLogin = hasAdminAccess && isCodeVerified && isVerified;
-  const isCodeAdmin = isCodeLogin && codeRole === "admin";
+  const [adminSession, setAdminSession] = useState<AdminSessionDetails | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+
+  useEffect(() => {
+    if (authLoading || roleLoading) {
+      return;
+    }
+
+    if (!user || !hasAdminAccess) {
+      setAdminSession(null);
+      setSessionLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSessionLoading(true);
+
+    void (async () => {
+      const validatedSession = await getValidatedAdminSession(user.id);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (!validatedSession) {
+        clearAdminSession();
+      }
+
+      setAdminSession(validatedSession);
+      setSessionLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, roleLoading, user, hasAdminAccess]);
+
+  const isCodeLogin = adminSession?.verifiedVia === "code";
+  const isCodeAdmin = isCodeLogin && adminSession?.codeRole === "admin";
 
   // Loading state (for database role check flow)
-  if (authLoading || roleLoading) {
+  if (authLoading || roleLoading || sessionLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -95,13 +128,13 @@ export function AdminLayout({ children, requireAdmin = false }: AdminLayoutProps
   }
 
   // Not verified with 2FA
-  if (!isVerified) {
+  if (!adminSession) {
     return <Navigate to="/admin/login" replace />;
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <AdminSidebar isCodeLogin={isCodeLogin} isCodeAdmin={isCodeAdmin} />
+      <AdminSidebar adminSession={adminSession} isCodeLogin={isCodeLogin} isCodeAdmin={isCodeAdmin} />
       
       <motion.main
         initial={{ opacity: 0 }}

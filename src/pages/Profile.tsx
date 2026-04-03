@@ -172,7 +172,7 @@ export default function Profile() {
     { icon: ScrollText, label: "ข้อกำหนดการใช้งาน", path: "/terms", action: () => navigate("/terms") },
     { 
       icon: Shield, 
-      label: profile?.pdpa_accepted_at ? "✓ ยอมรับ PDPA แล้ว" : "นโยบาย PDPA", 
+      label: profile?.pdpa_accepted_at ? "ยอมรับ PDPA แล้ว" : "นโยบาย PDPA", 
       path: "/pdpa-consent", 
       action: () => navigate("/pdpa-consent"),
       highlight: !!profile?.pdpa_accepted_at 
@@ -398,12 +398,12 @@ export default function Profile() {
                       {isPremium ? (
                         <>
                           <Sparkles className="w-3 h-3" />
-                          Premium
+                          พรีเมียม
                         </>
                       ) : (
                         <>
                           <Zap className="w-3 h-3" />
-                          Free
+                          ฟรี
                         </>
                       )}
                     </div>
@@ -435,9 +435,9 @@ export default function Profile() {
             >
               <div className="flex items-center gap-3">
                 <LayoutDashboard className="w-5 h-5 text-primary" />
-                <span className="text-foreground">Admin Hub</span>
+                <span className="text-foreground">ศูนย์ผู้ดูแล</span>
                 <span className="bg-primary/20 text-primary text-xs px-2 py-0.5 rounded-full">
-                  {isAdmin ? "Admin" : "Mod"}
+                  {isAdmin ? "แอดมิน" : "ม็อด"}
                 </span>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
@@ -457,6 +457,7 @@ export default function Profile() {
             <Switch
               checked={isDarkMode}
               onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+              aria-label={isDarkMode ? "ปิดโหมดมืด" : "เปิดโหมดมืด"}
             />
           </div>
 

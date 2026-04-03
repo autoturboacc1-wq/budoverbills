@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AvatarUpload } from "@/components/AvatarUpload";
-import { getThaiPhoneError, normalizeDigits } from "@/lib/validation";
+import { getDisplayNameError, getThaiPhoneError, normalizeDigits, normalizeDisplayName } from "@/lib/validation";
 
 interface EditProfileDialogProps {
   currentAvatarUrl?: string | null;
@@ -40,6 +40,7 @@ export function EditProfileDialog({
   const [newLastName, setNewLastName] = useState(lastName || "");
   const [newPhone, setNewPhone] = useState(phone || "");
   const [isSaving, setIsSaving] = useState(false);
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
   // Sync state when props change
@@ -49,12 +50,20 @@ export function EditProfileDialog({
       setNewFirstName(firstName || "");
       setNewLastName(lastName || "");
       setNewPhone(phone || "");
+      setDisplayNameError(null);
       setPhoneError(null);
     }
   }, [open, displayName, firstName, lastName, phone]);
 
   const handleSave = async () => {
-    if (!user?.id || !newName.trim()) return;
+    if (!user?.id) return;
+
+    const normalizedDisplayName = normalizeDisplayName(newName);
+    const nextDisplayNameError = getDisplayNameError(normalizedDisplayName);
+    setDisplayNameError(nextDisplayNameError);
+    if (nextDisplayNameError) {
+      return;
+    }
 
     const phoneValidationError = getThaiPhoneError(newPhone);
     if (phoneValidationError) {
@@ -68,7 +77,7 @@ export function EditProfileDialog({
       const { error } = await supabase
         .from('profiles')
         .update({ 
-          display_name: newName.trim(),
+          display_name: normalizedDisplayName,
           first_name: newFirstName.trim() || null,
           last_name: newLastName.trim() || null,
           phone: normalizeDigits(newPhone) || null,
@@ -121,10 +130,22 @@ export function EditProfileDialog({
             <Input
               id="displayName"
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+              onChange={(e) => {
+                setNewName(e.target.value);
+                if (displayNameError) setDisplayNameError(null);
+              }}
               placeholder="ใส่ชื่อของคุณ"
               maxLength={50}
+              autoComplete="nickname"
+              aria-invalid={Boolean(displayNameError)}
             />
+            {displayNameError ? (
+              <p className="text-xs text-destructive">{displayNameError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                ใช้ได้เฉพาะตัวอักษร ตัวเลข ช่องว่าง และ . _ -
+              </p>
+            )}
           </div>
 
           {/* First Name */}
@@ -161,11 +182,11 @@ export function EditProfileDialog({
               type="tel"
               value={newPhone}
               onChange={(e) => {
-                setNewPhone(e.target.value);
+                setNewPhone(normalizeDigits(e.target.value).slice(0, 10));
                 setPhoneError(null);
               }}
               placeholder="0812345678"
-              maxLength={15}
+              maxLength={10}
               inputMode="numeric"
               autoComplete="tel"
               aria-invalid={Boolean(phoneError)}
@@ -187,7 +208,7 @@ export function EditProfileDialog({
           <Button
             className="flex-1"
             onClick={handleSave}
-            disabled={isSaving || !newName.trim()}
+            disabled={isSaving || !normalizeDisplayName(newName) || Boolean(displayNameError) || Boolean(phoneError)}
           >
             {isSaving ? (
               <>

@@ -572,20 +572,20 @@ export function PaymentDialog({
 
         <div className="space-y-4">
           <PageSection
-            title={isLender ? "Lender Review Flow" : "Borrower Payment Flow"}
+            title={isLender ? "ขั้นตอนตรวจโดยเจ้าหนี้" : "ขั้นตอนชำระของผู้ยืม"}
             description={
               isLender
-                ? "ตรวจจำนวนเงิน หลักฐาน และตัดสินใจอนุมัติหรือปฏิเสธจากหน้าจอเดียว"
+                ? "ตรวจจำนวนเงิน หลักฐาน และตัดสินใจอนุมัติหรือปฏิเสธได้จากหน้าจอเดียว"
                 : "กรอกยอด อัปโหลดสลิป และตรวจข้อมูลปลายทางก่อนส่งยืนยัน"
             }
           >
             <ReviewPanel
-              title="Payment Summary"
+              title="สรุปการชำระเงิน"
               rows={[
                 { label: isFeeInstallment ? "ค่าเลื่อนงวด" : "ค่างวด", value: `฿${installment.amount.toLocaleString()}` },
                 {
                   label: "ประเภท",
-                  value: isFeeInstallment ? "Reschedule Fee" : "Installment Payment",
+                  value: isFeeInstallment ? "ค่าเลื่อนงวด" : "ชำระค่างวด",
                 },
                 pendingVerification
                   ? {
@@ -873,7 +873,7 @@ export function PaymentDialog({
           {showPromptPayQrTab ? (
             <Tabs defaultValue="promptpay" className="space-y-4">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="promptpay">PromptPay QR</TabsTrigger>
+                <TabsTrigger value="promptpay">พร้อมเพย์ QR</TabsTrigger>
                 <TabsTrigger value="slip">อัปโหลดสลิป</TabsTrigger>
               </TabsList>
 
@@ -918,19 +918,21 @@ export function PaymentDialog({
                         <Loader2 className="w-6 h-6 animate-spin text-primary" />
                       </div>
                     ) : signedSlipUrl && !displaySlipUrl?.toLowerCase().endsWith('.pdf') ? (
-                      <div 
+                      <button
+                        type="button"
                         className="relative rounded-xl overflow-hidden border border-border cursor-pointer"
                         onClick={() => setShowPreview(true)}
+                        aria-label="เปิดดูสลิปแบบเต็ม"
                       >
                         <img
                           src={signedSlipUrl}
-                          alt="Payment slip"
+                          alt="สลิปการโอนเงิน"
                           className="w-full max-h-48 object-cover"
                         />
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                          <Eye className="w-6 h-6 text-white" />
+                          <Eye className="w-6 h-6 text-white" aria-hidden="true" />
                         </div>
-                      </div>
+                      </button>
                     ) : signedSlipUrl ? (
                       <div className="flex items-center justify-center h-24 bg-secondary/50 rounded-xl">
                         <Button
@@ -952,6 +954,8 @@ export function PaymentDialog({
                         variant="ghost"
                         size="sm"
                         className="absolute top-2 right-2"
+                        type="button"
+                        aria-label="อัปโหลดสลิปใหม่"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isUploading}
                       >
@@ -1001,19 +1005,21 @@ export function PaymentDialog({
                       <Loader2 className="w-6 h-6 animate-spin text-primary" />
                     </div>
                   ) : signedSlipUrl && !displaySlipUrl?.toLowerCase().endsWith('.pdf') ? (
-                    <div 
+                    <button
+                      type="button"
                       className="relative rounded-xl overflow-hidden border border-border cursor-pointer"
                       onClick={() => setShowPreview(true)}
+                      aria-label="เปิดดูสลิปแบบเต็ม"
                     >
                       <img
                         src={signedSlipUrl}
-                        alt="Payment slip"
+                        alt="สลิปการโอนเงิน"
                         className="w-full max-h-48 object-cover"
                       />
                       <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                        <Eye className="w-6 h-6 text-white" />
+                        <Eye className="w-6 h-6 text-white" aria-hidden="true" />
                       </div>
-                    </div>
+                    </button>
                   ) : signedSlipUrl ? (
                     <div className="flex items-center justify-center h-24 bg-secondary/50 rounded-xl">
                       <Button
@@ -1036,6 +1042,8 @@ export function PaymentDialog({
                       variant="ghost"
                       size="sm"
                       className="absolute top-2 right-2"
+                      type="button"
+                      aria-label="อัปโหลดสลิปใหม่"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploading}
                     >
@@ -1152,7 +1160,7 @@ export function PaymentDialog({
               <>
                 <img
                   src={signedSlipUrl}
-                  alt="Payment slip"
+                  alt="สลิปการโอนเงิน"
                   className="w-full rounded-lg cursor-zoom-in"
                   style={{ touchAction: 'pinch-zoom' }}
                   onClick={() => window.open(signedSlipUrl, '_blank')}

@@ -2,7 +2,6 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import type { TablesInsert } from '@/integrations/supabase/types';
 
 export interface RescheduleRequest {
   id: string;
@@ -155,36 +154,21 @@ export function useRescheduleRequests() {
     if (!user) return false;
     
     try {
-      const feeCalc = calculateRescheduleFee(
-        input.principalPerInstallment,
-        input.interestPerInstallment,
-        input.currentInterestRate,
-        input.interestType,
-        input.feeInstallments,
-        input.customFeeRate
-      );
-      
-      const requestInsert: TablesInsert<'reschedule_requests'> = {
-          installment_id: input.installmentId,
-          agreement_id: input.agreementId,
-          requested_by: user.id,
-          original_due_date: input.originalDueDate,
-          new_due_date: input.newDueDate,
-          reschedule_fee: feeCalc.totalFee,
-          fee_installments: 1, // Always 1 now - pay upfront
-          fee_per_installment: feeCalc.totalFee,
-          original_fee_rate: feeCalc.baseFeeRate ?? 0,
-          applied_fee_rate: feeCalc.appliedFeeRate ?? 0,
-          safeguard_applied: feeCalc.safeguardApplied,
-          custom_fee_rate: input.customFeeRate || null,
-          slip_url: input.slipUrl || null,
-          submitted_amount: input.submittedAmount || null,
-          status: 'pending'
-      };
-
-      const { error } = await supabase
-        .from('reschedule_requests')
-        .insert(requestInsert);
+      const rpc = supabase.rpc as unknown as RpcClient;
+      const { error } = await rpc('create_reschedule_request', {
+        p_installment_id: input.installmentId,
+        p_agreement_id: input.agreementId,
+        p_original_due_date: input.originalDueDate,
+        p_new_due_date: input.newDueDate,
+        p_principal_per_installment: input.principalPerInstallment,
+        p_interest_per_installment: input.interestPerInstallment,
+        p_current_interest_rate: input.currentInterestRate,
+        p_interest_type: input.interestType,
+        p_fee_installments: input.feeInstallments,
+        p_custom_fee_rate: input.customFeeRate ?? null,
+        p_slip_url: input.slipUrl ?? null,
+        p_submitted_amount: input.submittedAmount ?? null,
+      });
       
       if (error) throw error;
       
@@ -195,7 +179,7 @@ export function useRescheduleRequests() {
       toast.error('ไม่สามารถส่งคำขอได้');
       return false;
     }
-  }, [user, calculateRescheduleFee]);
+  }, [user]);
 
   // Approve a request (lender only) - updates installment due_date, shifts ALL subsequent installments, and creates fee installments
   const approveRequest = useCallback(async (requestId: string): Promise<boolean> => {
@@ -227,39 +211,11 @@ export function useRescheduleRequests() {
     if (!user) return false;
     
     try {
-      const { data: request, error: requestError } = await supabase
-        .from('reschedule_requests')
-        .select('agreement_id')
-        .eq('id', requestId)
-        .maybeSingle();
-
-      if (requestError || !request) {
-        throw new Error('ไม่พบคำขอเลื่อนงวด');
-      }
-
-      const { data: agreement, error: agreementError } = await supabase
-        .from('debt_agreements')
-        .select('lender_id')
-        .eq('id', request.agreement_id)
-        .maybeSingle();
-
-      if (agreementError || !agreement) {
-        throw new Error('ไม่พบข้อตกลงที่เกี่ยวข้อง');
-      }
-
-      if (agreement.lender_id !== user.id) {
-        throw new Error('เฉพาะเจ้าหนี้เท่านั้นที่ปฏิเสธคำขอเลื่อนงวดได้');
-      }
-
-      const { error } = await supabase
-        .from('reschedule_requests')
-        .update({
-          status: 'rejected',
-          approved_by: user.id,
-          approved_at: new Date().toISOString(),
-          rejection_reason: reason || null
-        })
-        .eq('id', requestId);
+      const rpc = supabase.rpc as unknown as RpcClient;
+      const { error } = await rpc('reject_reschedule_request', {
+        p_request_id: requestId,
+        p_rejection_reason: reason ?? null,
+      });
       
       if (error) throw error;
       

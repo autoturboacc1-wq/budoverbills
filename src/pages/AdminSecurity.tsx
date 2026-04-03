@@ -20,10 +20,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { hasAdminSession } from '@/utils/adminSession';
 
 interface ActivityLog {
   id: string;
@@ -44,7 +42,6 @@ interface SuspiciousSummary {
 
 export default function AdminSecurity() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
   const [activeTab, setActiveTab] = useState('suspicious');
   const [suspiciousLogs, setSuspiciousLogs] = useState<ActivityLog[]>([]);
@@ -59,18 +56,8 @@ export default function AdminSecurity() {
     }
   }, [isAdmin, roleLoading, navigate]);
 
-  useEffect(() => {
-    if (roleLoading || !user || !isAdmin) {
-      return;
-    }
-
-    if (!hasAdminSession(user.id)) {
-      navigate('/admin/login', { replace: true });
-    }
-  }, [isAdmin, roleLoading, navigate, user]);
-
   const fetchLogs = useCallback(async () => {
-    if (!isAdmin || !hasAdminSession(user?.id)) return;
+    if (!isAdmin) return;
     
     setLoading(true);
     try {
@@ -109,7 +96,7 @@ export default function AdminSecurity() {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, user?.id]);
+  }, [isAdmin]);
 
   useEffect(() => {
     if (isAdmin) {

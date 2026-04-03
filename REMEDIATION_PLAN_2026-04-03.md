@@ -33,8 +33,8 @@
 
 ### Phase 1 (P1)
 - [-] 1.1 Chat Performance
-  batching หลักใน `Chat.tsx` เสร็จแล้ว
-  ยังไม่เสร็จ: summary/RPC path สำหรับ scale สูงมาก
+  batching หลักใน `Chat.tsx` และ server-side thread summary/unread path เสร็จแล้ว
+  ยังไม่เสร็จ: scale optimization เพิ่มเติมในระดับสูงมาก
 - [x] 1.2 Realtime Subscription Scoping
 - [x] 1.3 AudioContext / Voice Leaks
 - [-] 1.4 Auth Flow Hardening
@@ -46,30 +46,30 @@
 - [x] 1.8 Password Verification
 
 ### Phase 2 (P2)
-- [-] 2.1 Domain Logic Fixes
-  ก้อนหลักใน debt domain เสร็จแล้ว
+- [x] 2.1 Domain Logic Fixes
 - [-] 2.2 Money & PDF Fixes
   `roundMoney`, `moneyEquals`, PDF page-break guard และ server-side IP path เสร็จแล้ว
-  ยังไม่เสร็จ: dedicated `confirmed_at` columns ถ้าต้องแยกจาก field ปัจจุบัน
+  dedicated `confirmed_at` columns หลักเสร็จแล้ว
+  ยังไม่เสร็จ: ถ้าต้องแตกเพิ่มใน schema อื่นนอกข้อตกลง
 - [x] 2.3 Subscription Logic Fixes
 - [-] 2.4 i18n Completion
-  page chrome / labels / branding cleanup และ browser language auto-detect เสร็จแล้วหลายจุด
-  ยังไม่เสร็จ: help article body text และ hardcoded copy กระจายบางส่วน
+  page chrome / labels / branding cleanup และ help long-form content เสร็จแล้วหลายจุด
+  ยังไม่เสร็จ: hardcoded copy กระจายบางส่วนในหน้ารองอื่น
 - [x] 2.5 Timezone Consistency
 - [x] 2.6 Profile & Settings
 - [-] 2.7 Stale Closure / Hook Fixes
-  `useTypingIndicator` cleanup/upsert และ single-provider สำหรับ notifications/friend requests เสร็จแล้ว
+  `useTypingIndicator` cleanup/upsert, notifications/friend requests provider และ reschedule/payment agreement paths หลักเสร็จแล้ว
   ยังไม่เสร็จ: ยังไม่ได้ review ทุก hook ย่อยในระบบแบบ exhaustive
 
 ### Phase 3 (P3)
 - [-] 3.1 Code Cleanup
-  ลบ `useFriends.ts` แล้ว
+  ลบ `useFriends.ts` แล้ว และเก็บ cleanup ย่อยบางส่วน
   ยังไม่เสร็จ: cleanup ย่อยอื่นใน backlog
 - [-] 3.2 Test Coverage
-  debt/money tests เพิ่มแล้วบางส่วน
-  ยังไม่เสร็จ: checklist ที่เหลือใน phase นี้
+  debt/money tests เพิ่มแล้วหลายเคส และมี high-risk flow tests เพิ่มแล้ว
+  ยังไม่เสร็จ: integration coverage เพิ่มเติมใน flow ที่ยังพึ่ง external services
 - [-] 3.3 Accessibility
-  LanguageSelector, AppErrorBoundary และ `aria-live` notification list ดีขึ้นแล้ว
+  LanguageSelector, AppErrorBoundary, `aria-live` notification list, header/buttons และ friend-request flows ดีขึ้นแล้ว
   ยังไม่เสร็จ: polish เพิ่มเติมในจุดย่อยอื่น
 - [x] 3.4 PWA Fixes
 - [x] 3.5 Build & Config
@@ -460,9 +460,9 @@ Still required before calling the whole remediation complete:
 - finish remaining P2/P3 items
 
 Remaining code tasks worth doing next:
-- finish full i18n coverage for long-form help/article content and remaining hardcoded copy
-- review remaining accessibility polish such as broader `aria-live` coverage
-- decide whether PDF export needs dedicated `confirmed_at` schema fields beyond current data
+- finish full i18n coverage for remaining hardcoded copy outside the already-localized help/legal/settings surfaces
+- add integration tests for purchase completion / monetized completion path
+- optional chat scale optimization beyond the new thread summary path
 
 ---
 

@@ -98,26 +98,30 @@ export function FriendRequestsSection() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
+                    type="button"
                     size="sm"
                     variant="ghost"
                     className="h-8 w-8 p-0 text-status-overdue hover:bg-status-overdue/10"
                     onClick={() => handleReject(request.id)}
                     disabled={processingIds.has(request.id)}
+                    aria-label={`ปฏิเสธคำขอจาก ${request.from_profile?.display_name || `User ${request.from_profile?.user_code}`}`}
                   >
                     {processingIds.has(request.id) ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                     ) : (
-                      <X className="w-4 h-4" />
+                      <X className="w-4 h-4" aria-hidden="true" />
                     )}
                   </Button>
                   <Button
+                    type="button"
                     size="sm"
                     className="h-8 px-3"
                     onClick={() => handleAccept(request.id)}
                     disabled={processingIds.has(request.id)}
+                    aria-label={`ยอมรับคำขอจาก ${request.from_profile?.display_name || `User ${request.from_profile?.user_code}`}`}
                   >
                     {processingIds.has(request.id) ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                     ) : (
                       <>
                         <Check className="w-4 h-4 mr-1" />
@@ -163,14 +167,16 @@ export function FriendRequestsSection() {
                   </div>
                 </div>
                 <Button
+                  type="button"
                   size="sm"
                   variant="ghost"
                   className="h-8 text-muted-foreground hover:text-foreground"
                   onClick={() => handleCancel(request.id)}
                   disabled={processingIds.has(request.id)}
+                  aria-label={`ยกเลิกคำขอที่ส่งถึง ${request.to_profile?.display_name || `User ${request.to_profile?.user_code}`}`}
                 >
                   {processingIds.has(request.id) ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                   ) : (
                     "ยกเลิก"
                   )}

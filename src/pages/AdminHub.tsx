@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Newspaper, Shield, UserCog, Activity, LayoutDashboard, Crown, Clock, UserPlus, UserMinus, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -11,7 +11,6 @@ import { format, subDays, subMonths, startOfDay } from "date-fns";
 import { th } from "date-fns/locale";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { hasAdminSession } from "@/utils/adminSession";
 
 type ActionFilter = "all" | "role_granted" | "role_revoked";
 type TimeFilter = "all" | "today" | "7days" | "30days";
@@ -57,23 +56,6 @@ export default function AdminHub() {
   // Filters
   const [actionFilter, setActionFilter] = useState<ActionFilter>("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
-
-  // Check 2FA verification
-  useEffect(() => {
-    const checkVerification = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        if (!hasAdminSession(user.id)) {
-          // Not verified, redirect to admin login
-          navigate("/admin/login");
-        }
-      }
-    };
-    
-    if (!loading && (isAdmin || isModerator)) {
-      checkVerification();
-    }
-  }, [loading, isAdmin, isModerator, navigate]);
 
   // Fetch audit trail for role changes
   const { data: auditLogs = [], isLoading: auditLoading } = useQuery({

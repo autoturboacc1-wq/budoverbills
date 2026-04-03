@@ -55,9 +55,23 @@ describe('getNextInstallment', () => {
     expect(calculateDaysUntilDue('2026-04-18')).toBe(3);
   });
 
+  it('returns zero days until due when the due date is today', () => {
+    expect(calculateDaysUntilDue('2026-04-15')).toBe(0);
+  });
+
   it('treats due dates as Bangkok calendar days', () => {
     vi.setSystemTime(new Date('2026-04-15T01:00:00.000Z'));
     expect(calculateDaysUntilDue('2026-04-16')).toBe(1);
     expect(isInstallmentOverdue(createInstallment({ due_date: '2026-04-15', status: 'pending' }))).toBe(false);
+  });
+
+  it('ignores rescheduled installments when collecting overdue items', () => {
+    const installments = [
+      createInstallment({ id: '1', due_date: '2026-04-10', status: 'pending' }),
+      createInstallment({ id: '2', due_date: '2026-04-10', status: 'rescheduled' }),
+    ];
+
+    expect(getOverdueInstallments(installments)).toHaveLength(1);
+    expect(getOverdueInstallments(installments)[0]?.id).toBe('1');
   });
 });

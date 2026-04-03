@@ -110,6 +110,7 @@ const Notifications = () => {
               size="sm"
               onClick={handleMarkAllAsRead}
               className="gap-2"
+              aria-label="อ่านการแจ้งเตือนทั้งหมด"
             >
               <Check className="w-4 h-4" />
               อ่านทั้งหมด
@@ -151,9 +152,9 @@ const Notifications = () => {
                 }`}
               >
                 <div
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`เปิดการแจ้งเตือน: ${notification.title}`}
+                role="button"
+                tabIndex={0}
+                  aria-label={`เปิดการแจ้งเตือน: ${notification.title}${notification.is_read ? "" : " ยังไม่อ่าน"}`}
                   onClick={() => handleNotificationClick(notification)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
@@ -170,7 +171,7 @@ const Notifications = () => {
                         {notification.title}
                       </h3>
                       {!notification.is_read && (
-                        <span className="shrink-0 w-2 h-2 mt-2 bg-primary rounded-full animate-pulse" />
+                        <span className="shrink-0 w-2 h-2 mt-2 bg-primary rounded-full animate-pulse" aria-hidden="true" />
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">

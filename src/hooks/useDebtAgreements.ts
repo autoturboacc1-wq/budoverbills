@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
+import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   calculateRemainingAmount,
@@ -36,8 +36,10 @@ type DebtAgreementSecureRow = Tables<'debt_agreements_secure'> & {
   agreement_text?: string | null;
   lender_confirmed_ip?: string | null;
   lender_confirmed_device?: string | null;
+  lender_confirmed_at?: string | null;
   borrower_confirmed_ip?: string | null;
   borrower_confirmed_device?: string | null;
+  borrower_confirmed_at?: string | null;
 };
 
 type ProfileMap = Record<string, { avatar_url: string | null; display_name: string | null }>;
@@ -123,8 +125,10 @@ function mapAgreementRow(row: DebtAgreementSecureRow, profileMap: ProfileMap): D
     agreement_text: row.agreement_text ?? null,
     lender_confirmed_ip: row.lender_confirmed_ip ?? null,
     lender_confirmed_device: row.lender_confirmed_device ?? null,
+    lender_confirmed_at: row.lender_confirmed_at ?? null,
     borrower_confirmed_ip: row.borrower_confirmed_ip ?? null,
     borrower_confirmed_device: row.borrower_confirmed_device ?? null,
+    borrower_confirmed_at: row.borrower_confirmed_at ?? null,
   };
 }
 
@@ -334,21 +338,109 @@ export function useDebtAgreements() {
       return false;
     }
 
-    const installment = agreement.installments?.find((item) => item.id === installmentId);
-    if (!installment || installment.status === 'paid' || installment.confirmed_by_lender) {
+    const { data: freshInstallment, error: installmentError } = await supabase
+      .from('installments')
+      .select('id, agreement_id, amount, status, confirmed_by_lender, payment_proof_url')
+      .eq('id', installmentId)
+      .maybeSingle();
+
+    if (installmentError) {
+      handleSupabaseError(installmentError, 'upload-slip', 'ไม่สามารถตรวจสอบข้อมูลงวดได้');
+      return false;
+    }
+
+    if (!freshInstallment || freshInstallment.agreement_id !== agreement.id) {
+      toast.error('ไม่พบข้อมูลงวดที่ต้องการอัปโหลดสลิป');
+      return false;
+    }
+
+    if (freshInstallment.status === 'paid' || freshInstallment.confirmed_by_lender) {
       toast.error('งวดนี้ถูกยืนยันแล้ว ไม่สามารถอัปโหลดสลิปใหม่ได้');
       return false;
     }
 
     try {
-      const updates: TablesUpdate<'installments'> = {
-        payment_proof_url: slipUrl,
+      const { data: pendingVerification, error: verificationLookupError } = await supabase
+        .from('slip_verifications')
+        .select('id, slip_url, submitted_amount')
+        .eq('installment_id', installmentId)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      if (verificationLookupError) {
+        throw verificationLookupError;
+      }
+
+      const submittedAmount = toMoney(freshInstallment.amount);
+      const verificationPayload: TablesInsert<'slip_verifications'> = {
+        agreement_id: agreement.id,
+        installment_id: installmentId,
+        submitted_by: user.id,
+        submitted_amount: submittedAmount,
+        slip_url: slipUrl,
         status: 'pending',
       };
 
-      const { error } = await supabase.from('installments').update(updates).eq('id', installmentId);
+      let verificationId = pendingVerification?.id ?? null;
+      const previousSubmittedAmount = pendingVerification?.submitted_amount ?? submittedAmount;
+
+      if (pendingVerification) {
+        const { error: updateVerificationError } = await supabase
+          .from('slip_verifications')
+          .update({
+            slip_url: slipUrl,
+            submitted_amount: submittedAmount,
+          })
+          .eq('id', pendingVerification.id);
+
+        if (updateVerificationError) {
+          throw updateVerificationError;
+        }
+      } else {
+        const { data: insertedVerification, error: insertVerificationError } = await supabase
+          .from('slip_verifications')
+          .insert(verificationPayload)
+          .select('id')
+          .single();
+
+        if (insertVerificationError) {
+          throw insertVerificationError;
+        }
+
+        verificationId = insertedVerification.id;
+      }
+
+      const previousSlipUrl = freshInstallment.payment_proof_url;
+      const { error } = await supabase
+        .from('installments')
+        .update({
+          payment_proof_url: slipUrl,
+          status: 'pending',
+        })
+        .eq('id', installmentId);
 
       if (error) {
+        if (verificationId) {
+          if (pendingVerification) {
+            await supabase
+              .from('slip_verifications')
+              .update({
+                slip_url: pendingVerification.slip_url,
+                submitted_amount: previousSubmittedAmount,
+              })
+              .eq('id', verificationId);
+          } else {
+            await supabase.from('slip_verifications').delete().eq('id', verificationId);
+          }
+        }
+
+        if (previousSlipUrl !== slipUrl) {
+          await supabase
+            .from('installments')
+            .update({ payment_proof_url: previousSlipUrl })
+            .eq('id', installmentId);
+        }
+
         throw error;
       }
 
@@ -378,79 +470,73 @@ export function useDebtAgreements() {
     }
 
     try {
-      const { data: installmentData, error: fetchError } = await supabase
-        .from('installments')
-        .select('agreement_id')
-        .eq('id', installmentId)
-        .single();
+      const [{ data: installmentData, error: fetchError }, { data: pendingVerification, error: verificationError }] = await Promise.all([
+        supabase
+          .from('installments')
+          .select('id, status, confirmed_by_lender')
+          .eq('id', installmentId)
+          .maybeSingle(),
+        supabase
+          .from('slip_verifications')
+          .select('id, submitted_amount')
+          .eq('installment_id', installmentId)
+          .eq('status', 'pending')
+          .maybeSingle(),
+      ]);
 
       if (fetchError) {
         throw fetchError;
       }
 
-      const { error } = await supabase
-        .from('installments')
-        .update({
-          confirmed_by_lender: true,
-          status: 'paid',
-          paid_at: new Date().toISOString(),
-        })
-        .eq('id', installmentId);
+      if (verificationError) {
+        throw verificationError;
+      }
+
+      if (!installmentData) {
+        toast.error('ไม่พบข้อมูลงวดที่ต้องการยืนยัน');
+        return false;
+      }
+
+      if (installmentData.status === 'paid' || installmentData.confirmed_by_lender) {
+        toast.error('งวดนี้ถูกยืนยันไปแล้ว');
+        return false;
+      }
+
+      if (!pendingVerification) {
+        toast.error('ไม่พบสลิปที่รอยืนยันสำหรับงวดนี้');
+        return false;
+      }
+
+      const rpc = supabase.rpc as unknown as RpcClient;
+      const { data, error } = await rpc('confirm_installment_payment', {
+        p_installment_id: installmentId,
+        p_verification_id: pendingVerification.id,
+        p_verified_amount: pendingVerification.submitted_amount,
+      });
 
       if (error) {
         throw error;
       }
 
-      const { data: allInstallments, error: checkError } = await supabase
-        .from('installments')
-        .select('status')
-        .eq('agreement_id', installmentData.agreement_id);
+      const result = (data ?? {}) as {
+        success?: boolean;
+        extra_amount?: number;
+        extra_payment_result?: { success?: boolean; installments_closed?: number; principal_reduction?: number } | null;
+      };
 
-      if (!checkError && allInstallments) {
-        const allPaid = allInstallments.every((installment) => installment.status === 'paid');
-
-        if (allPaid) {
-          const { data: agreementData } = await supabase
-            .from('debt_agreements')
-            .select('lender_id, borrower_id, principal_amount')
-            .eq('id', installmentData.agreement_id)
-            .single();
-
-          const { error: completeError } = await supabase
-            .from('debt_agreements')
-            .update({ status: 'completed' })
-            .eq('id', installmentData.agreement_id);
-
-          if (!completeError && agreementData) {
-            toast.success('🎉 ข้อตกลงสิ้นสุดสมบูรณ์!');
-
-            const formattedAmount = toMoney(agreementData.principal_amount).toLocaleString();
-
-            await supabase.from('notifications').insert({
-              user_id: agreementData.lender_id,
-              type: 'agreement_completed',
-              title: '🎉 ข้อตกลงเงินกู้สิ้นสุดสมบูรณ์',
-              message: `ข้อตกลงมูลค่า ฿${formattedAmount} ได้รับการชำระครบถ้วนแล้ว`,
-              related_id: installmentData.agreement_id,
-              related_type: 'agreement',
-            });
-
-            if (agreementData.borrower_id) {
-              await supabase.from('notifications').insert({
-                user_id: agreementData.borrower_id,
-                type: 'agreement_completed',
-                title: '🎉 ชำระหนี้ครบถ้วน',
-                message: `คุณได้ชำระหนี้มูลค่า ฿${formattedAmount} ครบถ้วนแล้ว ขอบคุณ!`,
-                related_id: installmentData.agreement_id,
-                related_type: 'agreement',
-              });
-            }
-          }
-        }
+      if (!result.success) {
+        toast.error('ไม่สามารถยืนยันการชำระได้');
+        return false;
       }
 
       await fetchAgreements();
-      toast.success('ยืนยันการชำระเรียบร้อย');
+      if ((result.extra_amount ?? 0) > 0) {
+        toast.success('ยืนยันการชำระสำเร็จ', {
+          description: `รวมชำระเพิ่มเติม ฿${(result.extra_amount ?? 0).toLocaleString()} ตัดเงินต้น`,
+        });
+      } else {
+        toast.success('ยืนยันการชำระสำเร็จ');
+      }
       return true;
     } catch (error) {
       handleSupabaseError(error, 'confirm-payment', 'ไม่สามารถยืนยันได้');

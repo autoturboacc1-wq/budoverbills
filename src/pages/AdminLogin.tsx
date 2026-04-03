@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { BobLogo } from "@/components/BobLogo";
-import { clearAdminSession, hasAdminSession, issueAdminOtpSession, setAdminSession } from "@/utils/adminSession";
+import { clearAdminSession, getValidatedAdminSession, issueAdminOtpSession, setAdminSession } from "@/utils/adminSession";
 
 type LoginStep = "credentials" | "otp" | "success" | "locked";
 
@@ -43,12 +43,24 @@ export default function AdminLogin() {
       return;
     }
 
-    const checkAdminStatus = () => {
-      if (hasAdminSession(user.id)) {
+    let cancelled = false;
+
+    const checkAdminStatus = async () => {
+      const validatedSession = await getValidatedAdminSession(user.id);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (validatedSession) {
         navigate("/admin", { replace: true });
       }
     };
-    checkAdminStatus();
+    void checkAdminStatus();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user, roleLoading, isAdmin, isModerator, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -78,7 +90,7 @@ export default function AdminLogin() {
       
       if (!isAdmin) {
         await supabase.auth.signOut();
-        throw new Error("คุณไม่มีสิทธิ์เข้าถึงหน้า Admin");
+        throw new Error("คุณไม่มีสิทธิ์เข้าถึงหน้าผู้ดูแลระบบ");
       }
 
       // Generate and send OTP via email (secure - never display OTP client-side)
@@ -157,7 +169,7 @@ export default function AdminLogin() {
 
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) throw new Error("Session หมดอายุ");
+      if (!currentUser) throw new Error("เซสชันหมดอายุ");
 
       const result = await issueAdminOtpSession(otp);
 
@@ -165,12 +177,17 @@ export default function AdminLogin() {
         // Store verification in session
         clearAdminSession();
         if (!result.session_token) {
-          throw new Error("ไม่สามารถสร้าง admin session ได้");
+          throw new Error("ไม่สามารถสร้างเซสชันผู้ดูแลระบบได้");
         }
         setAdminSession({
-          userId: currentUser.id,
           sessionToken: result.session_token,
         });
+
+        const validatedSession = await getValidatedAdminSession(currentUser.id);
+        if (!validatedSession) {
+          clearAdminSession();
+          throw new Error("ไม่สามารถยืนยันเซสชันผู้ดูแลระบบได้");
+        }
 
         // Log successful verification
         await supabase.rpc("log_activity", {
@@ -236,7 +253,7 @@ export default function AdminLogin() {
     setLoading(true);
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) throw new Error("Session หมดอายุ");
+      if (!currentUser) throw new Error("เซสชันหมดอายุ");
 
       // Generate and send new OTP via email (secure - never display OTP client-side)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -273,14 +290,14 @@ export default function AdminLogin() {
               <BobLogo size="lg" />
             </div>
             <div className="flex items-center justify-center gap-2">
-              <Shield className="w-6 h-6 text-primary" />
-              <CardTitle className="text-xl">Admin Login</CardTitle>
+              <Shield className="w-6 h-6 text-primary" aria-hidden="true" />
+              <CardTitle className="text-xl">เข้าสู่ระบบแอดมิน</CardTitle>
             </div>
             <CardDescription>
-              {step === "credentials" && "เข้าสู่ระบบด้วยบัญชี Admin"}
+              {step === "credentials" && "เข้าสู่ระบบด้วยบัญชีแอดมิน"}
               {step === "otp" && `ยืนยันตัวตนด้วยรหัส OTP (เหลือ ${remainingAttempts} ครั้ง)`}
               {step === "success" && "ยืนยันตัวตนสำเร็จ!"}
-              {step === "locked" && "บัญชีถูกล็อคชั่วคราว"}
+              {step === "locked" && "บัญชีถูกล็อกชั่วคราว"}
             </CardDescription>
             
             {/* Progress indicator */}
@@ -306,38 +323,40 @@ export default function AdminLogin() {
                 <div className="space-y-2">
                   <Label htmlFor="email">อีเมล</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
                     <Input
                       id="email"
                       type="email"
-                      placeholder="admin@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10"
+                    required
+                    autoComplete="email"
+                  />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="password">รหัสผ่าน</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
                     <Input
                       id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10"
+                    required
+                    autoComplete="current-password"
+                  />
                   </div>
                 </div>
 
                 {error && (
                   <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
-                    <AlertCircle className="w-4 h-4" />
+                    <AlertCircle className="w-4 h-4" aria-hidden="true" />
                     {error}
                   </div>
                 )}
@@ -352,7 +371,7 @@ export default function AdminLogin() {
               <div className="space-y-6">
                 <div className="text-center">
                   <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <KeyRound className="w-8 h-8 text-primary" />
+                    <KeyRound className="w-8 h-8 text-primary" aria-hidden="true" />
                   </div>
                   <p className="text-sm text-muted-foreground">
                     กรุณากรอกรหัส OTP 6 หลักที่ส่งไปยังอีเมลของคุณ
@@ -381,7 +400,7 @@ export default function AdminLogin() {
 
                 {error && (
                   <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
-                    <AlertCircle className="w-4 h-4" />
+                    <AlertCircle className="w-4 h-4" aria-hidden="true" />
                     {error}
                   </div>
                 )}
@@ -390,6 +409,7 @@ export default function AdminLogin() {
                   <Button 
                     onClick={handleVerifyOtp} 
                     className="w-full" 
+                    type="button"
                     disabled={loading || otp.length !== 6}
                   >
                     {loading ? "กำลังยืนยัน..." : "ยืนยันรหัส OTP"}
@@ -399,12 +419,14 @@ export default function AdminLogin() {
                     variant="ghost"
                     className="w-full"
                     onClick={handleResendOtp}
+                    type="button"
                     disabled={loading || resendCooldown > 0}
                   >
-                    {resendCooldown > 0 ? `ส่งรหัส OTP ใหม่ใน ${resendCooldown}s` : "ส่งรหัส OTP อีกครั้ง"}
+                    {resendCooldown > 0 ? `ส่งรหัส OTP ใหม่ใน ${resendCooldown} วินาที` : "ส่งรหัส OTP อีกครั้ง"}
                   </Button>
 
                   <Button
+                    type="button"
                     variant="outline"
                     className="w-full"
                     onClick={() => {
@@ -415,7 +437,7 @@ export default function AdminLogin() {
                       supabase.auth.signOut();
                     }}
                   >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
                     กลับ
                   </Button>
                 </div>
@@ -430,9 +452,9 @@ export default function AdminLogin() {
                     animate={{ scale: 1 }}
                     className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4"
                   >
-                    <Lock className="w-10 h-10 text-destructive" />
+                    <Lock className="w-10 h-10 text-destructive" aria-hidden="true" />
                   </motion.div>
-                  <h3 className="text-lg font-semibold text-destructive mb-2">บัญชีถูกล็อคชั่วคราว</h3>
+                  <h3 className="text-lg font-semibold text-destructive mb-2">บัญชีถูกล็อกชั่วคราว</h3>
                   <p className="text-sm text-muted-foreground">
                     กรอกรหัส OTP ผิดเกินจำนวนที่กำหนด
                   </p>
@@ -442,17 +464,18 @@ export default function AdminLogin() {
                 </div>
 
                 <div className="flex items-center justify-center gap-2 p-4 bg-destructive/5 rounded-lg">
-                  <Timer className="w-6 h-6 text-destructive" />
+                  <Timer className="w-6 h-6 text-destructive" aria-hidden="true" />
                   <span className="text-2xl font-mono font-bold text-destructive">
                     {formatTime(lockCountdown)}
                   </span>
                 </div>
 
                 <p className="text-xs text-center text-muted-foreground">
-                  ระบบจะปลดล็อคอัตโนมัติเมื่อหมดเวลา
+                  ระบบจะปลดล็อกอัตโนมัติเมื่อหมดเวลา
                 </p>
 
                 <Button
+                  type="button"
                   variant="outline"
                   className="w-full"
                   onClick={() => {
@@ -463,7 +486,7 @@ export default function AdminLogin() {
                     supabase.auth.signOut();
                   }}
                 >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
                   กลับหน้าเข้าสู่ระบบ
                 </Button>
               </div>
@@ -476,21 +499,22 @@ export default function AdminLogin() {
                   animate={{ scale: 1 }}
                   className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto"
                 >
-                  <CheckCircle2 className="w-10 h-10 text-green-500" />
+                  <CheckCircle2 className="w-10 h-10 text-green-500" aria-hidden="true" />
                 </motion.div>
-                <p className="text-muted-foreground">กำลังนำท่านไปยังหน้า Admin...</p>
+                <p className="text-muted-foreground">กำลังนำคุณไปยังหน้าผู้ดูแลระบบ...</p>
               </div>
             )}
 
             {step === "credentials" && (
               <div className="mt-6 pt-4 border-t">
                 <Button
+                  type="button"
                   variant="ghost"
                   className="w-full"
                   onClick={() => navigate("/auth")}
                 >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  กลับไปหน้า Login ปกติ
+                  <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
+                  กลับไปหน้าเข้าสู่ระบบปกติ
                 </Button>
               </div>
             )}
@@ -498,7 +522,7 @@ export default function AdminLogin() {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
-          🔒 การเข้าสู่ระบบนี้ใช้การยืนยันตัวตน 2 ขั้นตอน (2FA) เพื่อความปลอดภัย
+          🔒 การเข้าสู่ระบบนี้ใช้การยืนยันตัวตนสองขั้นตอน (2FA) เพื่อความปลอดภัย
         </p>
       </motion.div>
     </div>

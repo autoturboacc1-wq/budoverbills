@@ -3,7 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { clearAdminSession, hasAdminSession, validateAdminSession } from '@/utils/adminSession';
+import { clearAdminSession, getValidatedAdminSession } from '@/utils/adminSession';
 
 interface ProtectedRouteProps {
   requireAdminSession?: boolean;
@@ -24,7 +24,7 @@ export function ProtectedRoute({ requireAdminSession = false }: ProtectedRoutePr
       return;
     }
 
-    if (!user || !hasAdminAccess || !hasAdminSession(user.id)) {
+    if (!user || !hasAdminAccess) {
       setAdminSessionValid(false);
       return;
     }
@@ -32,7 +32,7 @@ export function ProtectedRoute({ requireAdminSession = false }: ProtectedRoutePr
     let cancelled = false;
 
     void (async () => {
-      const valid = await validateAdminSession(user.id);
+      const valid = await getValidatedAdminSession(user.id);
 
       if (cancelled) {
         return;
@@ -42,7 +42,7 @@ export function ProtectedRoute({ requireAdminSession = false }: ProtectedRoutePr
         clearAdminSession();
       }
 
-      setAdminSessionValid(valid);
+      setAdminSessionValid(Boolean(valid));
     })();
 
     return () => {

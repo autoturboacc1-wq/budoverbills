@@ -25,6 +25,13 @@ type AdminSessionValidateResponse = {
   expires_at?: string;
 };
 
+export type AdminSessionDetails = {
+  verifiedVia: "otp" | "code";
+  codeName: string | null;
+  codeRole: "admin" | "moderator" | null;
+  expiresAt: string | null;
+};
+
 function getStoredSessionToken(): string | null {
   return sessionStorage.getItem(ADMIN_SESSION_TOKEN_KEY);
 }
@@ -44,13 +51,11 @@ export function getAdminSessionToken(): string | null {
 }
 
 export function hasAdminSession(userId?: string | null): boolean {
-  return Boolean(userId) &&
-    sessionStorage.getItem("admin_verified") === userId &&
-    Boolean(getStoredSessionToken());
+  return Boolean(userId) && Boolean(getStoredSessionToken());
 }
 
 export function hasAdminCodeSession(userId?: string | null): boolean {
-  return hasAdminSession(userId) && sessionStorage.getItem("admin_code_verified") === "true";
+  return Boolean(userId) && Boolean(getStoredSessionToken()) && sessionStorage.getItem("admin_code_verified") === "true";
 }
 
 export async function issueAdminOtpSession(otp: string): Promise<AdminSessionIssueResponse> {
@@ -70,32 +75,15 @@ export async function issueAdminCodeSession(code: string): Promise<AdminSessionI
 }
 
 export function setAdminSession(params: {
-  userId: string;
   sessionToken: string;
-  codeVerified?: boolean;
-  codeName?: string;
-  codeRole?: string;
 }) {
-  sessionStorage.setItem("admin_verified", params.userId);
   sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, params.sessionToken);
-
-  if (params.codeVerified) {
-    sessionStorage.setItem("admin_code_verified", "true");
-  }
-
-  if (params.codeName) {
-    sessionStorage.setItem("admin_code_name", params.codeName);
-  }
-
-  if (params.codeRole) {
-    sessionStorage.setItem("admin_code_role", params.codeRole);
-  }
 }
 
-export async function validateAdminSession(userId?: string | null): Promise<boolean> {
+async function validateAdminSessionDetails(userId?: string | null): Promise<AdminSessionDetails | null> {
   const token = getStoredSessionToken();
   if (!userId || !token) {
-    return false;
+    return null;
   }
 
   try {
@@ -105,26 +93,35 @@ export async function validateAdminSession(userId?: string | null): Promise<bool
     });
 
     if (!result?.valid) {
-      return false;
+      return null;
     }
-
-    sessionStorage.setItem("admin_verified", userId);
 
     if (result.verified_via === "code") {
       sessionStorage.setItem("admin_code_verified", "true");
-      if (result.code_name) {
-        sessionStorage.setItem("admin_code_name", result.code_name);
-      }
-      if (result.code_role) {
-        sessionStorage.setItem("admin_code_role", result.code_role);
-      }
+    } else {
+      sessionStorage.removeItem("admin_code_verified");
     }
 
-    return true;
+    return {
+      verifiedVia: result.verified_via ?? "otp",
+      codeName: result.code_name ?? null,
+      codeRole: result.code_role === "admin" || result.code_role === "moderator"
+        ? result.code_role
+        : null,
+      expiresAt: result.expires_at ?? null,
+    };
   } catch (error) {
     console.error("Failed to validate admin session:", error);
-    return false;
+    return null;
   }
+}
+
+export async function validateAdminSession(userId?: string | null): Promise<boolean> {
+  return Boolean(await validateAdminSessionDetails(userId));
+}
+
+export async function getValidatedAdminSession(userId?: string | null): Promise<AdminSessionDetails | null> {
+  return validateAdminSessionDetails(userId);
 }
 
 async function revokeAdminSession(sessionToken: string): Promise<void> {
@@ -144,7 +141,6 @@ export function clearAdminSession(): void {
     void revokeAdminSession(token);
   }
 
-  sessionStorage.removeItem("admin_verified");
   sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
   sessionStorage.removeItem("admin_code_verified");
   sessionStorage.removeItem("admin_code_name");

@@ -37,7 +37,7 @@ export function Header({ userName }: HeaderProps) {
           {displayAvatarUrl ? (
             <img
               src={displayAvatarUrl}
-              alt={userName}
+              alt={`รูปโปรไฟล์ของ ${userName}`}
               className="w-10 h-10 rounded-full object-cover bg-secondary"
               referrerPolicy="no-referrer"
             />
@@ -51,13 +51,21 @@ export function Header({ userName }: HeaderProps) {
         </div>
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setShowSearch(true)}
+            aria-haspopup="dialog"
+            aria-expanded={showSearch}
+            aria-label="เปิดค้นหา"
             className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
           >
             <Search className="w-5 h-5 text-secondary-foreground" />
           </button>
           <button
+            type="button"
             onClick={() => setShowNotifications(true)}
+            aria-haspopup="dialog"
+            aria-expanded={showNotifications}
+            aria-label={unreadCount > 0 ? `เปิดการแจ้งเตือน ${unreadCount} รายการที่ยังไม่อ่าน` : "เปิดการแจ้งเตือน"}
             className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors relative group"
           >
             <Bell className="w-5 h-5 text-primary" />
@@ -66,12 +74,13 @@ export function Header({ userName }: HeaderProps) {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 bg-status-overdue text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg"
+                aria-hidden="true"
               >
                 {unreadCount > 9 ? "9+" : unreadCount}
               </motion.span>
             )}
             {/* Pulse ring animation */}
-            {unreadCount > 0 && <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />}
+            {unreadCount > 0 && <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping" aria-hidden="true" />}
           </button>
         </div>
       </motion.header>

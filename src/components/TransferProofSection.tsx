@@ -94,21 +94,17 @@ export function TransferProofSection({
 
       if ('error' in result) throw result.error;
 
-      // Update agreement with transfer slip URL
-      const { data: updateData, error: updateError } = await supabase
-        .from('debt_agreements')
-        .update({
-          transfer_slip_url: result.path,
-          transferred_at: new Date().toISOString(),
-        })
-        .eq('id', agreementId)
-        .eq('lender_id', user.id)
-        .select('id')
-        .maybeSingle();
+      const { error: rpcError } = await supabase.rpc("confirm_agreement_transfer", {
+        p_agreement_id: agreementId,
+        p_transfer_slip_url: result.path,
+        p_mark_lender_confirmed: false,
+        p_mark_borrower_confirmed: false,
+        p_mark_borrower_transfer_confirmed: false,
+        p_confirmed_at: new Date().toISOString(),
+      });
 
-      if (updateError) throw updateError;
-      if (!updateData) {
-        throw new Error("ไม่พบรายการที่คุณมีสิทธิ์อัปโหลด");
+      if (rpcError) {
+        throw rpcError;
       }
 
       toast.success("อัปโหลดสลิปโอนเงินให้ยืมสำเร็จ");
@@ -132,21 +128,15 @@ export function TransferProofSection({
 
     setIsConfirming(true);
     try {
-      const { data, error } = await supabase
-        .from('debt_agreements')
-        .update({
-          borrower_confirmed_transfer: true,
-          borrower_confirmed_transfer_at: new Date().toISOString(),
-        })
-        .eq('id', agreementId)
-        .eq('borrower_id', user.id)
-        .select('id')
-        .maybeSingle();
+      const { error } = await supabase.rpc("confirm_agreement_transfer", {
+        p_agreement_id: agreementId,
+        p_mark_lender_confirmed: false,
+        p_mark_borrower_confirmed: false,
+        p_mark_borrower_transfer_confirmed: true,
+        p_confirmed_at: new Date().toISOString(),
+      });
 
       if (error) throw error;
-      if (!data) {
-        throw new Error("ไม่พบรายการที่คุณมีสิทธิ์ยืนยัน");
-      }
 
       toast.success("ยืนยันรับเงินสำเร็จ", {
         description: "ขอบคุณที่ยืนยันการรับเงิน",

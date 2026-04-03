@@ -109,7 +109,7 @@ export default function PDPAConsent() {
                   onClick={() => navigate("/terms")}
                   className="text-primary text-sm mt-3 hover:underline"
                 >
-                  อ่านเพิ่มเติม →
+                  อ่านเพิ่มเติม
                 </button>
               </motion.div>
             )}
@@ -157,7 +157,7 @@ export default function PDPAConsent() {
                   onClick={() => navigate("/privacy")}
                   className="text-primary text-sm mt-3 hover:underline"
                 >
-                  อ่านเพิ่มเติม →
+                  อ่านเพิ่มเติม
                 </button>
               </motion.div>
             )}
@@ -204,15 +204,18 @@ export default function PDPAConsent() {
               <div className="bg-status-paid/10 text-status-paid rounded-xl p-4 mb-4">
                 <Check className="w-6 h-6 mx-auto mb-2" />
                 <p className="font-medium">คุณได้ยอมรับข้อกำหนดแล้ว</p>
-                <p className="text-sm mt-1">
+                <time
+                  className="text-sm mt-1 block"
+                  dateTime={alreadyAccepted}
+                >
                   เมื่อ {new Date(alreadyAccepted).toLocaleDateString('th-TH', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
                     hour: '2-digit',
-                    minute: '2-digit'
+                    minute: '2-digit',
                   })}
-                </p>
+                </time>
               </div>
               <Button
                 onClick={() => navigate(-1)}

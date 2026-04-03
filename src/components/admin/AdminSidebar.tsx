@@ -19,6 +19,7 @@ import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { clearAdminSession } from "@/utils/adminSession";
+import type { AdminSessionDetails } from "@/utils/adminSession";
 
 const adminMenuItems = [
   {
@@ -50,9 +51,10 @@ const adminMenuItems = [
 interface AdminSidebarProps {
   isCodeLogin?: boolean;
   isCodeAdmin?: boolean;
+  adminSession?: AdminSessionDetails | null;
 }
 
-export function AdminSidebar({ isCodeLogin = false, isCodeAdmin = false }: AdminSidebarProps) {
+export function AdminSidebar({ isCodeLogin = false, isCodeAdmin = false, adminSession = null }: AdminSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAdmin, isModerator } = useUserRole();
@@ -62,7 +64,7 @@ export function AdminSidebar({ isCodeLogin = false, isCodeAdmin = false }: Admin
   
   // Use code-based role if code login, otherwise use database role
   const effectiveIsAdmin = isCodeLogin ? isCodeAdmin : isAdmin;
-  const codeName = isCodeLogin ? sessionStorage.getItem("admin_code_name") : null;
+  const codeName = isCodeLogin ? adminSession?.codeName : null;
 
   const visibleMenuItems = adminMenuItems.filter((item) => {
     if (item.requiredRole === "admin") return effectiveIsAdmin;

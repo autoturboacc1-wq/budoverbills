@@ -46,6 +46,16 @@ describe('getAgreementDisplayStatus', () => {
       )
     ).toBe('completed');
   });
+
+  it('returns completed when all installments are rescheduled', () => {
+    expect(
+      getAgreementDisplayStatus(
+        createAgreement({
+          installments: createAgreement().installments?.map((installment) => ({ ...installment, status: 'rescheduled' })),
+        })
+      )
+    ).toBe('completed');
+  });
 });
 
 describe('needsUserConfirmation', () => {

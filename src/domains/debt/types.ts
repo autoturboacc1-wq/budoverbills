@@ -60,8 +60,10 @@ export interface DebtAgreement {
   agreement_text?: string | null;
   lender_confirmed_ip?: string | null;
   lender_confirmed_device?: string | null;
+  lender_confirmed_at?: string | null;
   borrower_confirmed_ip?: string | null;
   borrower_confirmed_device?: string | null;
+  borrower_confirmed_at?: string | null;
 }
 
 export interface CreateAgreementInstallmentInput {

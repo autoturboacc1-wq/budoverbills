@@ -1,9 +1,15 @@
 const THAI_PHONE_DIGITS = 10;
 const THAI_PROMPTPAY_ID_DIGITS = 13;
 const THAI_BANK_ACCOUNT_DIGITS = 10;
+const DISPLAY_NAME_MAX_LENGTH = 50;
+const DISPLAY_NAME_ALLOWED_CHARS = /^[\p{L}\p{N}\p{M}\s.'_-]+$/u;
 
 export function normalizeDigits(value: string): string {
   return value.replace(/\D/g, "");
+}
+
+export function normalizeDisplayName(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
 }
 
 export function isValidThaiPhone(value: string): boolean {
@@ -55,4 +61,22 @@ export function normalizeBankAccountForStorage(bankName: string, value: string):
   }
 
   return digits;
+}
+
+export function getDisplayNameError(value: string): string | null {
+  const displayName = normalizeDisplayName(value);
+
+  if (!displayName) {
+    return "กรุณากรอกชื่อที่แสดง";
+  }
+
+  if (displayName.length > DISPLAY_NAME_MAX_LENGTH) {
+    return "ชื่อที่แสดงต้องไม่เกิน 50 ตัวอักษร";
+  }
+
+  if (!DISPLAY_NAME_ALLOWED_CHARS.test(displayName)) {
+    return "ชื่อที่แสดงใช้ได้เฉพาะตัวอักษร ตัวเลข ช่องว่าง และ . _ -";
+  }
+
+  return null;
 }

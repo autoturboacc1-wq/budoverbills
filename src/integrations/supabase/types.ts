@@ -301,6 +301,7 @@ export type Database = {
           borrower_confirmed: boolean | null
           borrower_confirmed_device: string | null
           borrower_confirmed_ip: string | null
+          borrower_confirmed_at: string | null
           borrower_confirmed_transfer: boolean | null
           borrower_confirmed_transfer_at: string | null
           borrower_id: string | null
@@ -315,6 +316,7 @@ export type Database = {
           lender_confirmed: boolean | null
           lender_confirmed_device: string | null
           lender_confirmed_ip: string | null
+          lender_confirmed_at: string | null
           lender_id: string
           num_installments: number
           principal_amount: number
@@ -335,6 +337,7 @@ export type Database = {
           borrower_confirmed?: boolean | null
           borrower_confirmed_device?: string | null
           borrower_confirmed_ip?: string | null
+          borrower_confirmed_at?: string | null
           borrower_confirmed_transfer?: boolean | null
           borrower_confirmed_transfer_at?: string | null
           borrower_id?: string | null
@@ -349,6 +352,7 @@ export type Database = {
           lender_confirmed?: boolean | null
           lender_confirmed_device?: string | null
           lender_confirmed_ip?: string | null
+          lender_confirmed_at?: string | null
           lender_id: string
           num_installments?: number
           principal_amount: number
@@ -369,6 +373,7 @@ export type Database = {
           borrower_confirmed?: boolean | null
           borrower_confirmed_device?: string | null
           borrower_confirmed_ip?: string | null
+          borrower_confirmed_at?: string | null
           borrower_confirmed_transfer?: boolean | null
           borrower_confirmed_transfer_at?: string | null
           borrower_id?: string | null
@@ -383,6 +388,7 @@ export type Database = {
           lender_confirmed?: boolean | null
           lender_confirmed_device?: string | null
           lender_confirmed_ip?: string | null
+          lender_confirmed_at?: string | null
           lender_id?: string
           num_installments?: number
           principal_amount?: number
@@ -1174,8 +1180,14 @@ export type Database = {
         Row: {
           account_name: string | null
           account_number: string | null
+          agreement_text: string | null
           bank_name: string | null
           borrower_confirmed: boolean | null
+          borrower_confirmed_at: string | null
+          borrower_confirmed_device: string | null
+          borrower_confirmed_ip: string | null
+          borrower_confirmed_transfer: boolean | null
+          borrower_confirmed_transfer_at: string | null
           borrower_id: string | null
           borrower_name: string | null
           borrower_phone: string | null
@@ -1186,6 +1198,9 @@ export type Database = {
           interest_rate: number | null
           interest_type: string | null
           lender_confirmed: boolean | null
+          lender_confirmed_at: string | null
+          lender_confirmed_device: string | null
+          lender_confirmed_ip: string | null
           lender_id: string | null
           num_installments: number | null
           principal_amount: number | null
@@ -1194,13 +1209,21 @@ export type Database = {
           start_date: string | null
           status: string | null
           total_amount: number | null
+          transfer_slip_url: string | null
+          transferred_at: string | null
           updated_at: string | null
         }
         Insert: {
           account_name?: string | null
           account_number?: string | null
+          agreement_text?: string | null
           bank_name?: string | null
           borrower_confirmed?: boolean | null
+          borrower_confirmed_at?: string | null
+          borrower_confirmed_device?: string | null
+          borrower_confirmed_ip?: string | null
+          borrower_confirmed_transfer?: boolean | null
+          borrower_confirmed_transfer_at?: string | null
           borrower_id?: string | null
           borrower_name?: never
           borrower_phone?: never
@@ -1211,6 +1234,9 @@ export type Database = {
           interest_rate?: number | null
           interest_type?: string | null
           lender_confirmed?: boolean | null
+          lender_confirmed_at?: string | null
+          lender_confirmed_device?: string | null
+          lender_confirmed_ip?: string | null
           lender_id?: string | null
           num_installments?: number | null
           principal_amount?: number | null
@@ -1219,13 +1245,21 @@ export type Database = {
           start_date?: string | null
           status?: string | null
           total_amount?: number | null
+          transfer_slip_url?: string | null
+          transferred_at?: string | null
           updated_at?: string | null
         }
         Update: {
           account_name?: string | null
           account_number?: string | null
+          agreement_text?: string | null
           bank_name?: string | null
           borrower_confirmed?: boolean | null
+          borrower_confirmed_at?: string | null
+          borrower_confirmed_device?: string | null
+          borrower_confirmed_ip?: string | null
+          borrower_confirmed_transfer?: boolean | null
+          borrower_confirmed_transfer_at?: string | null
           borrower_id?: string | null
           borrower_name?: never
           borrower_phone?: never
@@ -1236,6 +1270,9 @@ export type Database = {
           interest_rate?: number | null
           interest_type?: string | null
           lender_confirmed?: boolean | null
+          lender_confirmed_at?: string | null
+          lender_confirmed_device?: string | null
+          lender_confirmed_ip?: string | null
           lender_id?: string | null
           num_installments?: number | null
           principal_amount?: number | null
@@ -1244,6 +1281,8 @@ export type Database = {
           start_date?: string | null
           status?: string | null
           total_amount?: number | null
+          transfer_slip_url?: string | null
+          transferred_at?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -1327,6 +1366,19 @@ export type Database = {
           total_amount: number
           updated_at: string
         }[]
+      }
+      confirm_agreement_transfer: {
+        Args: {
+          p_agreement_id: string
+          p_client_ip?: string | null
+          p_confirmed_at?: string | null
+          p_device_id?: string | null
+          p_mark_borrower_confirmed?: boolean
+          p_mark_borrower_transfer_confirmed?: boolean
+          p_mark_lender_confirmed?: boolean
+          p_transfer_slip_url?: string | null
+        }
+        Returns: Json
       }
       get_suspicious_activities: {
         Args: { p_hours?: number }

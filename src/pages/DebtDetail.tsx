@@ -273,12 +273,12 @@ export default function DebtDetail() {
         description: agreement.description || undefined,
         
         lenderName: lenderFullName,
-        lenderConfirmedAt: agreement.lender_confirmed ? agreement.updated_at : undefined,
+        lenderConfirmedAt: agreement.lender_confirmed_at ?? undefined,
         lenderConfirmedIP: agreement.lender_confirmed_ip ?? undefined,
         lenderConfirmedDevice: agreement.lender_confirmed_device ?? undefined,
         
         borrowerName: agreement.borrower_name || "ผู้ยืม",
-        borrowerConfirmedAt: agreement.borrower_confirmed ? agreement.updated_at : undefined,
+        borrowerConfirmedAt: agreement.borrower_confirmed_at ?? undefined,
         borrowerConfirmedIP: agreement.borrower_confirmed_ip ?? undefined,
         borrowerConfirmedDevice: agreement.borrower_confirmed_device ?? undefined,
         

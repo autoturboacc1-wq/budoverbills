@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,7 +33,6 @@ export function AddFriendSection() {
   } | null>(null);
   
   const { profile, user, requireAuth } = useAuth();
-  const { t } = useLanguage();
   const navigate = useNavigate();
   const { friends } = useDbFriends();
   const { sendRequest, outgoingRequests } = useFriendRequests();
@@ -69,7 +67,7 @@ export function AddFriendSection() {
     // Parse the QR code - expected format: debtmate://add-friend/USERCODE
     const match = decodedText.match(/debtmate:\/\/add-friend\/([A-Z0-9]{8})/);
     if (!match) {
-      toast.error("QR Code ไม่ถูกต้อง");
+      toast.error("QR code ไม่ถูกต้อง");
       return;
     }
 
@@ -231,8 +229,11 @@ export function AddFriendSection() {
       >
         {/* Expandable Button */}
         <Button
+          type="button"
           onClick={() => setIsExpanded(!isExpanded)}
           variant="outline"
+          aria-expanded={isExpanded}
+          aria-controls="add-friend-panel"
           className="w-full h-12 flex items-center justify-between px-4 bg-gradient-to-r from-primary/10 to-transparent border-primary/30 hover:bg-primary/15"
         >
           <div className="flex items-center gap-2">
@@ -257,7 +258,7 @@ export function AddFriendSection() {
               transition={{ duration: 0.2 }}
               className="overflow-hidden"
             >
-              <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-b-2xl p-4 border border-t-0 border-primary/20">
+              <div id="add-friend-panel" className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-b-2xl p-4 border border-t-0 border-primary/20">
                 {/* User Code Display */}
                 {user && (
                   <div className="bg-card rounded-xl p-3 mb-4">
@@ -267,15 +268,17 @@ export function AddFriendSection() {
                         {userCode}
                       </span>
                       <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         onClick={handleCopyCode}
                         className="h-8 px-2"
+                        aria-label="คัดลอกรหัสผู้ใช้"
                       >
                         {copied ? (
-                          <Check className="w-4 h-4 text-status-paid" />
+                          <Check className="w-4 h-4 text-status-paid" aria-hidden="true" />
                         ) : (
-                          <Copy className="w-4 h-4" />
+                          <Copy className="w-4 h-4" aria-hidden="true" />
                         )}
                       </Button>
                     </div>
@@ -286,6 +289,7 @@ export function AddFriendSection() {
                 <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
                   {actionButtons.map((btn, index) => (
                     <Button
+                      type="button"
                       key={index}
                       onClick={btn.onClick}
                       variant={btn.variant}
@@ -295,7 +299,7 @@ export function AddFriendSection() {
                           : "border-primary/30 text-primary hover:bg-primary/10"
                       }`}
                     >
-                      <btn.icon className="w-4 h-4" />
+                      <btn.icon className="w-4 h-4" aria-hidden="true" />
                       <span className="text-sm whitespace-nowrap">{btn.label}</span>
                     </Button>
                   ))}
@@ -310,7 +314,7 @@ export function AddFriendSection() {
       <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-center">QR Code ของฉัน</DialogTitle>
+            <DialogTitle className="text-center">QR code ของฉัน</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col items-center py-6">
             <div className="bg-white p-4 rounded-2xl shadow-lg mb-4">
@@ -327,20 +331,22 @@ export function AddFriendSection() {
                 {userCode}
               </span>
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
                 onClick={handleCopyCode}
                 className="h-8 px-2"
+                aria-label="คัดลอกรหัสผู้ใช้"
               >
                 {copied ? (
-                  <Check className="w-4 h-4 text-status-paid" />
+                  <Check className="w-4 h-4 text-status-paid" aria-hidden="true" />
                 ) : (
-                  <Copy className="w-4 h-4" />
+                  <Copy className="w-4 h-4" aria-hidden="true" />
                 )}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-4 text-center">
-              ให้เพื่อนสแกน QR Code นี้หรือใส่รหัสเพื่อเพิ่มเป็นเพื่อน
+              ให้เพื่อนสแกน QR code นี้หรือใส่รหัสเพื่อเพิ่มเป็นเพื่อน
             </p>
           </div>
         </DialogContent>
@@ -366,18 +372,20 @@ export function AddFriendSection() {
                     value={searchCode}
                     onChange={(e) => setSearchCode(e.target.value.toUpperCase())}
                     placeholder="ใส่รหัส 8 ตัวอักษร"
+                    aria-label="รหัสผู้ใช้ 8 ตัวอักษร"
                     className="h-12 text-center font-mono text-lg tracking-widest"
                     maxLength={8}
                   />
                 </div>
                 <Button
+                  type="button"
                   onClick={handleSearchByCode}
                   className="w-full h-12"
                   disabled={searchCode.length !== 8 || isSearching}
                 >
                   {isSearching ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
                       กำลังค้นหา...
                     </>
                   ) : (
@@ -402,6 +410,7 @@ export function AddFriendSection() {
                 </div>
                 <div className="flex gap-2">
                   <Button
+                    type="button"
                     variant="outline"
                     className="flex-1"
                     onClick={() => setFoundUser(null)}
@@ -409,10 +418,11 @@ export function AddFriendSection() {
                     ยกเลิก
                   </Button>
                   <Button
+                    type="button"
                     className="flex-1"
                     onClick={handleSendRequestToFoundUser}
                   >
-                    <Send className="w-4 h-4 mr-2" />
+                    <Send className="w-4 h-4 mr-2" aria-hidden="true" />
                     ส่งคำขอ
                   </Button>
                 </div>

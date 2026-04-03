@@ -18,9 +18,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getUserRoleInAgreement } from "@/domains/debt";
 import { getDeviceIdString, getClientIP } from "@/utils/deviceInfo";
-import { format } from "date-fns";
-import { th } from "date-fns/locale";
-import type { TablesUpdate } from "@/integrations/supabase/types";
 import {
   getPaymentSlipSignedUrl,
   uploadPaymentSlip,
@@ -56,6 +53,10 @@ export default function AgreementConfirm() {
       setAgreement(found || null);
     }
   }, [id, getAgreement]);
+
+  useEffect(() => {
+    setTransferSlipUrl(agreement?.transfer_slip_url || null);
+  }, [agreement?.transfer_slip_url]);
   
   // Fetch lender name for borrowers
   useEffect(() => {
@@ -135,6 +136,8 @@ export default function AgreementConfirm() {
   };
 
   const handleConfirmClick = () => {
+    const effectiveTransferSlipUrl = transferSlipUrl || agreement?.transfer_slip_url || null;
+
     if (!user) {
       toast.error("กรุณาเข้าสู่ระบบก่อน");
       navigate("/auth");
@@ -142,7 +145,7 @@ export default function AgreementConfirm() {
     }
     
     // Lender must upload transfer slip before confirming
-    if (isLender && !transferSlipUrl) {
+    if (isLender && !effectiveTransferSlipUrl) {
       toast.error("กรุณาอัปโหลดสลิปโอนเงินให้ยืมก่อน", {
         description: "สลิปโอนเงินเป็นหลักฐานสำคัญสำหรับทั้งสองฝ่าย"
       });
@@ -165,83 +168,35 @@ export default function AgreementConfirm() {
       return;
     }
 
+    const effectiveTransferSlipUrl = transferSlipUrl || agreement.transfer_slip_url || null;
+
     setIsConfirming(true);
     try {
-      const { data: latestAgreement, error: latestAgreementError } = await supabase
-        .from('debt_agreements')
-        .select('id, lender_confirmed, borrower_confirmed')
-        .eq('id', agreement.id)
-        .maybeSingle();
-
-      if (latestAgreementError || !latestAgreement) {
-        throw latestAgreementError ?? new Error('ไม่พบข้อตกลงล่าสุด');
-      }
-
       // Get IP and Device info for legal evidence
       const [clientIP, deviceId] = await Promise.all([
         getClientIP(),
         Promise.resolve(getDeviceIdString())
       ]);
-      
-      // Generate agreement text
-      const borrowerFullName = agreement.borrower_name || "ผู้ยืม";
-      const lenderFullName = lenderName || "ผู้ให้ยืม";
-      const now = new Date();
-      const formattedDate = format(now, "d MMMM yyyy เวลา HH:mm น.", { locale: th });
-      
-      const agreementText = isLender
-        ? `ข้าพเจ้า ${lenderFullName} ยืนยันว่าได้โอนเงินจำนวน ${agreement.principal_amount.toLocaleString()} บาท ให้แก่ ${borrowerFullName} เมื่อวันที่ ${formattedDate} และตกลงรับชำระคืนตามข้อตกลงที่ระบุในแอพ Budoverbills`
-        : `ข้าพเจ้า ${borrowerFullName} ยืนยันว่าได้รับเงินจำนวน ${agreement.principal_amount.toLocaleString()} บาท จาก ${lenderFullName} เมื่อวันที่ ${formattedDate} และตกลงจะชำระคืนตามข้อตกลงที่ระบุในแอพ Budoverbills`;
-      
-      const updates: TablesUpdate<'debt_agreements'> & Record<string, unknown> = {};
-      
-      if (isLender) {
-        updates.lender_confirmed = true;
-        updates.lender_confirmed_ip = clientIP;
-        updates.lender_confirmed_device = deviceId;
-        // Include transfer slip URL when lender confirms
-        if (transferSlipUrl) {
-          updates.transfer_slip_url = transferSlipUrl;
-          updates.transferred_at = new Date().toISOString();
-        }
-      } else if (isBorrower) {
-        updates.borrower_confirmed = true;
-        updates.borrower_confirmed_ip = clientIP;
-        updates.borrower_confirmed_device = deviceId;
-        updates.borrower_confirmed_transfer = true;
-        updates.borrower_confirmed_transfer_at = new Date().toISOString();
-      }
-      
-      // Store agreement text (append if both parties confirm)
-      const existingText = agreement.agreement_text || "";
-      updates.agreement_text = existingText 
-        ? `${existingText}\n\n---\n\n${agreementText}`
-        : agreementText;
-
-      // Check if both parties will have confirmed after this
-      const willBeFullyConfirmed = 
-        (isLender && latestAgreement.borrower_confirmed) ||
-        (isBorrower && latestAgreement.lender_confirmed);
-
-      if (willBeFullyConfirmed) {
-        updates.status = 'active';
-      }
-
-      let updateQuery = supabase
-        .from('debt_agreements')
-        .update(updates)
-        .eq('id', agreement.id);
-
-      updateQuery = isLender
-        ? updateQuery.eq('lender_id', user.id)
-        : updateQuery.eq('borrower_id', user.id);
-
-      const { error } = await updateQuery;
+      const confirmedAt = new Date().toISOString();
+      const { error } = await supabase.rpc("confirm_agreement_transfer", {
+        p_agreement_id: agreement.id,
+        p_transfer_slip_url: isLender ? effectiveTransferSlipUrl : null,
+        p_mark_lender_confirmed: isLender,
+        p_mark_borrower_confirmed: isBorrower,
+        p_mark_borrower_transfer_confirmed: isBorrower,
+        p_confirmed_at: confirmedAt,
+        p_client_ip: clientIP,
+        p_device_id: deviceId,
+      });
 
       if (error) throw error;
 
       await refresh();
       
+      const willBeFullyConfirmed = isLender
+        ? Boolean(agreement.borrower_confirmed)
+        : Boolean(agreement.lender_confirmed);
+
       if (willBeFullyConfirmed) {
         toast.success("ข้อตกลงถูกยืนยันแล้ว!", {
           description: "งวดชำระจะแสดงในปฏิทิน",

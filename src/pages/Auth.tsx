@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, ShieldAlert, MailCheck } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
 import { useRateLimiter } from "@/hooks/useRateLimiter";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -32,7 +31,6 @@ export default function Auth() {
   const [resetEmailSent, setResetEmailSent] = useState(false);
 
   const { signIn, signUp, signInWithGoogle, user, profile } = useAuth();
-  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -172,7 +170,7 @@ export default function Auth() {
   };
 
   const handleLineSignIn = async () => {
-    toast.info("LINE Sign In กำลังพัฒนา");
+    toast.info("การเข้าสู่ระบบด้วย LINE กำลังพัฒนา");
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -208,15 +206,17 @@ export default function Auth() {
       return (
         <div className="min-h-screen bg-gradient-hero flex flex-col">
           <div className="p-4">
-            <button
-              onClick={() => {
-                setShowForgotPassword(false);
-                setResetEmailSent(false);
-              }}
-              className="p-2 -ml-2 hover:bg-secondary/50 rounded-full transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-foreground" />
-            </button>
+              <button
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setResetEmailSent(false);
+                }}
+                type="button"
+                aria-label="กลับ"
+                className="p-2 -ml-2 hover:bg-secondary/50 rounded-full transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-foreground" aria-hidden="true" />
+              </button>
           </div>
 
           <div className="flex-1 flex flex-col justify-center items-center px-6 pb-12">
@@ -226,7 +226,7 @@ export default function Auth() {
               className="max-w-sm mx-auto w-full text-center"
             >
               <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <MailCheck className="w-10 h-10 text-primary" />
+                <MailCheck className="w-10 h-10 text-primary" aria-hidden="true" />
               </div>
               
               <h1 className="text-2xl font-heading font-semibold text-foreground mb-3">
@@ -244,7 +244,7 @@ export default function Auth() {
                 <p className="text-sm text-muted-foreground">
                   กรุณาคลิกลิงก์ในอีเมลเพื่อตั้งรหัสผ่านใหม่
                   <br />
-                  หากไม่พบอีเมล กรุณาตรวจสอบโฟลเดอร์ Spam
+                  หากไม่พบอีเมล กรุณาตรวจสอบโฟลเดอร์จดหมายขยะ (Spam)
                 </p>
               </div>
 
@@ -270,9 +270,11 @@ export default function Auth() {
         <div className="p-4">
           <button
             onClick={() => setShowForgotPassword(false)}
+            type="button"
+            aria-label="กลับ"
             className="p-2 -ml-2 hover:bg-secondary/50 rounded-full transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 text-foreground" />
+            <ArrowLeft className="w-5 h-5 text-foreground" aria-hidden="true" />
           </button>
         </div>
 
@@ -284,7 +286,7 @@ export default function Auth() {
           >
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-8 h-8 text-primary" />
+                <Lock className="w-8 h-8 text-primary" aria-hidden="true" />
               </div>
               <h1 className="text-2xl font-heading font-semibold text-foreground">
                 ลืมรหัสผ่าน?
@@ -300,7 +302,7 @@ export default function Auth() {
                   อีเมล
                 </Label>
                 <div className="relative mt-1">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
                   <Input
                     id="resetEmail"
                     type="email"
@@ -309,8 +311,9 @@ export default function Auth() {
                       setEmail(e.target.value);
                       setErrors({});
                     }}
-                    placeholder="your@email.com"
+                    placeholder="name@example.com"
                     className={`pl-10 h-12 ${errors.email ? "border-destructive" : ""}`}
+                    autoComplete="email"
                   />
                 </div>
                 {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
@@ -348,9 +351,11 @@ export default function Auth() {
         <div className="p-4">
           <button
             onClick={() => setShowEmailConfirmation(false)}
+            type="button"
+            aria-label="กลับ"
             className="p-2 -ml-2 hover:bg-secondary/50 rounded-full transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 text-foreground" />
+            <ArrowLeft className="w-5 h-5 text-foreground" aria-hidden="true" />
           </button>
         </div>
 
@@ -361,7 +366,7 @@ export default function Auth() {
             className="max-w-sm mx-auto w-full text-center"
           >
             <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <MailCheck className="w-10 h-10 text-primary" />
+              <MailCheck className="w-10 h-10 text-primary" aria-hidden="true" />
             </div>
             
             <h1 className="text-2xl font-heading font-semibold text-foreground mb-3">
@@ -379,7 +384,7 @@ export default function Auth() {
               <p className="text-sm text-muted-foreground">
                 กรุณาคลิกลิงก์ในอีเมลเพื่อยืนยันบัญชีของคุณ
                 <br />
-                หากไม่พบอีเมล กรุณาตรวจสอบโฟลเดอร์ Spam
+                หากไม่พบอีเมล กรุณาตรวจสอบโฟลเดอร์จดหมายขยะ (Spam)
               </p>
             </div>
 
@@ -405,9 +410,11 @@ export default function Auth() {
       <div className="p-4">
         <button
           onClick={() => navigate(-1)}
+          type="button"
+          aria-label="กลับ"
           className="p-2 -ml-2 hover:bg-secondary/50 rounded-full transition-colors"
         >
-          <ArrowLeft className="w-5 h-5 text-foreground" />
+          <ArrowLeft className="w-5 h-5 text-foreground" aria-hidden="true" />
         </button>
       </div>
 
@@ -422,7 +429,7 @@ export default function Auth() {
               <BobLogo size="lg" />
             </div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Secure Access
+              การเข้าถึงแบบปลอดภัย
             </p>
             <h1 className="mt-1 text-2xl font-heading font-semibold text-foreground">
               {isLogin ? "เข้าสู่ระบบอย่างปลอดภัย" : "สร้างบัญชี Bud Over Bills"}
@@ -435,8 +442,8 @@ export default function Auth() {
           </div>
 
           <div className="surface-panel space-y-3 mb-5">
-            <Button variant="outline" className="w-full h-12 text-base" onClick={handleGoogleSignIn}>
-              <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
+            <Button variant="outline" className="w-full h-12 text-base" onClick={handleGoogleSignIn} type="button">
+              <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path
                   fill="#4285F4"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -454,18 +461,19 @@ export default function Auth() {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              ดำเนินการด้วย Google
+              เข้าสู่ระบบด้วย Google
             </Button>
 
             <Button
               variant="outline"
               className="w-full h-12 text-base bg-[#06C755] hover:bg-[#06C755]/90 text-white border-[#06C755]"
               onClick={handleLineSignIn}
+              type="button"
             >
-              <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24" fill="currentColor">
+              <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
                 <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
               </svg>
-              ดำเนินการด้วย LINE
+              เข้าสู่ระบบด้วย LINE
             </Button>
           </div>
 
@@ -485,7 +493,7 @@ export default function Auth() {
                   ชื่อที่แสดง
                 </Label>
                 <div className="relative mt-1">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
                   <Input
                     id="displayName"
                     type="text"
@@ -493,6 +501,7 @@ export default function Auth() {
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="ชื่อของคุณ"
                     className="pl-10 h-12"
+                    autoComplete="name"
                   />
                 </div>
               </div>
@@ -503,14 +512,15 @@ export default function Auth() {
                 อีเมล
               </Label>
               <div className="relative mt-1">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
+                  placeholder="name@example.com"
                   className={`pl-10 h-12 ${errors.email ? "border-destructive" : ""}`}
+                  autoComplete="email"
                 />
               </div>
               {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
@@ -521,7 +531,7 @@ export default function Auth() {
                 รหัสผ่าน
               </Label>
               <div className="relative mt-1">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
@@ -529,13 +539,15 @@ export default function Auth() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   className={`pl-10 pr-10 h-12 ${errors.password ? "border-destructive" : ""}`}
+                  autoComplete={isLogin ? "current-password" : "new-password"}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                 </button>
               </div>
               {errors.password && (

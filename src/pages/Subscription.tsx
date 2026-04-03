@@ -21,8 +21,6 @@ import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/contexts/AuthContext";
@@ -37,7 +35,7 @@ const COFFEE_TIERS = [
     price: 19,
     credits: 1,
     image: coffeeBasic,
-    description: "กาแฟแก้วเล็กๆ ริมถนน",
+    description: "กาแฟแก้วเล็ก ๆ จากร้านริมทาง",
     popular: false,
   },
   {
@@ -52,12 +50,12 @@ const COFFEE_TIERS = [
   },
   {
     id: "premium",
-    name: "กาแฟพรีเมี่ยม",
+    name: "กาแฟพรีเมียม",
     emoji: "✨",
     price: 49,
     credits: 4,
     image: coffeePremium,
-    description: "กาแฟ Specialty พร้อมขนม",
+    description: "กาแฟสเปเชียลตี้พร้อมขนม",
     popular: false,
   },
 ];
@@ -74,7 +72,6 @@ export default function Subscription() {
   const [showMessage, setShowMessage] = useState<boolean>(false);
   
   const { 
-    isPremium, 
     isTrial, 
     trialDaysRemaining, 
     quota,
@@ -88,6 +85,8 @@ export default function Subscription() {
 
   const selectedCoffee = COFFEE_TIERS.find(t => t.id === selectedTier);
   const selectedWhyCoffee = COFFEE_TIERS.find(t => t.id === selectedWhyTier);
+  const coffeePanelId = "subscription-coffee-panel";
+  const whyPanelId = "subscription-why-panel";
 
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
@@ -132,6 +131,8 @@ export default function Subscription() {
         >
           <button
             onClick={() => window.history.length > 1 ? navigate(-1) : navigate("/")}
+            type="button"
+            aria-label="กลับไปหน้าก่อนหน้า"
             className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-secondary-foreground" />
@@ -155,7 +156,7 @@ export default function Subscription() {
             เลี้ยงกาแฟทีมงาน
           </h2>
           <p className="text-muted-foreground text-sm">
-            สนับสนุนทีมงาน + รับสิทธิ์สร้างข้อตกลงเพิ่ม
+            สนับสนุนทีมงานและรับสิทธิ์สร้างข้อตกลงเพิ่ม
           </p>
         </motion.div>
 
@@ -231,6 +232,9 @@ export default function Subscription() {
         >
           <button
             onClick={() => toggleSection("coffee")}
+            type="button"
+            aria-expanded={expandedSection === "coffee"}
+            aria-controls={coffeePanelId}
             className="w-full p-4 border-b border-border flex items-center justify-between hover:bg-secondary/30 transition-colors"
           >
             <div className="flex items-center gap-3">
@@ -247,6 +251,7 @@ export default function Subscription() {
           <AnimatePresence>
             {expandedSection === "coffee" && (
               <motion.div
+                id={coffeePanelId}
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
@@ -260,6 +265,9 @@ export default function Subscription() {
                       <motion.button
                         key={tier.id}
                         onClick={() => setSelectedTier(tier.id)}
+                        type="button"
+                        aria-pressed={selectedTier === tier.id}
+                        aria-label={`${tier.name} ราคา ฿${tier.price} ได้ ${tier.credits} สิทธิ์${selectedTier === tier.id ? " เลือกแล้ว" : ""}`}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         className={`w-full p-4 rounded-xl border-2 transition-all ${
@@ -273,7 +281,7 @@ export default function Subscription() {
                           <div className="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center flex-shrink-0">
                             <img 
                               src={tier.image} 
-                              alt={tier.name}
+                              alt={`${tier.name} แพ็กเกจ`}
                               className="w-12 h-12 object-contain"
                             />
                           </div>
@@ -298,7 +306,7 @@ export default function Subscription() {
                                 ฿{tier.price}
                               </span>
                               <span className="text-sm text-emerald-600 font-medium">
-                                → ได้ {tier.credits} สิทธิ์
+                                ได้ {tier.credits} สิทธิ์
                               </span>
                             </div>
                           </div>
@@ -322,6 +330,9 @@ export default function Subscription() {
                   <div className="space-y-2">
                     <button
                       onClick={() => setShowMessage(!showMessage)}
+                      type="button"
+                      aria-expanded={showMessage}
+                      aria-controls="subscription-message"
                       className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <Heart className="w-4 h-4" />
@@ -332,6 +343,7 @@ export default function Subscription() {
                     <AnimatePresence>
                       {showMessage && (
                         <motion.div
+                          id="subscription-message"
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
@@ -339,7 +351,8 @@ export default function Subscription() {
                           <Textarea
                             value={tipMessage}
                             onChange={(e) => setTipMessage(e.target.value)}
-                            placeholder="ขอบคุณที่สร้างแอปดีๆ..."
+                            aria-label="ข้อความถึงทีมงาน"
+                            placeholder="ฝากข้อความถึงทีมงาน..."
                             rows={2}
                             className="mt-2"
                           />
@@ -357,7 +370,7 @@ export default function Subscription() {
                     >
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <p className="text-sm text-muted-foreground">คุณเลือก</p>
+                          <p className="text-sm text-muted-foreground">รายการที่เลือก</p>
                           <p className="font-medium text-foreground">
                             {selectedCoffee.emoji} {selectedCoffee.name}
                           </p>
@@ -408,6 +421,9 @@ export default function Subscription() {
         >
           <button
             onClick={() => toggleSection("why")}
+            type="button"
+            aria-expanded={expandedSection === "why"}
+            aria-controls={whyPanelId}
             className="w-full p-4 border-b border-border flex items-center justify-between hover:bg-secondary/30 transition-colors"
           >
             <div className="flex items-center gap-3">
@@ -424,6 +440,7 @@ export default function Subscription() {
           <AnimatePresence>
             {expandedSection === "why" && (
               <motion.div
+                id={whyPanelId}
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
@@ -460,6 +477,9 @@ export default function Subscription() {
                         <button
                           key={tier.id}
                           onClick={() => setSelectedWhyTier(tier.id)}
+                          type="button"
+                          aria-pressed={selectedWhyTier === tier.id}
+                          aria-label={`${tier.name} ราคา ฿${tier.price}${selectedWhyTier === tier.id ? " เลือกอยู่" : ""}`}
                           className={`flex-1 py-2 px-3 rounded-xl border-2 transition-all text-center ${
                             selectedWhyTier === tier.id
                               ? "border-amber-500 bg-amber-500/10"

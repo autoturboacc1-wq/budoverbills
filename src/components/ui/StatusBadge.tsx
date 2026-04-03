@@ -20,7 +20,7 @@ interface StatusBadgeProps {
   size?: "sm" | "md";
 }
 
-const statusConfig: Record<Status, { label: string; dotClass: string; bgClass: string }> = {
+const statusConfig = {
   paid: {
     label: "ชำระแล้ว",
     dotClass: "bg-status-paid",
@@ -81,7 +81,7 @@ const statusConfig: Record<Status, { label: string; dotClass: string; bgClass: s
     dotClass: "bg-muted-foreground",
     bgClass: "bg-muted text-muted-foreground",
   },
-};
+} satisfies Record<Status, { label: string; dotClass: string; bgClass: string }>;
 
 export function StatusBadge({ status, className, size = "md" }: StatusBadgeProps) {
   const config = statusConfig[status];

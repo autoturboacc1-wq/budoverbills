@@ -171,6 +171,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                 size="sm" 
                 onClick={markAllAsRead}
                 className="text-xs"
+                aria-label="อ่านการแจ้งเตือนทั้งหมด"
               >
                 อ่านทั้งหมด
               </Button>
@@ -203,7 +204,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
                   onClick={() => handleClick(notif)}
-                  aria-label={`เปิดการแจ้งเตือน: ${notif.title}`}
+                  aria-label={`เปิดการแจ้งเตือน: ${notif.title}${notif.is_read ? "" : " ยังไม่อ่าน"}`}
                   className={`w-full p-4 rounded-xl border text-left transition-all ${
                     notif.is_read 
                       ? "bg-background border-border hover:bg-secondary/50 opacity-75" 

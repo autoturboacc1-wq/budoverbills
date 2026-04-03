@@ -30,7 +30,8 @@ export function createAgreement(overrides: Partial<DebtAgreement> = {}): DebtAgr
     principal_amount: 3000,
     interest_rate: 12,
     interest_type: 'flat',
-    total_amount: 3300,
+    // Keep the default total aligned with the installment fixture sum.
+    total_amount: 3000,
     num_installments: 3,
     frequency: 'monthly',
     start_date: '2026-04-01',

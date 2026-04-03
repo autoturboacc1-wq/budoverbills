@@ -524,8 +524,10 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
       if ('error' in result) throw result.error;
 
       // Use file path instead of public URL
-      await uploadSlip(pending.installmentId, result.path);
-      toast.success("อัปโหลดสลิปสำเร็จ", { description: "รอเจ้าหนี้ยืนยันการชำระ" });
+      const uploaded = await uploadSlip(pending.installmentId, result.path);
+      if (uploaded) {
+        toast.success("อัปโหลดสลิปสำเร็จ", { description: "รอเจ้าหนี้ยืนยันการชำระ" });
+      }
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("เกิดข้อผิดพลาดในการอัปโหลด");
@@ -546,7 +548,6 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
     setConfirmingId(installmentId);
     try {
       await confirmPayment(installmentId);
-      toast.success("ยืนยันการชำระเรียบร้อย");
     } catch (error) {
       toast.error("เกิดข้อผิดพลาด");
     } finally {

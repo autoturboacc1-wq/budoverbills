@@ -23,6 +23,10 @@ describe('money utils', () => {
     expect(() => toMoney(-100)).toThrow();
   });
 
+  it('allows negative values when explicitly enabled', () => {
+    expect(toMoney(-100, { allowNegative: true })).toBe(-100);
+  });
+
   it('sums decimal values safely', () => {
     expect(sumMoney(0.1, 0.2)).toBe(0.3);
   });
@@ -39,5 +43,10 @@ describe('money utils', () => {
 
   it('divides with 2-decimal normalization', () => {
     expect(divideMoney(100, 3)).toBe(33.33);
+  });
+
+  it('throws on invalid divisors', () => {
+    expect(() => divideMoney(100, 0)).toThrow();
+    expect(() => divideMoney(100, -2)).toThrow();
   });
 });
