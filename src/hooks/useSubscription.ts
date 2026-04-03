@@ -35,6 +35,7 @@ function getTotalAvailable(freeRemaining: number, credits: number, totalAvailabl
 export function useSubscription() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const paymentGatewayEnabled = false;
 
   // Fetch agreement quota (2 free, then pay per agreement)
   const { data: quota, isLoading, refetch } = useQuery({
@@ -161,6 +162,10 @@ export function useSubscription() {
   // Record agreement payment
   const recordPaymentMutation = useMutation({
     mutationFn: async (params: { agreementId: string; amount: number; currency?: string }) => {
+      if (!paymentGatewayEnabled) {
+        throw new Error("Payment gateway is not enabled");
+      }
+
       if (!user?.id) throw new Error("Not authenticated");
 
       const { data, error } = await supabase.rpc("record_agreement_payment", {
@@ -184,8 +189,8 @@ export function useSubscription() {
   });
 
   // Check if can create free agreement
-  const canCreateFree = quota?.can_create_free ?? true;
-  const freeRemaining = quota?.free_remaining ?? 2;
+  const canCreateFree = quota?.can_create_free ?? false;
+  const freeRemaining = quota?.free_remaining ?? 0;
   const feeAmount = getDefaultFeeAmount(quota?.fee_amount);
   const feeCurrency = quota?.fee_currency ?? 'THB';
 

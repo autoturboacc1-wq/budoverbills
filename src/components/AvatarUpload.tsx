@@ -5,6 +5,31 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
 
+const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_AVATAR_MIME_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+function getAvatarStoragePathFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+
+  try {
+    const pathname = new URL(url).pathname;
+    const marker = "/avatars/";
+    const index = pathname.indexOf(marker);
+
+    if (index === -1) {
+      return null;
+    }
+
+    return decodeURIComponent(pathname.slice(index + marker.length));
+  } catch {
+    return null;
+  }
+}
+
 interface AvatarUploadProps {
   currentAvatarUrl?: string | null;
   displayName: string;
@@ -21,32 +46,28 @@ export function AvatarUpload({ currentAvatarUrl, displayName, onAvatarChange }: 
     const file = event.target.files?.[0];
     if (!file || !user?.id) return;
 
+    const fileExt = ALLOWED_AVATAR_MIME_TYPES[file.type];
+
     // Validate file type
-    if (!file.type.startsWith('image/')) {
+    if (!fileExt) {
       toast.error("กรุณาเลือกไฟล์รูปภาพเท่านั้น");
       return;
     }
 
     // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > MAX_AVATAR_SIZE_BYTES) {
       toast.error("ไฟล์ใหญ่เกินไป (สูงสุด 5MB)");
       return;
     }
 
     setIsUploading(true);
 
-    try {
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
+    let uploadedPath: string | null = null;
+    const oldAvatarPath = getAvatarStoragePathFromUrl(currentAvatarUrl);
 
-      // Delete old avatar if exists
-      if (currentAvatarUrl) {
-        const oldPath = currentAvatarUrl.split('/avatars/')[1];
-        if (oldPath) {
-          await supabase.storage.from('avatars').remove([oldPath]);
-        }
-      }
+    try {
+      // Generate unique filename from the MIME type, not the original file name.
+      const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
 
       // Upload new avatar
       const { error: uploadError } = await supabase.storage
@@ -57,6 +78,7 @@ export function AvatarUpload({ currentAvatarUrl, displayName, onAvatarChange }: 
         });
 
       if (uploadError) throw uploadError;
+      uploadedPath = fileName;
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
@@ -71,6 +93,17 @@ export function AvatarUpload({ currentAvatarUrl, displayName, onAvatarChange }: 
 
       if (updateError) throw updateError;
 
+      // Delete the old avatar only after the profile now points at the new one.
+      if (oldAvatarPath && oldAvatarPath !== fileName) {
+        const { error: removeError } = await supabase.storage
+          .from('avatars')
+          .remove([oldAvatarPath]);
+
+        if (removeError) {
+          console.warn("Failed to remove old avatar:", removeError);
+        }
+      }
+
       toast.success("อัปโหลดรูปโปรไฟล์สำเร็จ");
       onAvatarChange?.(publicUrl);
       
@@ -79,6 +112,9 @@ export function AvatarUpload({ currentAvatarUrl, displayName, onAvatarChange }: 
         await refreshProfile();
       }
     } catch (error) {
+      if (uploadedPath) {
+        await supabase.storage.from('avatars').remove([uploadedPath]).catch(() => null);
+      }
       console.error('Upload error:', error);
       toast.error("ไม่สามารถอัปโหลดรูปได้");
     } finally {
@@ -122,7 +158,7 @@ export function AvatarUpload({ currentAvatarUrl, displayName, onAvatarChange }: 
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp"
         onChange={handleFileSelect}
         className="hidden"
         disabled={isUploading}

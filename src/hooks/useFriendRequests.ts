@@ -3,6 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+type RpcClient = {
+  rpc<TData>(functionName: string, args?: Record<string, unknown>): Promise<{
+    data: TData | null;
+    error: { message: string } | null;
+  }>;
+};
+
+const rpcClient = supabase as unknown as RpcClient;
+
 export interface FriendRequest {
   id: string;
   from_user_id: string;
@@ -120,6 +129,31 @@ export function useFriendRequests() {
     }
   }, [clearRequests, userId]);
 
+  const acceptFriendRequest = useCallback(async (requestId: string): Promise<boolean> => {
+    if (!userId) return false;
+
+    try {
+      const { data, error } = await rpcClient.rpc<{ success?: boolean }>('accept_friend_request', {
+        p_request_id: requestId,
+      });
+
+      if (error) throw error;
+
+      const result = data as { success?: boolean } | null;
+      if (!result?.success) {
+        throw new Error('ไม่สามารถยอมรับคำขอได้');
+      }
+
+      await fetchRequests();
+      toast.success('ยอมรับคำขอเป็นเพื่อนแล้ว');
+      return true;
+    } catch (error: unknown) {
+      console.error('Error accepting friend request:', error);
+      toast.error('ไม่สามารถยอมรับคำขอได้');
+      return false;
+    }
+  }, [fetchRequests, userId]);
+
   useEffect(() => {
     fetchRequests();
   }, [fetchRequests]);
@@ -129,7 +163,7 @@ export function useFriendRequests() {
     if (!userId) return;
 
     const channel = supabase
-      .channel('friend-requests-changes')
+      .channel(`friend-requests-changes-${userId}`)
       .on(
         'postgres_changes',
         {
@@ -225,96 +259,7 @@ export function useFriendRequests() {
     }
   };
 
-  const acceptRequest = async (requestId: string) => {
-    if (!userId) return false;
-    const createdFriendIds: string[] = [];
-
-    try {
-      const { data: request, error: requestError } = await supabase
-        .from('friend_requests')
-        .select('*')
-        .eq('id', requestId)
-        .eq('to_user_id', userId)
-        .eq('status', 'pending')
-        .maybeSingle();
-
-      if (requestError) throw requestError;
-
-      if (!request) {
-        toast.error('ไม่พบคำขอ');
-        return false;
-      }
-
-      const [fromProfileResult, toProfileResult] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('display_name, user_code')
-          .eq('user_id', request.from_user_id)
-          .maybeSingle(),
-        supabase
-          .from('profiles')
-          .select('display_name, user_code')
-          .eq('user_id', userId)
-          .maybeSingle(),
-      ]);
-
-      if (fromProfileResult.error) throw fromProfileResult.error;
-      if (toProfileResult.error) throw toProfileResult.error;
-
-      const { data: friend1, error: friend1Error } = await supabase
-        .from('friends')
-        .insert({
-          user_id: userId,
-          friend_user_id: request.from_user_id,
-          friend_name: fromProfileResult.data?.display_name || `User ${fromProfileResult.data?.user_code || 'Unknown'}`,
-        })
-        .select('id')
-        .single();
-
-      if (friend1Error) throw friend1Error;
-      if (friend1?.id) {
-        createdFriendIds.push(friend1.id);
-      }
-
-      const { data: friend2, error: friend2Error } = await supabase
-        .from('friends')
-        .insert({
-          user_id: request.from_user_id,
-          friend_user_id: userId,
-          friend_name: toProfileResult.data?.display_name || `User ${toProfileResult.data?.user_code || 'Unknown'}`,
-        })
-        .select('id')
-        .single();
-
-      if (friend2Error) throw friend2Error;
-      if (friend2?.id) {
-        createdFriendIds.push(friend2.id);
-      }
-
-      const { error: updateError } = await supabase
-        .from('friend_requests')
-        .update({ status: 'accepted' })
-        .eq('id', requestId)
-        .eq('to_user_id', userId)
-        .eq('status', 'pending');
-
-      if (updateError) throw updateError;
-
-      await fetchRequests();
-      toast.success('ยอมรับคำขอเป็นเพื่อนแล้ว');
-      return true;
-    } catch (error: unknown) {
-      console.error('Error accepting friend request:', error);
-      if (createdFriendIds.length > 0) {
-        await supabase
-          .from('friends')
-          .delete()
-          .in('id', createdFriendIds);
-      }
-      toast.error('ไม่สามารถยอมรับคำขอได้');
-      return false;
-    }
-  };
+  const acceptRequest = acceptFriendRequest;
 
   const rejectRequest = async (requestId: string) => {
     try {

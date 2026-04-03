@@ -1,7 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+
+type RpcClient = {
+  rpc<TData>(functionName: string, args?: Record<string, unknown>): Promise<{
+    data: TData | null;
+    error: { message: string } | null;
+  }>;
+};
+
+const rpcClient = supabase as unknown as RpcClient;
 
 // Point values
 const POINT_VALUES = {
@@ -59,6 +68,8 @@ export function useUserPoints() {
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
   const [badges, setBadges] = useState<EngagementBadge[]>([]);
   const [loading, setLoading] = useState(true);
+  const earnLockRef = useRef(false);
+  const redeemLockRef = useRef(false);
 
   const checkBadgeProgress = useCallback(async (actionType: keyof typeof POINT_VALUES) => {
     if (!user) return;
@@ -226,90 +237,40 @@ export function useUserPoints() {
     description?: string
   ) => {
     if (!user) return false;
+    if (earnLockRef.current) return false;
 
-    const { data: latestPoints, error: pointsError } = await supabase
-      .from("user_points")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
-
-    if (pointsError) {
-      console.error("Error refreshing points before earning:", pointsError);
-      return false;
-    }
-
-    const currentPoints = latestPoints as UserPointsRow;
-
-    // Check daily limit against the latest server snapshot
-    if (currentPoints.daily_earned_today >= DAILY_LIMIT) {
-      return false;
-    }
-
-    const pointsToEarn = Math.min(
-      POINT_VALUES[actionType],
-      DAILY_LIMIT - currentPoints.daily_earned_today
-    );
-
-    if (pointsToEarn <= 0) return false;
+    earnLockRef.current = true;
 
     try {
-      // Check if already earned for this reference (prevent duplicates)
-      if (referenceId) {
-        const { data: existing } = await supabase
-          .from("point_transactions")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("action_type", actionType)
-          .eq("reference_id", referenceId)
-          .maybeSingle();
+      const referenceIdToUse = referenceId ?? crypto.randomUUID();
+      const { data, error } = await rpcClient.rpc<{
+        success?: boolean;
+        duplicate?: boolean;
+        points_earned?: number;
+      }>("earn_points", {
+        p_user_id: user.id,
+        p_action_type: actionType,
+        p_reference_id: referenceIdToUse,
+        p_points: POINT_VALUES[actionType],
+        p_description: description || null,
+      });
 
-        if (existing) return false; // Already earned
-      }
+      if (error) throw error;
 
-      const nextPoints = {
-        total_points: currentPoints.total_points + pointsToEarn,
-        lifetime_points: currentPoints.lifetime_points + pointsToEarn,
-        daily_earned_today: currentPoints.daily_earned_today + pointsToEarn,
-      };
+      const result = data as {
+        success?: boolean;
+        duplicate?: boolean;
+        points_earned?: number;
+      } | null;
 
-      // Update points first so the counter remains consistent with any later transaction write.
-      const { data: updatedPoints, error: updateError } = await supabase
-        .from("user_points")
-        .update(nextPoints)
-        .eq("user_id", user.id)
-        .select()
-        .single();
-
-      if (updateError) throw updateError;
-
-      // Insert transaction
-      const { error: transactionError } = await supabase
-        .from("point_transactions")
-        .insert({
-          user_id: user.id,
-          points: pointsToEarn,
-          action_type: actionType,
-          reference_id: referenceId || null,
-          description: description || null,
-        });
-
-      if (transactionError) {
-        await supabase
-          .from("user_points")
-          .update(currentPoints)
-          .eq("user_id", user.id);
-        setPoints(currentPoints);
-        throw transactionError;
-      }
-
-      if (updatedPoints) {
-        setPoints(updatedPoints);
+      if (!result?.success || (result.points_earned ?? 0) <= 0) {
+        return false;
       }
 
       await fetchTransactions();
       await fetchPoints();
 
-      toast.success(`+${pointsToEarn} คะแนน!`, {
+      toast.success(`+${result.points_earned} คะแนน!`, {
         description: description || `จากการ${getActionLabel(actionType)}`,
       });
 
@@ -320,6 +281,8 @@ export function useUserPoints() {
     } catch (error) {
       console.error("Error earning points:", error);
       return false;
+    } finally {
+      earnLockRef.current = false;
     }
   }, [user, checkBadgeProgress, fetchPoints, fetchTransactions]);
 
@@ -329,89 +292,33 @@ export function useUserPoints() {
     rewardValue: string
   ) => {
     if (!user) return false;
-
-    const { data: latestPoints, error: pointsError } = await supabase
-      .from("user_points")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
-
-    if (pointsError) {
-      console.error("Error refreshing points before redeeming:", pointsError);
-      toast.error("เกิดข้อผิดพลาด");
-      return false;
-    }
-
-    const currentPoints = latestPoints as UserPointsRow;
-
-    if (currentPoints.total_points < pointsToSpend) {
-      toast.error("คะแนนไม่เพียงพอ");
-      return false;
-    }
+    if (redeemLockRef.current) return false;
+    redeemLockRef.current = true;
 
     try {
-      const nextPoints = {
-        total_points: currentPoints.total_points - pointsToSpend,
-        lifetime_points: currentPoints.lifetime_points,
-        daily_earned_today: currentPoints.daily_earned_today,
-      };
+      const { data, error } = await rpcClient.rpc<{
+        success?: boolean;
+        duplicate?: boolean;
+        points_spent?: number;
+      }>("redeem_points", {
+        p_user_id: user.id,
+        p_points: pointsToSpend,
+        p_reward_type: rewardType,
+        p_reward_value: rewardValue,
+        p_description: `แลก ${rewardType}: ${rewardValue}`,
+        p_reference_id: crypto.randomUUID(),
+      });
 
-      const { data: updatedPoints, error: updateError } = await supabase
-        .from("user_points")
-        .update(nextPoints)
-        .eq("user_id", user.id)
-        .select()
-        .single();
+      if (error) throw error;
 
-      if (updateError) throw updateError;
+      const result = data as {
+        success?: boolean;
+        duplicate?: boolean;
+        points_spent?: number;
+      } | null;
 
-      // Create redemption
-      const { data: redemption, error: redemptionError } = await supabase
-        .from("point_redemptions")
-        .insert({
-          user_id: user.id,
-          points_spent: pointsToSpend,
-          reward_type: rewardType,
-          reward_value: rewardValue,
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-        })
-        .select()
-        .single();
-
-      if (redemptionError) {
-        await supabase
-          .from("user_points")
-          .update(currentPoints)
-          .eq("user_id", user.id);
-        setPoints(currentPoints);
-        throw redemptionError;
-      }
-
-      // Log redemption transaction
-      const { error: transactionError } = await supabase
-        .from("point_transactions")
-        .insert({
-          user_id: user.id,
-          points: -pointsToSpend,
-          action_type: "redeem",
-          description: `แลก ${rewardType}: ${rewardValue}`,
-        });
-
-      if (transactionError) {
-        if (redemption?.id) {
-          await supabase.from("point_redemptions").delete().eq("id", redemption.id);
-        }
-
-        await supabase
-          .from("user_points")
-          .update(currentPoints)
-          .eq("user_id", user.id);
-        setPoints(currentPoints);
-        throw transactionError;
-      }
-
-      if (updatedPoints) {
-        setPoints(updatedPoints);
+      if (!result?.success) {
+        return false;
       }
 
       await fetchTransactions();
@@ -422,6 +329,8 @@ export function useUserPoints() {
       console.error("Error redeeming points:", error);
       toast.error("เกิดข้อผิดพลาด");
       return false;
+    } finally {
+      redeemLockRef.current = false;
     }
   }, [user, fetchPoints, fetchTransactions]);
 

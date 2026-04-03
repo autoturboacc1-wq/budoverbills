@@ -26,7 +26,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 // Coffee tiers with credits
@@ -66,6 +65,7 @@ const COFFEE_TIERS = [
 export default function Subscription() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const paymentGatewayEnabled = false;
   const [expandedSection, setExpandedSection] = useState<string | null>("coffee");
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [selectedWhyTier, setSelectedWhyTier] = useState<string>("luxury"); // Default to popular tier
@@ -99,6 +99,11 @@ export default function Subscription() {
       return;
     }
 
+    if (!paymentGatewayEnabled) {
+      toast.error("ระบบรับชำระเงินยังไม่เปิดใช้งาน");
+      return;
+    }
+
     if (!selectedCoffee) {
       toast.error("กรุณาเลือกกาแฟ");
       return;
@@ -107,40 +112,10 @@ export default function Subscription() {
     setIsSubmitting(true);
 
     try {
-      // Record tip with coffee purchase
-      const { error: tipError } = await supabase.rpc("record_tip", {
-        p_user_id: user.id,
-        p_amount: selectedCoffee.price,
-        p_currency: "THB",
-        p_message: tipMessage || `ซื้อ${selectedCoffee.name}`,
-        p_display_name: undefined,
-        p_is_anonymous: false,
-      });
-
-      if (tipError) throw tipError;
-
-      // Add credits to user's account
-      const { error: creditsError } = await supabase.rpc("add_agreement_credits", {
-        p_user_id: user.id,
-        p_credits: selectedCoffee.credits,
-      });
-
-      if (creditsError) throw creditsError;
-
-      toast.success(`ขอบคุณที่เลี้ยงกาแฟ! ☕`, {
-        description: `ได้รับ ${selectedCoffee.credits} สิทธิ์สร้างข้อตกลง`,
-      });
-
-      // Reset form
-      setSelectedTier(null);
-      setTipMessage("");
-      setShowMessage(false);
-      
-      // TODO: Integrate with actual payment gateway (PromptPay, Omise)
-      
+      throw new Error("Payment gateway is not enabled");
     } catch (error) {
       console.error("Error purchasing coffee:", error);
-      toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+      toast.error("ระบบรับชำระเงินยังไม่เปิดใช้งาน");
     } finally {
       setIsSubmitting(false);
     }
@@ -398,7 +373,7 @@ export default function Subscription() {
                       <Button
                         className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-medium py-6"
                         onClick={handlePurchaseCoffee}
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || !paymentGatewayEnabled}
                       >
                         {isSubmitting ? (
                           <span className="flex items-center gap-2">
@@ -414,7 +389,7 @@ export default function Subscription() {
                       </Button>
 
                       <p className="text-xs text-center text-muted-foreground mt-2">
-                        💝 รองรับ PromptPay • สิทธิ์ใช้ได้ตลอดไม่หมดอายุ
+                        ระบบชำระเงินจริงยังไม่เปิดใช้งาน
                       </p>
                     </motion.div>
                   )}
