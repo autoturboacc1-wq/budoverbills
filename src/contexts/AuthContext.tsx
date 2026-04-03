@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useRe
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { logActivityDirect } from '@/hooks/useActivityLogger';
+import { clearAdminSession } from '@/utils/adminSession';
 interface Profile {
   id: string;
   user_id: string;
@@ -23,7 +24,7 @@ interface AuthContextType {
   isGuest: boolean;
   signUp: (email: string, password: string, displayName?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signInWithGoogle: () => Promise<{ error: Error | null }>;
+  signInWithGoogle: (destinationPath?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   requireAuth: (action: string) => boolean;
   refreshProfile: () => Promise<void>;
@@ -35,22 +36,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
   const currentUserIdRef = useRef<string | null>(null);
 
-  const fetchProfile = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-    
-    if (currentUserIdRef.current !== userId) {
-      return;
+  const getSafeAuthDestination = useCallback((destinationPath?: string | null) => {
+    if (!destinationPath || !destinationPath.startsWith('/') || destinationPath.startsWith('//')) {
+      return '/';
     }
-    
-    if (!error) {
-      setProfile(data ?? null);
+
+    return destinationPath;
+  }, []);
+
+  const fetchProfile = useCallback(async (userId: string) => {
+    setProfileLoading(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (currentUserIdRef.current !== userId) {
+        return;
+      }
+
+      if (!error) {
+        setProfile(data ?? null);
+      }
+    } finally {
+      if (currentUserIdRef.current === userId) {
+        setProfileLoading(false);
+      }
     }
   }, []);
 
@@ -65,18 +83,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, session) => {
         const nextUser = session?.user ?? null;
         currentUserIdRef.current = nextUser?.id ?? null;
+        setAuthLoading(true);
         setSession(session);
         setUser(nextUser);
         
         if (nextUser) {
+          if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/auth') {
+            window.location.assign('/auth?type=recovery');
+            return;
+          }
+
           setTimeout(() => {
-            void fetchProfile(nextUser.id);
+            void (async () => {
+              await fetchProfile(nextUser.id);
+              setAuthLoading(false);
+            })();
           }, 0);
         } else {
+          clearAdminSession();
           setProfile(null);
+          setProfileLoading(false);
+          setAuthLoading(false);
         }
-        
-        setIsLoading(false);
       }
     );
 
@@ -135,11 +163,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (destinationPath?: string) => {
+    const safeDestination = getSafeAuthDestination(destinationPath);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: `${window.location.origin}/auth?from=${encodeURIComponent(safeDestination)}`,
       },
     });
     
@@ -156,19 +185,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     }
     
+    clearAdminSession();
     await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setProfile(null);
   };
 
   const requireAuth = (action: string): boolean => {
     if (!user) {
-      // Return false to indicate auth is required
+      console.warn(`Authentication required for action: ${action}`);
+      const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      window.location.assign(`/auth?from=${encodeURIComponent(returnTo)}`);
       return false;
     }
     return true;
   };
+
+  const isLoading = authLoading || profileLoading;
 
   const value: AuthContextType = {
     user,

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   calculateRemainingAmount,
@@ -23,6 +23,10 @@ export type { Installment, DebtAgreement, CreateAgreementInput } from '@/domains
 
 type ProfileRow = Tables<'profiles'>;
 type InstallmentRow = Tables<'installments'>;
+type RpcClient = (
+  fn: string,
+  params?: Record<string, unknown>
+) => Promise<{ data: unknown; error: Error | null }>;
 type DebtAgreementSecureRow = Tables<'debt_agreements_secure'> & {
   installments: InstallmentRow[] | null;
   transfer_slip_url?: string | null;
@@ -218,54 +222,44 @@ export function useDebtAgreements() {
     }
 
     try {
-      const agreementInsert: TablesInsert<'debt_agreements'> = {
-        lender_id: user.id,
-        borrower_id: input.borrower_id ?? null,
-        borrower_phone: input.borrower_phone ?? null,
-        borrower_name: input.borrower_name ?? null,
-        principal_amount: toMoney(input.principal_amount),
-        interest_rate: toMoney(input.interest_rate),
-        interest_type: input.interest_type,
-        total_amount: toMoney(input.total_amount),
-        num_installments: input.num_installments,
-        frequency: input.frequency,
-        start_date: input.start_date,
-        description: input.description ?? null,
-        reschedule_fee_rate: input.reschedule_fee_rate ?? 5,
-        reschedule_interest_multiplier: input.reschedule_interest_multiplier ?? 1,
-        bank_name: input.bank_name ?? null,
-        account_number: input.account_number ?? null,
-        account_name: input.account_name ?? null,
-        lender_confirmed: true,
-      };
+      const rpc = supabase.rpc as unknown as RpcClient;
+      const { data, error } = await rpc('create_agreement_with_installments', {
+        p_lender_id: user.id,
+        p_borrower_id: input.borrower_id ?? null,
+        p_borrower_phone: input.borrower_phone ?? null,
+        p_borrower_name: input.borrower_name ?? null,
+        p_principal_amount: toMoney(input.principal_amount),
+        p_interest_rate: toMoney(input.interest_rate),
+        p_interest_type: input.interest_type,
+        p_total_amount: toMoney(input.total_amount),
+        p_num_installments: input.num_installments,
+        p_frequency: input.frequency,
+        p_start_date: input.start_date,
+        p_description: input.description ?? null,
+        p_reschedule_fee_rate: input.reschedule_fee_rate ?? 5,
+        p_reschedule_interest_multiplier: input.reschedule_interest_multiplier ?? 1,
+        p_bank_name: input.bank_name ?? null,
+        p_account_number: input.account_number ?? null,
+        p_account_name: input.account_name ?? null,
+        p_installments: input.installments.map((installment) => ({
+          installment_number: installment.installment_number,
+          due_date: installment.due_date,
+          amount: toMoney(installment.amount),
+          principal_portion: toMoney(installment.principal_portion),
+          interest_portion: toMoney(installment.interest_portion),
+        })),
+      });
 
-      const { data: agreement, error: agreementError } = await supabase
-        .from('debt_agreements')
-        .insert(agreementInsert)
-        .select()
-        .single();
-
-      if (agreementError) {
-        throw agreementError;
+      if (error) {
+        throw error;
       }
 
-      const installmentsToInsert: TablesInsert<'installments'>[] = input.installments.map((installment) => ({
-        agreement_id: agreement.id,
-        installment_number: installment.installment_number,
-        due_date: installment.due_date,
-        amount: toMoney(installment.amount),
-        principal_portion: toMoney(installment.principal_portion),
-        interest_portion: toMoney(installment.interest_portion),
-      }));
-
-      const { error: installmentsError } = await supabase.from('installments').insert(installmentsToInsert);
-
-      if (installmentsError) {
-        throw installmentsError;
-      }
+      const createdAgreementId = typeof data === 'object' && data !== null && 'agreement_id' in data
+        ? String((data as { agreement_id: string }).agreement_id)
+        : null;
 
       await fetchAgreements();
-      return agreement;
+      return createdAgreementId;
     } catch (error) {
       handleSupabaseError(error, 'create-agreement', `ไม่สามารถสร้างข้อตกลงได้: ${getErrorMessage(error)}`);
       return null;

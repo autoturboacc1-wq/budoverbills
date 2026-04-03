@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { clearAdminSession } from "@/utils/adminSession";
 
 const adminMenuItems = [
   {
@@ -151,9 +152,7 @@ export function AdminSidebar({ isCodeLogin = false, isCodeAdmin = false }: Admin
           onClick={() => {
             if (isCodeLogin) {
               // Clear code session and go back to code login
-              sessionStorage.removeItem("admin_code_verified");
-              sessionStorage.removeItem("admin_code_name");
-              sessionStorage.removeItem("admin_code_role");
+              clearAdminSession();
               navigate("/admin/code");
             } else {
               navigate("/profile");

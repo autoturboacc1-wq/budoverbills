@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { BobLogo } from "@/components/BobLogo";
+import { clearAdminSession, hasAdminSession } from "@/utils/adminSession";
 
 type LoginStep = "credentials" | "otp" | "success" | "locked";
 
@@ -52,8 +53,7 @@ export default function AdminLogin() {
     }
 
     const checkAdminStatus = () => {
-      const verified = sessionStorage.getItem("admin_verified");
-      if (verified === user.id) {
+      if (hasAdminSession(user.id)) {
         navigate("/admin", { replace: true });
       }
     };
@@ -178,6 +178,7 @@ export default function AdminLogin() {
 
       if (result.success) {
         // Store verification in session
+        clearAdminSession();
         sessionStorage.setItem("admin_verified", currentUser.id);
 
         // Log successful verification

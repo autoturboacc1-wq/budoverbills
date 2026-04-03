@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { hasAdminCodeSession, hasAdminSession } from "@/utils/adminSession";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -22,9 +23,9 @@ export function AdminLayout({ children, requireAdmin = false }: AdminLayoutProps
   const hasAdminAccess = isAdmin || isModerator;
   
   // Check for admin code login state, but only after role-based access is confirmed.
-  const isCodeVerified = sessionStorage.getItem("admin_code_verified") === "true";
+  const isVerified = hasAdminSession(user?.id);
+  const isCodeVerified = hasAdminCodeSession(user?.id);
   const codeRole = sessionStorage.getItem("admin_code_role");
-  const isVerified = Boolean(user && hasAdminAccess && sessionStorage.getItem("admin_verified") === user.id);
   const isCodeLogin = hasAdminAccess && isCodeVerified && isVerified;
   const isCodeAdmin = isCodeLogin && codeRole === "admin";
 

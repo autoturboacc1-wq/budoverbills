@@ -11,6 +11,7 @@ import { format, subDays, subMonths, startOfDay } from "date-fns";
 import { th } from "date-fns/locale";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { hasAdminSession } from "@/utils/adminSession";
 
 type ActionFilter = "all" | "role_granted" | "role_revoked";
 type TimeFilter = "all" | "today" | "7days" | "30days";
@@ -62,8 +63,7 @@ export default function AdminHub() {
     const checkVerification = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const verified = sessionStorage.getItem("admin_verified");
-        if (verified !== user.id) {
+        if (!hasAdminSession(user.id)) {
           // Not verified, redirect to admin login
           navigate("/admin/login");
         }

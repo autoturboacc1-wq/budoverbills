@@ -59,6 +59,22 @@ interface SlipVerification {
   verified_at: string | null;
 }
 
+type InstallmentSnapshot = Pick<
+  Installment,
+  | "id"
+  | "amount"
+  | "installment_number"
+  | "principal_portion"
+  | "status"
+  | "confirmed_by_lender"
+  | "payment_proof_url"
+>;
+
+type RpcClient = (
+  fn: string,
+  params?: Record<string, unknown>
+) => Promise<{ data: unknown; error: Error | null }>;
+
 export function PaymentDialog({
   open,
   onOpenChange,
@@ -81,8 +97,47 @@ export function PaymentDialog({
   const [signedSlipUrl, setSignedSlipUrl] = useState<string | null>(null);
   const [loadingSignedUrl, setLoadingSignedUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadLockRef = useRef(false);
+  const borrowerSubmitLockRef = useRef(false);
+  const lenderActionLockRef = useRef(false);
   
-  const { calculateExtraPaymentPreview, processExtraPayment } = useExtraPayment();
+  const { calculateExtraPaymentPreview } = useExtraPayment();
+
+  const refreshPaymentState = useCallback(async () => {
+    if (!installment) return null;
+
+    const [installmentResult, pendingResult] = await Promise.all([
+      supabase
+        .from("installments")
+        .select("id, amount, installment_number, principal_portion, status, confirmed_by_lender, payment_proof_url")
+        .eq("id", installment.id)
+        .maybeSingle(),
+      supabase
+        .from("slip_verifications")
+        .select("id, submitted_amount, verified_amount, slip_url, status, rejection_reason, created_at, verified_at")
+        .eq("installment_id", installment.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1),
+    ]);
+
+    if (installmentResult.error) throw installmentResult.error;
+    if (pendingResult.error) throw pendingResult.error;
+
+    const freshInstallment = installmentResult.data as InstallmentSnapshot | null;
+    const freshPending = ((pendingResult.data ?? [])[0] ?? null) as SlipVerification | null;
+
+    setPendingVerification(freshPending);
+
+    if (freshPending && isLender) {
+      setVerifiedAmount(freshPending.submitted_amount.toString());
+    }
+
+    return {
+      freshInstallment,
+      freshPending,
+    };
+  }, [installment, isLender]);
 
   const fetchVerificationHistory = useCallback(async () => {
     if (!installment) return;
@@ -170,16 +225,9 @@ export function PaymentDialog({
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !installment) return;
+    if (uploadLockRef.current) return;
     if (!user || isLender || user.id !== agreement.borrower_id) {
       toast.error("คุณไม่มีสิทธิ์อัปโหลดสลิปงวดนี้");
-      return;
-    }
-    if (pendingVerification) {
-      toast.error("มีสลิปที่รอตรวจสอบอยู่แล้ว");
-      return;
-    }
-    if (installment.confirmed_by_lender || installment.status === 'paid') {
-      toast.error("งวดนี้ถูกยืนยันแล้ว ไม่สามารถอัปโหลดสลิปใหม่ได้");
       return;
     }
 
@@ -189,9 +237,33 @@ export function PaymentDialog({
       return;
     }
 
+    uploadLockRef.current = true;
     setIsUploading(true);
 
     try {
+      const latestState = await refreshPaymentState();
+      const freshInstallment = latestState?.freshInstallment;
+      const freshPending = latestState?.freshPending;
+
+      if (!freshInstallment) {
+        toast.error("ไม่พบข้อมูลค่างวดล่าสุด");
+        return;
+      }
+
+      if (
+        freshInstallment.confirmed_by_lender ||
+        freshInstallment.status === "paid" ||
+        freshInstallment.payment_proof_url
+      ) {
+        toast.error("งวดนี้ถูกยืนยันแล้ว ไม่สามารถอัปโหลดสลิปใหม่ได้");
+        return;
+      }
+
+      if (freshPending) {
+        toast.error("มีสลิปที่รอตรวจสอบอยู่แล้ว");
+        return;
+      }
+
       const result = await uploadPaymentSlip({
         agreementId: agreement.id,
         kind: 'installment',
@@ -211,6 +283,7 @@ export function PaymentDialog({
       toast.error("เกิดข้อผิดพลาดในการอัปโหลด");
     } finally {
       setIsUploading(false);
+      uploadLockRef.current = false;
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -219,16 +292,48 @@ export function PaymentDialog({
 
   const handleSubmitPayment = async () => {
     if (!installment || !slipUrl || !user) return;
+    if (borrowerSubmitLockRef.current) return;
     if (numericAmount < installment.amount) {
       toast.error("ยอดเงินต้องไม่น้อยกว่าค่างวด");
       return;
     }
 
+    borrowerSubmitLockRef.current = true;
     setIsSubmitting(true);
 
+    let insertedSlipVerificationId: string | null = null;
+
     try {
+      const latestState = await refreshPaymentState();
+      const freshInstallment = latestState?.freshInstallment;
+      const freshPending = latestState?.freshPending;
+
+      if (!freshInstallment) {
+        toast.error("ไม่พบข้อมูลค่างวดล่าสุด");
+        return;
+      }
+
+      const freshAmount = freshInstallment.amount;
+
+      if (freshInstallment.confirmed_by_lender || freshInstallment.status === "paid") {
+        toast.error("งวดนี้ถูกยืนยันแล้ว ไม่สามารถส่งสลิปใหม่ได้");
+        return;
+      }
+
+      if (freshPending) {
+        toast.error("มีสลิปที่รอตรวจสอบอยู่แล้ว");
+        return;
+      }
+
+      if (numericAmount < freshAmount) {
+        toast.error("ยอดเงินต้องไม่น้อยกว่าค่างวด");
+        return;
+      }
+
+      const freshIsExtraPayment = numericAmount > freshAmount;
+
       // Create slip verification record
-      const { error: verificationError } = await supabase
+      const { data: verificationData, error: verificationError } = await supabase
         .from('slip_verifications')
         .insert({
           installment_id: installment.id,
@@ -237,9 +342,12 @@ export function PaymentDialog({
           submitted_amount: numericAmount,
           slip_url: slipUrl,
           status: 'pending'
-        });
+        })
+        .select("id")
+        .single();
 
       if (verificationError) throw verificationError;
+      insertedSlipVerificationId = verificationData.id;
 
       // Update installment with slip URL
       const { error: updateError } = await supabase
@@ -250,13 +358,21 @@ export function PaymentDialog({
         })
         .eq('id', installment.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        if (insertedSlipVerificationId) {
+          await supabase
+            .from('slip_verifications')
+            .delete()
+            .eq('id', insertedSlipVerificationId);
+        }
+        throw updateError;
+      }
 
       // Create notification for lender
-      const isFee = installment.principal_portion === 0 && installment.amount > 0;
-      const label = isFee ? 'ค่าเลื่อนงวด' : `งวดที่ ${installment.installment_number}`;
-      const notificationMessage = isExtraPayment
-        ? `มีการชำระเงิน${label} ยอด ฿${numericAmount.toLocaleString()} (เกินค่างวด ฿${(numericAmount - installment.amount).toLocaleString()}) - รอตรวจสอบสลิป`
+      const isFee = freshInstallment.principal_portion === 0 && freshAmount > 0;
+      const label = isFee ? 'ค่าเลื่อนงวด' : `งวดที่ ${freshInstallment.installment_number}`;
+      const notificationMessage = freshIsExtraPayment
+        ? `มีการชำระเงิน${label} ยอด ฿${numericAmount.toLocaleString()} (เกินค่างวด ฿${(numericAmount - freshAmount).toLocaleString()}) - รอตรวจสอบสลิป`
         : `มีการชำระเงิน${label} ยอด ฿${numericAmount.toLocaleString()} - รอตรวจสอบสลิป`;
 
       await supabase.from('notifications').insert({
@@ -280,12 +396,14 @@ export function PaymentDialog({
       toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่");
     } finally {
       setIsSubmitting(false);
+      borrowerSubmitLockRef.current = false;
     }
   };
 
   // Lender confirms amount matches
   const handleConfirmPayment = async () => {
     if (!installment || !pendingVerification || !user) return;
+    if (lenderActionLockRef.current) return;
     if (!isLender || user.id !== agreement.lender_id) {
       toast.error("เฉพาะเจ้าหนี้เท่านั้นที่ยืนยันการชำระได้");
       return;
@@ -295,67 +413,50 @@ export function PaymentDialog({
       return;
     }
 
+    lenderActionLockRef.current = true;
     setIsSubmitting(true);
 
     try {
-      // Update verification record
-      await supabase
-        .from('slip_verifications')
-        .update({
-          verified_amount: numericVerifiedAmount,
-          verified_by: user.id,
-          status: 'approved',
-          verified_at: new Date().toISOString()
-        })
-        .eq('id', pendingVerification.id);
+      const latestState = await refreshPaymentState();
+      const freshInstallment = latestState?.freshInstallment;
+      const freshPending = latestState?.freshPending;
 
-      // Mark installment as paid
-      await supabase
-        .from('installments')
-        .update({ 
-          confirmed_by_lender: true,
-          status: 'paid',
-          paid_at: new Date().toISOString()
-        })
-        .eq('id', installment.id);
+      if (!freshInstallment || !freshPending) {
+        toast.error("ไม่พบสลิปที่รอตรวจสอบแล้ว");
+        return;
+      }
 
-      // Process extra payment if verified amount exceeds installment
-      const extraAmount = numericVerifiedAmount - installment.amount;
+      if (freshInstallment.confirmed_by_lender || freshInstallment.status === "paid") {
+        toast.error("งวดนี้ถูกยืนยันไปแล้ว");
+        return;
+      }
+
+      const rpc = supabase.rpc as unknown as RpcClient;
+      const { data, error } = await rpc("confirm_installment_payment", {
+        p_installment_id: freshInstallment.id,
+        p_verification_id: freshPending.id,
+        p_verified_amount: numericVerifiedAmount,
+      });
+
+      if (error) throw error;
+
+      const result = (data ?? {}) as {
+        success?: boolean;
+        extra_amount?: number;
+        extra_payment_result?: { success?: boolean; installments_closed?: number; principal_reduction?: number } | null;
+      };
+
+      if (!result.success) {
+        toast.error("ไม่สามารถยืนยันการชำระได้");
+        return;
+      }
+
+      const extraAmount = result.extra_amount ?? 0;
       if (extraAmount > 0) {
-        await processExtraPayment(agreement, extraAmount, () => {});
-        
-        // Notify borrower about extra payment processing
-        const isFee = installment.principal_portion === 0 && installment.amount > 0;
-        const label = isFee ? 'ค่าเลื่อนงวด' : `งวดที่ ${installment.installment_number}`;
-        if (agreement.borrower_id) {
-          await supabase.from('notifications').insert({
-            user_id: agreement.borrower_id,
-            type: 'payment_confirmed',
-            title: 'ยืนยันการชำระ + ชำระเพิ่มเติม',
-            message: `${label} ยืนยันแล้ว + ตัดเงินต้นเพิ่ม ฿${extraAmount.toLocaleString()}`,
-            related_type: 'installment',
-            related_id: installment.id
-          });
-        }
-
         toast.success("ยืนยันการชำระสำเร็จ", {
           description: `รวมชำระเพิ่มเติม ฿${extraAmount.toLocaleString()} ตัดเงินต้น`
         });
       } else {
-        // Normal payment notification
-        const isFee = installment.principal_portion === 0 && installment.amount > 0;
-        const label = isFee ? 'ค่าเลื่อนงวด' : `งวดที่ ${installment.installment_number}`;
-        if (agreement.borrower_id) {
-          await supabase.from('notifications').insert({
-            user_id: agreement.borrower_id,
-            type: 'payment_confirmed',
-            title: isFee ? 'ยืนยันการชำระค่าเลื่อนงวด' : 'ยืนยันการชำระแล้ว',
-            message: `${label} เจ้าหนี้ยืนยันยอด ฿${numericVerifiedAmount.toLocaleString()} และรับเงินแล้ว`,
-            related_type: 'installment',
-            related_id: installment.id
-          });
-        }
-
         toast.success("ยืนยันการชำระสำเร็จ");
       }
 
@@ -367,51 +468,45 @@ export function PaymentDialog({
       toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่");
     } finally {
       setIsSubmitting(false);
+      lenderActionLockRef.current = false;
     }
   };
 
   // Lender rejects - amount doesn't match
   const handleRejectPayment = async () => {
     if (!installment || !pendingVerification || !user) return;
+    if (lenderActionLockRef.current) return;
     if (!isLender || user.id !== agreement.lender_id) {
       toast.error("เฉพาะเจ้าหนี้เท่านั้นที่ปฏิเสธสลิปได้");
       return;
     }
 
+    lenderActionLockRef.current = true;
     setIsSubmitting(true);
 
     try {
-      // Update verification record as rejected
-      await supabase
-        .from('slip_verifications')
-        .update({
-          status: 'rejected',
-          rejection_reason: 'ยอดเงินไม่ตรงกับสลิป',
-          verified_at: new Date().toISOString()
-        })
-        .eq('id', pendingVerification.id);
+      const latestState = await refreshPaymentState();
+      const freshInstallment = latestState?.freshInstallment;
+      const freshPending = latestState?.freshPending;
 
-      // Reset the installment status so borrower can resubmit
-      await supabase
-        .from('installments')
-        .update({ 
-          payment_proof_url: null,
-          status: 'pending'
-        })
-        .eq('id', installment.id);
+      if (!freshInstallment || !freshPending) {
+        toast.error("ไม่พบสลิปที่รอตรวจสอบแล้ว");
+        return;
+      }
 
-      // Notify borrower to resubmit
-      const isFee = installment.principal_portion === 0 && installment.amount > 0;
-      const label = isFee ? 'ค่าเลื่อนงวด' : `งวดที่ ${installment.installment_number}`;
-      if (agreement.borrower_id) {
-        await supabase.from('notifications').insert({
-          user_id: agreement.borrower_id,
-          type: 'payment_rejected',
-          title: 'ยอดเงินไม่ตรง',
-          message: `${label}: เจ้าหนี้แจ้งว่ายอดเงินที่กรอก (฿${pendingVerification.submitted_amount.toLocaleString()}) ไม่ตรงกับสลิป กรุณาตรวจสอบและส่งใหม่`,
-          related_type: 'installment',
-          related_id: installment.id
-        });
+      const rpc = supabase.rpc as unknown as RpcClient;
+      const { data, error } = await rpc("reject_installment_payment", {
+        p_installment_id: freshInstallment.id,
+        p_verification_id: freshPending.id,
+        p_reason: "ยอดเงินไม่ตรงกับสลิป",
+      });
+
+      if (error) throw error;
+
+      const result = (data ?? {}) as { success?: boolean };
+      if (!result.success) {
+        toast.error("ไม่สามารถปฏิเสธสลิปได้");
+        return;
       }
 
       toast.success("แจ้งผู้ยืมแล้ว", {
@@ -425,6 +520,7 @@ export function PaymentDialog({
       toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่");
     } finally {
       setIsSubmitting(false);
+      lenderActionLockRef.current = false;
     }
   };
 
@@ -583,7 +679,8 @@ export function PaymentDialog({
                 onChange={(e) => setPaymentAmount(e.target.value)}
                 placeholder={`อย่างน้อย ฿${installment.amount.toLocaleString()}`}
                 className="text-lg font-semibold"
-                min={1}
+                min={installment.amount}
+                step="0.01"
               />
               <p className="text-xs text-muted-foreground mt-1">
                 กรอกยอดให้ตรงกับสลิปที่โอน (สามารถชำระมากกว่าค่างวดได้)
@@ -610,6 +707,7 @@ export function PaymentDialog({
                     : ''
                 }`}
                 min={1}
+                step="0.01"
               />
               
               {/* Amount Match/Mismatch Indicator */}

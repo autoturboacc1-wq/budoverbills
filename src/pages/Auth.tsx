@@ -16,6 +16,14 @@ import { BobLogo } from "@/components/BobLogo";
 const emailSchema = z.string().email("อีเมลไม่ถูกต้อง");
 const passwordSchema = z.string().min(6, "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
 
+function getSafeInternalPath(path: string | null | undefined) {
+  if (!path || !path.startsWith("/") || path.startsWith("//")) {
+    return "/";
+  }
+
+  return path;
+}
+
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -47,7 +55,8 @@ export default function Auth() {
   });
 
   const locationState = location.state as { from?: { pathname?: string }; returnTo?: string } | null;
-  const from = locationState?.from?.pathname || locationState?.returnTo || "/";
+  const fromQuery = new URLSearchParams(location.search).get("from");
+  const from = getSafeInternalPath(locationState?.from?.pathname || locationState?.returnTo || fromQuery || "/");
 
   useEffect(() => {
     const checkRoleAndRedirect = async () => {
@@ -161,7 +170,7 @@ export default function Auth() {
   };
 
   const handleGoogleSignIn = async () => {
-    const { error } = await signInWithGoogle();
+    const { error } = await signInWithGoogle(from);
     if (error) {
       toast.error("เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google");
       console.error("Google sign in error:", error);

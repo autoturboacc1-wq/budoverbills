@@ -1290,6 +1290,13 @@ export type Database = {
         Returns: Json
       }
       generate_user_code: { Args: never; Returns: string }
+      grant_user_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
+        }
+        Returns: Json
+      }
       get_debt_agreement_safe: {
         Args: { p_agreement_id: string }
         Returns: {
@@ -1369,6 +1376,13 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      revoke_user_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
+        }
+        Returns: Json
       }
       search_profile_by_code: {
         Args: { search_code: string }

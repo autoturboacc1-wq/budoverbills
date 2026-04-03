@@ -53,6 +53,11 @@ interface FeeCalculation {
   interestPrepayPercent?: number; // % ของดอกเบี้ยที่จ่ายล่วงหน้า (10-100%)
 }
 
+type RpcClient = (
+  fn: string,
+  params?: Record<string, unknown>
+) => Promise<{ data: unknown; error: Error | null }>;
+
 const MAX_ANNUAL_RATE = 15; // 15% per year max by Thai law
 const BASE_RESCHEDULE_FEE_RATE = 5; // 5% per request
 
@@ -197,98 +202,18 @@ export function useRescheduleRequests() {
     if (!user) return false;
     
     try {
-      // First, get the request details
-      const { data: request, error: fetchError } = await supabase
-        .from('reschedule_requests')
-        .select('*')
-        .eq('id', requestId)
-        .maybeSingle();
-      
-      if (fetchError || !request) {
-        throw new Error('ไม่พบคำขอเลื่อนงวด');
-      }
+      const rpc = supabase.rpc as unknown as RpcClient;
+      const { data, error } = await rpc('approve_reschedule_request', {
+        p_request_id: requestId,
+      });
 
-      const { data: agreement, error: agreementError } = await supabase
-        .from('debt_agreements')
-        .select('lender_id')
-        .eq('id', request.agreement_id)
-        .maybeSingle();
+      if (error) throw error;
 
-      if (agreementError || !agreement) {
-        throw new Error('ไม่พบข้อตกลงที่เกี่ยวข้อง');
-      }
+      const shiftedCount = typeof data === 'object' && data !== null && 'shifted_count' in data
+        ? Number((data as { shifted_count: number }).shifted_count)
+        : 0;
 
-      if (agreement.lender_id !== user.id) {
-        throw new Error('เฉพาะเจ้าหนี้เท่านั้นที่อนุมัติคำขอเลื่อนงวดได้');
-      }
-
-      // Get the original installment to know its number
-      const { data: targetInstallment, error: targetError } = await supabase
-        .from('installments')
-        .select('installment_number, due_date')
-        .eq('id', request.installment_id)
-        .maybeSingle();
-
-      if (targetError || !targetInstallment) {
-        throw new Error('ไม่พบงวดที่ต้องการเลื่อน');
-      }
-
-      // Calculate the number of days to shift
-      const originalDate = new Date(request.original_due_date);
-      const newDate = new Date(request.new_due_date);
-      const daysDiff = Math.round((newDate.getTime() - originalDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      // Get all installments for this agreement that are >= the target installment number AND not yet paid
-      const { data: installmentsToShift, error: shiftError } = await supabase
-        .from('installments')
-        .select('id, installment_number, due_date, status')
-        .eq('agreement_id', request.agreement_id)
-        .gte('installment_number', targetInstallment.installment_number)
-        .neq('status', 'paid')
-        .order('installment_number', { ascending: true });
-
-      if (shiftError) throw shiftError;
-
-      // Update each installment's due_date by shifting it
-      for (const inst of (installmentsToShift || [])) {
-        const currentDueDate = new Date(inst.due_date);
-        currentDueDate.setDate(currentDueDate.getDate() + daysDiff);
-        
-        const updateData: { due_date: string; status?: string; original_due_date?: string } = {
-          due_date: currentDueDate.toISOString().split('T')[0]
-        };
-
-        // Reset to pending if it was the target installment (in case it was overdue)
-        // Also store the original_due_date for the target installment
-        if (inst.id === request.installment_id) {
-          updateData.status = 'pending';
-          updateData.original_due_date = request.original_due_date;
-        }
-
-        const { error: updateInstError } = await supabase
-          .from('installments')
-          .update(updateData)
-          .eq('id', inst.id);
-        
-        if (updateInstError) throw updateInstError;
-      }
-      
-      // No longer creating fee installments - fee is paid upfront with slip
-      
-      // Update the reschedule request status
-      const { error: updateError } = await supabase
-        .from('reschedule_requests')
-        .update({
-          status: 'approved',
-          approved_by: user.id,
-          approved_at: new Date().toISOString()
-        })
-        .eq('id', requestId);
-      
-      if (updateError) throw updateError;
-      
-      const shiftedCount = (installmentsToShift || []).length;
-      toast.success(`อนุมัติเรียบร้อย! เลื่อนงวดที่ขอและงวดถัดไปอีก ${shiftedCount - 1} งวด`);
+      toast.success(`อนุมัติเรียบร้อย! เลื่อนงวดที่ขอและงวดถัดไปอีก ${Math.max(0, shiftedCount - 1)} งวด`);
       return true;
     } catch (error: unknown) {
       console.error('Error approving request:', error);

@@ -23,6 +23,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { th } from 'date-fns/locale';
+import { hasAdminSession } from '@/utils/adminSession';
 
 interface ActivityLog {
   id: string;
@@ -63,14 +64,13 @@ export default function AdminSecurity() {
       return;
     }
 
-    const verified = sessionStorage.getItem('admin_verified');
-    if (verified !== user.id) {
+    if (!hasAdminSession(user.id)) {
       navigate('/admin/login', { replace: true });
     }
   }, [isAdmin, roleLoading, navigate, user]);
 
   const fetchLogs = useCallback(async () => {
-    if (!isAdmin || sessionStorage.getItem('admin_verified') !== user?.id) return;
+    if (!isAdmin || !hasAdminSession(user?.id)) return;
     
     setLoading(true);
     try {
