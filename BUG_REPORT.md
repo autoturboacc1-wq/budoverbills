@@ -1,0 +1,101 @@
+# Bug Report Checklist - BudOverBills
+> Status updated against the current worktree on 2026-04-03.
+
+## Done
+- [x] C-01 Admin Panel Bypass via sessionStorage
+- [x] C-04 payment-reminder-cron Has Zero Authentication
+- [x] C-05 Language System Completely Broken
+- [x] C-10 useRateLimiter - Global Store Shared Across Users
+- [x] C-15 recalculateEffectiveRateSchedule - toMoney() on Rate Percentage
+- [x] C-18 ProfileBankAccount mass-update scope limited to open agreements only
+- [x] C-19 SQL Migration: INSERT Policy Not Replaced for chat-attachments
+- [x] C-20 SQL Migration: Any Chat Participant Can Overwrite voice_url
+- [x] C-21 notify-unconfirmed-transfers - constant-time secret compare
+- [x] C-22 downgrade-expired-trials now uses INTERNAL_FUNCTION_SECRET instead of service-role key for HTTP auth
+- [x] C-24 AuthContext - Race Condition: Stale Profile After Logout
+- [x] C-25 useSignedUrl - Race Condition: Stale Async Result
+- [x] C-26 promptpay.ts - CRC-16 Bit Masking Bug
+- [x] C-27 BankAccountSection update query is now ownership-scoped by lender_id
+- [x] C-28 useActivityFeed cross-table filter replaced with explicit agreement-id scoping
+- [x] C-29 ProtectedRoute - Logic Error in Admin Verification
+- [x] C-16 AgreementConfirm - handleReject now checks the current user role before cancelling
+- [x] H-03 Client-side sessionStorage check before admin navigation
+- [x] H-06 NotificationSheet open redirect sanitization
+- [x] H-08 QRCodeScanner result validation and sanitization
+- [x] H-09 usePushNotifications - unsubscribe now removes only the current device subscription
+- [x] H-10 AdminLogin OTP resend now has a client-side cooldown
+- [x] H-13 AdminSecurity now requires the verified admin session
+- [x] H-19 cancelled status mapping is fixed
+- [x] H-20 getNextInstallment - timezone bug fixed to Bangkok day boundaries
+- [x] H-21 mapAgreementToDebtCard - amount now reflects remaining amount
+- [x] H-25 pdfExport / money math - float aggregation hardened via money helpers
+- [x] H-29 useNotifications initial fetch / mutation local behavior hardened
+- [x] H-30 useTypingIndicator - timeout cleanup and unmount safety
+- [x] H-34 useSearch - async cancellation / unmount safety
+- [x] H-37 useUserRole no longer depends on the full user object reference
+- [x] H-38 useUserPoints - daily reset uses Bangkok timezone
+- [x] H-39 useUserPoints - earn path now uses latest server snapshot
+- [x] H-40 useUserPoints - redeem path now rolls back on partial failure
+- [x] H-41 useSubscription - fallback arithmetic and trial semantics
+- [x] H-42 notify-unconfirmed-transfers dedupe now scopes by user
+- [x] H-43 notify-unconfirmed-transfers run limit added
+- [x] H-44 send-chat-push-notification related_type/target scoping fixed
+- [x] H-45 send-chat-push-notification no longer exposes wildcard CORS origin
+- [x] H-47 payment-reminder-cron - UTC window fixed to Asia/Bangkok
+- [x] H-48 send-chat-push-notification - function config entry added
+- [x] H-52 cancelled status now renders correctly in DebtDetail
+- [x] H-01 useDebtAgreements updateInstallmentStatus now blocks non-lender callers in the hook
+- [x] H-02 useDebtAgreements uploadSlip no longer overwrites already-confirmed installments
+- [x] H-04 AgreementConfirm now re-reads confirmation state before deciding whether to activate the agreement
+- [x] Bank/transfer proof ownership guards added on client
+- [x] Friend request client-side scoping and rollback added
+- [x] Notification, settings, toast, and typing local correctness hardened
+- [x] send-chat-push-notification request validation and subscription scoping hardened
+- [x] Chat voice-note / attachment integrity migration added
+
+## Partial / Needs Backend
+- [ ] C-09 TransferProofSection - client-side ownership guard is in place, but server-side RLS / RPC enforcement is still missing
+- [ ] C-13 useUserPoints - stale client arithmetic was reduced, but true atomicity still needs server-side locking / RPC
+- [ ] C-14 useFriendRequests - rollback was added, but transaction-level atomicity still belongs in server-side RPC
+- [ ] C-11 useRescheduleRequests - lender check was added in the hook, but true enforcement still belongs in RLS / RPC
+- [ ] C-23 PasswordConfirmDialog - stale async cleanup is fixed, but password verification still uses signInWithPassword
+- [ ] H-17 PaymentDialog now blocks non-lender confirm/reject in the UI, but server-side identity enforcement is still missing
+- [ ] H-31 useTypingIndicator - race is reduced with maybeSingle/cleanup, but not fully atomic at the DB level
+
+## Still Open
+- [ ] C-02 Payment Gateway Not Integrated
+- [ ] C-03 Push Notifications Never Dispatched
+- [ ] C-06 Non-Atomic Payment Confirmation
+- [ ] C-07 Double Payment Submission Possible
+- [ ] C-08 processExtraPayment Called After Installment Already Marked Paid
+- [ ] C-12 useDebtAgreements - TOCTOU Race on Payment Completion
+- [ ] C-17 CreateAgreement - quota and creation should be atomic in RPC
+- [ ] C-30 useDebtAgreements - orphaned row prevention should move to transaction/RPC
+- [ ] H-05 Chat direct-room TOCTOU duplicate prevention
+- [ ] H-07 AvatarUpload MIME validation needs server-side enforcement
+- [ ] H-11 AdminHub audit log query hardening
+- [ ] H-12 AdminUserRoles / AdminUsersPage role mutation hardening
+- [ ] H-14 useExtraPayment preview logic
+- [ ] H-15 useExtraPayment Promise.all partial failure handling
+- [ ] H-16 useExtraPayment schedule close/recalc atomicity
+- [ ] H-18 PaymentSlipUpload file replacement race
+- [ ] H-22 DebtDetail PDF confirmed timestamps use updated_at for both sides
+- [ ] H-23 debtStrategies daily-frequency assumption
+- [ ] H-24 pdfExport page-break/header consistency
+- [ ] H-26 Chat N+1 query pattern
+- [ ] H-27 Chat .single() failures on empty message sets
+- [ ] H-28 BottomNav global realtime message subscription
+- [ ] H-32 useChatNotificationSound AudioContext leak
+- [ ] H-33 useGlobalChatNotification broad subscription
+- [ ] H-35 Chat global message refetch storm
+- [ ] H-36 useFriends stale closures
+- [ ] H-46 downgrade_expired_trials() migration still needs is_trial reset
+- [ ] H-49 chat_rooms INSERT policy hardening
+- [ ] H-50 chat_rooms missing auth.users FKs
+- [ ] H-51 chat_rooms trigger user2_id bug
+- [ ] Remaining medium/low items not yet converted into code or schema fixes
+
+## Notes
+- The checklist above reflects the current repo state after the latest client, hook, edge-function, and migration hardening work.
+- A checked item means the concrete bug described in the report is fixed in the current codebase to a release-usable level.
+- Items in `Partial / Needs Backend` have meaningful mitigation in code, but I did not tick them because the report's real fix still requires backend transaction/RLS/API work.
