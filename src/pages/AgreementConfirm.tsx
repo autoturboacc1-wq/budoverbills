@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, User, Clock, CheckCircle, AlertCircle, Upload, Loader2, Eye } from "lucide-react";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -269,6 +270,7 @@ export default function AgreementConfirm() {
   const roleLabel = isLender ? "คุณให้ยืม" : "คุณยืม";
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-hero pb-24">
       <div className="max-w-lg mx-auto px-4">
         {/* Hidden file input */}
@@ -624,5 +626,6 @@ export default function AgreementConfirm() {
 
       <BottomNav />
     </div>
+    </PageTransition>
   );
 }

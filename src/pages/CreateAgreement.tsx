@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { ArrowLeft, User, Calendar, Percent, Calculator, Info, UserPlus, Check, X, AlertTriangle, ShieldCheck, Coins, Building } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
@@ -599,6 +600,7 @@ export default function CreateAgreement() {
   }, [currentStep]);
 
   return (
+    <PageTransition>
     <div className="min-h-screen">
       <div className="page-shell max-w-5xl">
         <PageHeader
@@ -1560,5 +1562,6 @@ export default function CreateAgreement() {
         />
       </div>
     </div>
+    </PageTransition>
   );
 }

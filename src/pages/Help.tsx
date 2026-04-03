@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { PageTransition } from "@/components/ux/PageTransition";
 import {
   ArrowLeft,
   BookOpen,
@@ -902,6 +903,7 @@ export default function Help() {
   };
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-hero pb-24">
       <div className="max-w-lg mx-auto px-4">
         <motion.header
@@ -993,5 +995,6 @@ export default function Help() {
 
       <BottomNav />
     </div>
+    </PageTransition>
   );
 }

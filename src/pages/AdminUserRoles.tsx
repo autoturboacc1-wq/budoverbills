@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { ArrowLeft, Shield, UserCog, Search, Crown, User, Trash2, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -235,6 +236,7 @@ export default function AdminUserRoles() {
   }
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-hero pb-24">
       <div className="max-w-2xl mx-auto px-4">
         {/* Header */}
@@ -375,5 +377,6 @@ export default function AdminUserRoles() {
 
       <BottomNav />
     </div>
+    </PageTransition>
   );
 }

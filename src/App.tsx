@@ -1,6 +1,7 @@
 import { Suspense, lazy, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -57,6 +58,53 @@ function AppErrorBoundaryWithReset({ children }: { children: ReactNode }) {
   return <AppErrorBoundary key={location.key}>{children}</AppErrorBoundary>;
 }
 
+function AnimatedRoutes() {
+  const location = useLocation();
+  return (
+    <AnimatePresence mode="wait">
+      <Suspense fallback={<RouteFallback />}>
+        <Routes location={location} key={location.pathname}>
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/code" element={<AdminCodeLogin />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/support" element={<Support />} />
+          <Route path="/help" element={<Help />} />
+
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Index />} />
+            <Route path="/create" element={<CreateAgreement />} />
+            <Route path="/agreement/:id/confirm" element={<AgreementConfirm />} />
+            <Route path="/friends" element={<Friends />} />
+            <Route path="/chat" element={<Chat />} />
+            <Route path="/chat/:chatId" element={<Chat />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/badges" element={<Badges />} />
+            <Route path="/history" element={<History />} />
+            <Route path="/history/debt-consolidation" element={<DebtConsolidation />} />
+            <Route path="/debt/:id" element={<DebtDetail />} />
+            <Route path="/pdpa-consent" element={<PDPAConsent />} />
+            <Route path="/personal-info" element={<PersonalInfoOnboarding />} />
+            <Route path="/subscription" element={<Subscription />} />
+          </Route>
+
+          <Route element={<ProtectedRoute requireAdminSession />}>
+            <Route path="/admin" element={<AdminHub />} />
+            <Route path="/admin/security" element={<AdminSecurity />} />
+            <Route path="/admin/users" element={<AdminUserRoles />} />
+            <Route path="/admin/codes" element={<AdminCodesPage />} />
+          </Route>
+
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+    </AnimatePresence>
+  );
+}
+
 const App = () => {
   const [queryClient] = useState(
     () =>
@@ -86,45 +134,7 @@ const App = () => {
                   <NotificationsProvider>
                     <FriendRequestsProvider>
                       <GlobalChatNotificationProvider>
-                        <Suspense fallback={<RouteFallback />}>
-                          <Routes>
-                        <Route path="/auth" element={<Auth />} />
-                        <Route path="/admin/login" element={<AdminLogin />} />
-                        <Route path="/admin/code" element={<AdminCodeLogin />} />
-                        <Route path="/terms" element={<Terms />} />
-                        <Route path="/privacy" element={<Privacy />} />
-                        <Route path="/support" element={<Support />} />
-                        <Route path="/help" element={<Help />} />
-
-                        <Route element={<ProtectedRoute />}>
-                          <Route path="/" element={<Index />} />
-                          <Route path="/create" element={<CreateAgreement />} />
-                          <Route path="/agreement/:id/confirm" element={<AgreementConfirm />} />
-                          <Route path="/friends" element={<Friends />} />
-                          <Route path="/chat" element={<Chat />} />
-                          <Route path="/chat/:chatId" element={<Chat />} />
-                          <Route path="/notifications" element={<Notifications />} />
-                          <Route path="/profile" element={<Profile />} />
-                          <Route path="/settings" element={<Settings />} />
-                          <Route path="/badges" element={<Badges />} />
-                          <Route path="/history" element={<History />} />
-                          <Route path="/history/debt-consolidation" element={<DebtConsolidation />} />
-                          <Route path="/debt/:id" element={<DebtDetail />} />
-                          <Route path="/pdpa-consent" element={<PDPAConsent />} />
-                          <Route path="/personal-info" element={<PersonalInfoOnboarding />} />
-                          <Route path="/subscription" element={<Subscription />} />
-                        </Route>
-
-                        <Route element={<ProtectedRoute requireAdminSession />}>
-                          <Route path="/admin" element={<AdminHub />} />
-                          <Route path="/admin/security" element={<AdminSecurity />} />
-                          <Route path="/admin/users" element={<AdminUserRoles />} />
-                          <Route path="/admin/codes" element={<AdminCodesPage />} />
-                        </Route>
-
-                        <Route path="*" element={<NotFound />} />
-                          </Routes>
-                        </Suspense>
+                        <AnimatedRoutes />
                       </GlobalChatNotificationProvider>
                     </FriendRequestsProvider>
                   </NotificationsProvider>

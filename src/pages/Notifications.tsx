@@ -9,6 +9,7 @@ import { th } from "date-fns/locale";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getSafeNotificationTarget, isSafeInternalPath } from "@/utils/navigation";
+import { PageTransition } from "@/components/ux/PageTransition";
 
 const Notifications = () => {
   const navigate = useNavigate();
@@ -90,6 +91,7 @@ const Notifications = () => {
   const unreadCount = notifications?.filter(n => !n.is_read).length || 0;
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-background pb-24">
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -203,6 +205,7 @@ const Notifications = () => {
 
       <BottomNav />
     </div>
+    </PageTransition>
   );
 };
 

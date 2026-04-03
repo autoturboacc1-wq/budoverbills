@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PageTransition } from "@/components/ux/PageTransition";
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -163,6 +164,7 @@ export default function AdminSecurity() {
   }).length;
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-background">
       <Header userName="Admin" />
       <main className="container mx-auto px-4 pt-20 pb-24">
@@ -441,5 +443,6 @@ export default function AdminSecurity() {
       </main>
       <BottomNav />
     </div>
+    </PageTransition>
   );
 }

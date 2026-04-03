@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -163,6 +164,7 @@ const AdminCodesPage = () => {
   };
 
   return (
+    <PageTransition>
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -367,6 +369,7 @@ const AdminCodesPage = () => {
         </Dialog>
       </div>
     </AdminLayout>
+    </PageTransition>
   );
 };
 

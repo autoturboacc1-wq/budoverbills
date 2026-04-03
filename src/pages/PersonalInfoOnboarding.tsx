@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { useNavigate } from "react-router-dom";
 import { User, Phone, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,7 @@ export default function PersonalInfoOnboarding() {
   };
 
   return (
+    <PageTransition>
     <div className="min-h-screen">
       <div className="page-shell max-w-lg">
         <PageHeader
@@ -209,5 +211,6 @@ export default function PersonalInfoOnboarding() {
         </motion.div>
       </div>
     </div>
+    </PageTransition>
   );
 }

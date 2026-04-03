@@ -35,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { PageTransition } from "@/components/ux/PageTransition";
 
 export default function Friends() {
   const navigate = useNavigate();
@@ -117,6 +118,7 @@ export default function Friends() {
   };
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-hero pb-24">
       <div className="max-w-lg mx-auto px-4">
         {/* Header */}
@@ -345,5 +347,6 @@ export default function Friends() {
 
       <BottomNav />
     </div>
+    </PageTransition>
   );
 }

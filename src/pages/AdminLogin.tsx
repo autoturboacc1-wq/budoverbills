@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { Shield, Lock, Mail, KeyRound, ArrowLeft, AlertCircle, CheckCircle2, Timer } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -278,6 +279,7 @@ export default function AdminLogin() {
   };
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -526,5 +528,6 @@ export default function AdminLogin() {
         </p>
       </motion.div>
     </div>
+    </PageTransition>
   );
 }

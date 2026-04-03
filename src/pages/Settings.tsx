@@ -40,6 +40,7 @@ import { ThemePicker } from "@/components/ThemePicker";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, PageSection } from "@/components/ux";
+import { PageTransition } from "@/components/ux/PageTransition";
 
 interface SettingsState {
   notifications: {
@@ -253,6 +254,7 @@ export default function Settings() {
   }, [limits]);
 
   return (
+    <PageTransition>
     <div className="min-h-screen pb-24">
       <div className="page-shell max-w-lg">
         <PageHeader
@@ -503,5 +505,6 @@ export default function Settings() {
 
       <BottomNav />
     </div>
+    </PageTransition>
   );
 }

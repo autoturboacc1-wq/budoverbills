@@ -1,5 +1,6 @@
 import { ArrowLeft, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { PageTransition } from "@/components/ux/PageTransition";
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -112,6 +113,7 @@ const Privacy = () => {
       };
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-3">
         <div className="flex items-center gap-3">
@@ -164,6 +166,7 @@ const Privacy = () => {
         </div>
       </main>
     </div>
+    </PageTransition>
   );
 };
 

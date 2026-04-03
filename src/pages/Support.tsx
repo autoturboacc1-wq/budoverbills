@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { ArrowLeft, Coffee, Heart, Sparkles, Gift, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
@@ -156,6 +157,7 @@ export default function Support() {
   };
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-hero">
       <div className="max-w-lg mx-auto px-4 pb-24">
         {/* Header */}
@@ -376,5 +378,6 @@ export default function Support() {
         </motion.div>
       </div>
     </div>
+    </PageTransition>
   );
 }

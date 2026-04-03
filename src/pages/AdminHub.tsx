@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { ArrowLeft, Newspaper, Shield, UserCog, Activity, LayoutDashboard, Crown, Clock, UserPlus, UserMinus, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -164,6 +165,7 @@ export default function AdminHub() {
   };
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-hero pb-24">
       <div className="max-w-2xl mx-auto px-4">
         {/* Header */}
@@ -360,5 +362,6 @@ export default function AdminHub() {
 
       <BottomNav />
     </div>
+    </PageTransition>
   );
 }

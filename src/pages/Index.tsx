@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { EmptyState, PageSection } from "@/components/ux";
+import { PageTransition } from "@/components/ux/PageTransition";
 
 // Domain imports - SINGLE SOURCE OF TRUTH
 import { mapAgreementsToDebtCards, AgreementRole, isAgreementEffectivelyCompleted } from "@/domains/debt";
@@ -53,6 +54,7 @@ const Index = () => {
   const borrowerCount = debtCards.filter(c => !c.isLender).length;
 
   return (
+    <PageTransition>
     <div className="min-h-screen pb-24">
       <div className="page-shell section-stack max-w-lg">
         <Header userName={displayName} />
@@ -190,6 +192,7 @@ const Index = () => {
 
       <BottomNav />
     </div>
+    </PageTransition>
   );
 };
 

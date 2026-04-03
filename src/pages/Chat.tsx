@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { EmptyState, PageHeader } from "@/components/ux";
+import { PageTransition } from "@/components/ux/PageTransition";
 
 type ChatThreadSummaryRow = {
   chat_id: string;
@@ -183,6 +184,7 @@ const Chat = () => {
 
   // Thread list view with tabs
   return (
+    <PageTransition>
     <div className="min-h-screen bg-background flex flex-col pb-20">
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -240,6 +242,7 @@ const Chat = () => {
 
       <BottomNav />
     </div>
+    </PageTransition>
   );
 };
 

@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { ArrowLeft, FileText, Check, Calendar, Loader2, Download, Sparkles } from "lucide-react";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 import { useDebtAgreements } from "@/hooks/useDebtAgreements";
@@ -83,6 +84,7 @@ export default function History() {
   };
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-hero pb-24">
       <div className="max-w-lg mx-auto px-4">
         {/* Header */}
@@ -342,5 +344,6 @@ export default function History() {
 
       <BottomNav />
     </div>
+    </PageTransition>
   );
 }

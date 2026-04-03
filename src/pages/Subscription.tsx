@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { 
   ArrowLeft, 
   Crown,
@@ -121,6 +122,7 @@ export default function Subscription() {
   };
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-hero pb-24">
       <div className="max-w-lg mx-auto px-4">
         {/* Header */}
@@ -514,5 +516,6 @@ export default function Subscription() {
 
       <BottomNav />
     </div>
+    </PageTransition>
   );
 }

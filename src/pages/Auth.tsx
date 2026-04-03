@@ -13,6 +13,7 @@ import { z } from "zod";
 import { BobLogo } from "@/components/BobLogo";
 import { getSafeInternalPath } from "@/utils/navigation";
 import { InlineValidationMessage } from "@/components/ux";
+import { PageTransition } from "@/components/ux/PageTransition";
 
 const emailSchema = z.string().email("อีเมลไม่ถูกต้อง");
 const passwordSchema = z.string().min(6, "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
@@ -204,6 +205,7 @@ export default function Auth() {
   if (showForgotPassword) {
     if (resetEmailSent) {
       return (
+        <PageTransition>
         <div className="min-h-screen bg-gradient-hero flex flex-col">
           <div className="p-4">
               <button
@@ -262,10 +264,12 @@ export default function Auth() {
             </motion.div>
           </div>
         </div>
+        </PageTransition>
       );
     }
 
     return (
+      <PageTransition>
       <div className="min-h-screen bg-gradient-hero flex flex-col">
         <div className="p-4">
           <button
@@ -341,12 +345,14 @@ export default function Auth() {
           </motion.div>
         </div>
       </div>
+      </PageTransition>
     );
   }
 
   // Email Confirmation Screen
   if (showEmailConfirmation) {
     return (
+      <PageTransition>
       <div className="min-h-screen bg-gradient-hero flex flex-col">
         <div className="p-4">
           <button
@@ -401,10 +407,12 @@ export default function Auth() {
           </motion.div>
         </div>
       </div>
+      </PageTransition>
     );
   }
 
   return (
+    <PageTransition>
     <div className="min-h-screen flex flex-col">
       {/* Header */}
       <div className="p-4">
@@ -621,5 +629,6 @@ export default function Auth() {
         </motion.div>
       </div>
     </div>
+    </PageTransition>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { Shield, KeyRound, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -140,6 +141,7 @@ const AdminCodeLogin = () => {
   }
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -221,6 +223,7 @@ const AdminCodeLogin = () => {
         </p>
       </motion.div>
     </div>
+    </PageTransition>
   );
 };
 

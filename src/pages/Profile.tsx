@@ -40,6 +40,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { hasAdminSession } from "@/utils/adminSession";
+import { PageTransition } from "@/components/ux/PageTransition";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -205,6 +206,7 @@ export default function Profile() {
   const displayInitial = displayName.charAt(0).toUpperCase();
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-hero pb-24">
       <div className="max-w-lg mx-auto px-4">
         {/* Top Header with Notification */}
@@ -514,5 +516,6 @@ export default function Profile() {
       <NotificationSheet open={showNotifications} onOpenChange={setShowNotifications} />
       <BottomNav />
     </div>
+    </PageTransition>
   );
 }

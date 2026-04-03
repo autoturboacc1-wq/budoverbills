@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { ArrowLeft, Calculator, Loader2, Sparkles } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -145,6 +146,7 @@ export default function DebtConsolidation() {
   }
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-hero pb-24">
       <div className="max-w-5xl mx-auto px-4">
         <motion.header
@@ -284,5 +286,6 @@ export default function DebtConsolidation() {
 
       <BottomNav />
     </div>
+    </PageTransition>
   );
 }

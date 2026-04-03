@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { PageTransition } from "@/components/ux/PageTransition";
 import { useNavigate } from "react-router-dom";
 import { Shield, Check, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ export default function PDPAConsent() {
   };
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-gradient-hero flex flex-col">
       <div className="flex-1 flex flex-col justify-center px-6 py-12">
         <motion.div
@@ -250,5 +252,6 @@ export default function PDPAConsent() {
         </motion.div>
       </div>
     </div>
+    </PageTransition>
   );
 }

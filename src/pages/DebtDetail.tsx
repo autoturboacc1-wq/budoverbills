@@ -22,6 +22,7 @@ import { getUserRoleInAgreement, isInstallmentOverdue, getAgreementDisplayStatus
 import { generateAgreementPDF, downloadPDF } from "@/utils/pdfExport";
 import { divideMoney, roundMoney } from "@/utils/money";
 import { PageHeader, PageSection, ReviewPanel, StatusTimeline, type StatusTimelineItem } from "@/components/ux";
+import { PageTransition } from "@/components/ux/PageTransition";
 
 export default function DebtDetail() {
   const navigate = useNavigate();
@@ -399,6 +400,7 @@ export default function DebtDetail() {
   }
 
   return (
+    <PageTransition>
     <div className="min-h-screen pb-8">
       <div className="page-shell max-w-lg">
         <PageHeader
@@ -998,5 +1000,6 @@ export default function DebtDetail() {
         />
       )}
     </div>
+    </PageTransition>
   );
 }
