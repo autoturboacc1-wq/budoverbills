@@ -5,3 +5,15 @@ project_id = "taihdoldpcbovubzjjah"
 # Caller must send `Authorization: Bearer $INTERNAL_FUNCTION_SECRET`
 # or `x-internal-secret: $INTERNAL_FUNCTION_SECRET`.
 verify_jwt = false
+
+[functions.send-chat-push-notification]
+# Authenticated user endpoint.
+# The handler performs its own participant checks, and Supabase should still
+# require a valid JWT before invoking it.
+verify_jwt = true
+
+[functions.downgrade-expired-trials]
+# Internal cron/invocation only.
+# Caller must send `Authorization: Bearer $INTERNAL_FUNCTION_SECRET`
+# or `x-internal-secret: $INTERNAL_FUNCTION_SECRET`.
+verify_jwt = false

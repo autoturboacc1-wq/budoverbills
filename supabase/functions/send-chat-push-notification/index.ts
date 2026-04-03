@@ -3,9 +3,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isNonEmptyString, isValidUuid } from "../_shared/validation.ts";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "null",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 interface WebPushPayload {
@@ -16,6 +18,19 @@ interface WebPushPayload {
   data?: Record<string, unknown>;
 }
 
+interface ChatNotificationRequest {
+  recipientId: unknown;
+  senderName: unknown;
+  messagePreview?: unknown;
+  agreementId?: unknown;
+}
+
+interface ChatTargetContext {
+  relatedId: string;
+  relatedType: "agreement" | "chat";
+  actionUrl: string;
+}
+
 function getBearerToken(req: Request): string | null {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -24,6 +39,31 @@ function getBearerToken(req: Request): string | null {
 
   const token = authHeader.slice("Bearer ".length).trim();
   return token.length > 0 ? token : null;
+}
+
+function buildChatTargetContext(agreementId: string | null, chatId: string): ChatTargetContext {
+  if (agreementId) {
+    return {
+      relatedId: agreementId,
+      relatedType: "agreement",
+      actionUrl: `/chat/${agreementId}`,
+    };
+  }
+
+  return {
+    relatedId: chatId,
+    relatedType: "chat",
+    actionUrl: `/chat/${chatId}`,
+  };
+}
+
+function truncateMessage(message: string | null | undefined, maxLength: number): string {
+  const trimmed = (message ?? "").trim();
+  if (!trimmed) {
+    return "คุณมีข้อความใหม่";
+  }
+
+  return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength - 1)}…` : trimmed;
 }
 
 serve(async (req) => {
@@ -39,8 +79,16 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return new Response(JSON.stringify({ error: "Missing Supabase environment variables" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const bearerToken = getBearerToken(req);
 
@@ -61,7 +109,7 @@ serve(async (req) => {
       });
     }
 
-    const body = await req.json().catch(() => null);
+    const body = await req.json().catch(() => null) as ChatNotificationRequest | null;
 
     if (!body || typeof body !== "object") {
       return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
@@ -70,12 +118,7 @@ serve(async (req) => {
       });
     }
 
-    const {
-      recipientId,
-      senderName,
-      messagePreview,
-      agreementId,
-    } = body as Record<string, unknown>;
+    const { recipientId, senderName, messagePreview, agreementId } = body;
 
     if (!isValidUuid(recipientId)) {
       return new Response(JSON.stringify({ error: "Invalid recipientId" }), {
@@ -104,6 +147,16 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    if (recipientId === callerId) {
+      return new Response(JSON.stringify({ error: "Cannot notify yourself" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const targetAgreementId = typeof agreementId === "string" ? agreementId : null;
+    let targetContext: ChatTargetContext | null = null;
 
     if (typeof agreementId === "string") {
       const { data: agreement, error: agreementError } = await supabase
@@ -134,6 +187,8 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      targetContext = buildChatTargetContext(targetAgreementId, agreementId);
     } else {
       const participantPair = [callerId, String(recipientId)].sort();
       const [user1Id, user2Id] = participantPair;
@@ -156,11 +211,20 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      targetContext = buildChatTargetContext(null, directChat.id);
     }
 
-    const { data: subscriptions, error: subError } = await supabase
+    if (!targetContext) {
+      return new Response(JSON.stringify({ error: "Failed to resolve chat target" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { count: subscriptionCount, error: subError } = await supabase
       .from("push_subscriptions")
-      .select("endpoint, p256dh, auth")
+      .select("id", { count: "exact", head: true })
       .eq("user_id", recipientId);
 
     if (subError) {
@@ -168,7 +232,7 @@ serve(async (req) => {
       throw subError;
     }
 
-    if (!subscriptions || subscriptions.length === 0) {
+    if (!subscriptionCount || subscriptionCount === 0) {
       return new Response(
         JSON.stringify({ message: "No push subscriptions found for user" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -177,29 +241,37 @@ serve(async (req) => {
 
     const payload: WebPushPayload = {
       title: `ข้อความจาก ${senderName}`,
-      body: typeof messagePreview === "string" ? messagePreview.substring(0, 100) : "คุณมีข้อความใหม่",
+      body: truncateMessage(typeof messagePreview === "string" ? messagePreview : null, 100),
       icon: "/pwa-192x192.png",
       badge: "/favicon.png",
       data: {
-        url: typeof agreementId === "string" ? `/chat/${agreementId}` : "/chat",
-        agreementId,
+        url: targetContext.actionUrl,
+        relatedId: targetContext.relatedId,
+        relatedType: targetContext.relatedType,
       },
     };
 
-    await supabase.from("notifications").insert({
+    const { error: insertError } = await supabase.from("notifications").insert({
       user_id: recipientId,
       type: "new_message",
       title: payload.title,
       message: payload.body,
-      related_type: "agreement",
-      related_id: typeof agreementId === "string" ? agreementId : null,
+      related_type: targetContext.relatedType,
+      related_id: targetContext.relatedId,
+      action_url: targetContext.actionUrl,
     });
+
+    if (insertError) {
+      console.error("Error creating notification:", insertError);
+      throw insertError;
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: "Notification sent",
-        subscriptionCount: subscriptions.length,
+        message: "Notification queued",
+        subscriptionCount,
+        pushDispatched: false,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

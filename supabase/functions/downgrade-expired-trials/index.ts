@@ -1,9 +1,40 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Origin": "null",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+const INTERNAL_SECRET_HEADER = "x-internal-secret";
+
+function constantTimeEquals(left: string, right: string): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  let mismatch = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+
+  return mismatch === 0;
+}
+
+function getInternalSecret(req: Request): string | null {
+  const headerSecret = req.headers.get(INTERNAL_SECRET_HEADER);
+  if (headerSecret) {
+    return headerSecret;
+  }
+
+  const authorization = req.headers.get("authorization");
+  if (!authorization) {
+    return null;
+  }
+
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] ?? null;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -15,16 +46,19 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: "Method not allowed" }),
       {
         status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }
 
   try {
-    const authHeader = req.headers.get("authorization");
-    const expectedToken = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
-    if (!authHeader || authHeader !== `Bearer ${expectedToken}`) {
+    const internalSecret = Deno.env.get("INTERNAL_FUNCTION_SECRET");
+    if (!internalSecret) {
+      throw new Error("Missing INTERNAL_FUNCTION_SECRET");
+    }
+
+    const requestSecret = getInternalSecret(req);
+    if (!requestSecret || !constantTimeEquals(requestSecret, internalSecret)) {
       console.error("[downgrade-expired-trials] Unauthorized request attempted");
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
