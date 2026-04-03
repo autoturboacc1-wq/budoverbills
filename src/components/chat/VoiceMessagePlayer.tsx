@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,18 @@ export function VoiceMessagePlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const { signedUrl, isLoading, error } = useSignedUrl("chat-attachments", voicePath, 3600);
 
+  useEffect(() => {
+    const audioElement = audioRef.current;
+
+    return () => {
+      if (!audioElement) return;
+
+      audioElement.pause();
+      audioElement.removeAttribute("src");
+      audioElement.load();
+    };
+  }, []);
+
   const progress = useMemo(() => {
     if (duration <= 0) return 0;
     return Math.min((currentTime / duration) * 100, 100);
@@ -40,8 +52,13 @@ export function VoiceMessagePlayer({
       return;
     }
 
-    await audioRef.current.play();
-    setIsPlaying(true);
+    try {
+      await audioRef.current.play();
+      setIsPlaying(true);
+    } catch (playError) {
+      setIsPlaying(false);
+      console.error("Error playing voice message:", playError);
+    }
   };
 
   if (error) {

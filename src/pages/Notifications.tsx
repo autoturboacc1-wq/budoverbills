@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { getSafeNotificationTarget, isSafeInternalPath } from "@/utils/navigation";
 
 const Notifications = () => {
   const navigate = useNavigate();
@@ -42,15 +44,29 @@ const Notifications = () => {
     // Mark as read
     handleMarkAsRead(notification.id);
 
-    // Navigate based on type
-    if (
-      (notification.related_type === "agreement" ||
-        notification.related_type === "debt_agreement") &&
-      notification.related_id
-    ) {
-      navigate(`/debt/${notification.related_id}`);
-    } else if (notification.related_type === "friend_request") {
-      navigate("/friends");
+    const safeTarget = getSafeNotificationTarget(notification);
+    if (safeTarget) {
+      navigate(safeTarget);
+      return;
+    }
+
+    const installmentId = notification.related_id;
+    if (notification.related_type === "installment" && installmentId) {
+      void (async () => {
+        const { data } = await supabase
+          .from("installments")
+          .select("agreement_id")
+          .eq("id", installmentId)
+          .maybeSingle();
+
+        if (data?.agreement_id) {
+          const target = `/debt/${data.agreement_id}`;
+          if (isSafeInternalPath(target)) {
+            navigate(target);
+          }
+        }
+      })();
+      return;
     }
   };
 

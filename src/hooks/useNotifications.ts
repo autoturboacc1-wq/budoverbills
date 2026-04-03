@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { isSafeInternalPath } from "@/utils/navigation";
 
 export type NotificationPriority = "critical" | "important" | "info";
 
@@ -26,6 +27,17 @@ export function useNotifications() {
   const requestIdRef = useRef(0);
 
   const userId = user?.id ?? null;
+
+  const normalizeNotification = useCallback((notification: Notification): Notification => {
+    const safeActionUrl = notification.action_url && isSafeInternalPath(notification.action_url)
+      ? notification.action_url
+      : null;
+
+    return {
+      ...notification,
+      action_url: safeActionUrl,
+    };
+  }, []);
 
   const fetchNotifications = useCallback(async () => {
     const requestId = ++requestIdRef.current;
@@ -52,7 +64,7 @@ export function useNotifications() {
         return;
       }
 
-      setNotifications(data || []);
+      setNotifications((data || []).map(normalizeNotification));
     } catch (error) {
       if (requestId !== requestIdRef.current) {
         return;
@@ -64,7 +76,7 @@ export function useNotifications() {
         setLoading(false);
       }
     }
-  }, [userId]);
+  }, [normalizeNotification, userId]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
     if (!userId) return;
@@ -148,7 +160,7 @@ export function useNotifications() {
         },
         (payload) => {
           if (cancelled) return;
-          const newNotification = payload.new as Notification;
+          const newNotification = normalizeNotification(payload.new as Notification);
           setNotifications(prev => [newNotification, ...prev]);
           
           // Show toast for new notification
@@ -167,7 +179,7 @@ export function useNotifications() {
         },
         (payload) => {
           if (cancelled) return;
-          const updated = payload.new as Notification;
+          const updated = normalizeNotification(payload.new as Notification);
           setNotifications(prev =>
             prev.map(n => (n.id === updated.id ? updated : n))
           );
@@ -194,7 +206,7 @@ export function useNotifications() {
       requestIdRef.current += 1;
       supabase.removeChannel(channel);
     };
-  }, [fetchNotifications, userId]);
+  }, [fetchNotifications, normalizeNotification, userId]);
 
   return {
     notifications,

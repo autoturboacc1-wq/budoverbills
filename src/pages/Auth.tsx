@@ -12,17 +12,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
 import { BobLogo } from "@/components/BobLogo";
+import { getSafeInternalPath } from "@/utils/navigation";
 
 const emailSchema = z.string().email("อีเมลไม่ถูกต้อง");
 const passwordSchema = z.string().min(6, "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
-
-function getSafeInternalPath(path: string | null | undefined) {
-  if (!path || !path.startsWith("/") || path.startsWith("//")) {
-    return "/";
-  }
-
-  return path;
-}
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);

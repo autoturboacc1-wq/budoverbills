@@ -30,20 +30,43 @@ export function VoiceRecorder({
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
+  const mountedRef = useRef(true);
+  const previewUrlRef = useRef<string | null>(null);
+  const discardRecordingRef = useRef(false);
+
+  useEffect(() => {
+    previewUrlRef.current = previewUrl;
+  }, [previewUrl]);
 
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
+
       if (timerRef.current) {
         window.clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        try {
+          recorder.ondataavailable = null;
+          recorder.onstop = null;
+          recorder.stop();
+        } catch {
+          // Ignore recorder stop failures during teardown.
+        }
       }
 
       streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
 
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
       }
     };
-  }, [previewUrl]);
+  }, []);
 
   const resetDraft = () => {
     if (timerRef.current) {
@@ -51,17 +74,33 @@ export function VoiceRecorder({
       timerRef.current = null;
     }
 
+    discardRecordingRef.current = true;
+
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.stop();
+      } catch {
+        // Ignore if the recorder is already stopping.
+      }
+    }
+
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     mediaRecorderRef.current = null;
     chunksRef.current = [];
-    setIsRecording(false);
-    setDuration(0);
-    setAudioBlob(null);
+    if (mountedRef.current) {
+      setIsRecording(false);
+      setDuration(0);
+      setAudioBlob(null);
+    }
 
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+      if (mountedRef.current) {
+        setPreviewUrl(null);
+      }
     }
   };
 
@@ -80,6 +119,7 @@ export function VoiceRecorder({
     if (isRecording || audioBlob) return;
 
     try {
+      discardRecordingRef.current = false;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
@@ -101,7 +141,14 @@ export function VoiceRecorder({
       recorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
+        mediaRecorderRef.current = null;
         setIsRecording(false);
+
+        if (discardRecordingRef.current || !mountedRef.current) {
+          discardRecordingRef.current = false;
+          chunksRef.current = [];
+          return;
+        }
 
         if (chunksRef.current.length === 0) {
           return;
@@ -112,6 +159,7 @@ export function VoiceRecorder({
 
         setAudioBlob(blob);
         setPreviewUrl(url);
+        previewUrlRef.current = url;
       };
 
       recorder.start(250);
