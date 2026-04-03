@@ -64,6 +64,16 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
 
+## Pre-deploy audit
+
+For release work in this repo, run:
+
+```sh
+npm run audit:predeploy
+```
+
+The audit enforces the local strict gates and points to the production-only checklist in `docs/pre-deploy-runbook.md`.
+
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!

@@ -1,0 +1,13 @@
+{
+  "src/components/ui/badge.tsx::react-refresh/only-export-components": 1,
+  "src/components/ui/button.tsx::react-refresh/only-export-components": 1,
+  "src/components/ui/form.tsx::react-refresh/only-export-components": 1,
+  "src/components/ui/navigation-menu.tsx::react-refresh/only-export-components": 1,
+  "src/components/ui/sidebar.tsx::react-refresh/only-export-components": 1,
+  "src/components/ui/sonner.tsx::react-refresh/only-export-components": 1,
+  "src/components/ui/toggle.tsx::react-refresh/only-export-components": 1,
+  "src/contexts/AuthContext.tsx::react-refresh/only-export-components": 1,
+  "src/contexts/LanguageContext.tsx::react-refresh/only-export-components": 2,
+  "src/contexts/ThemeContext.tsx::react-refresh/only-export-components": 2,
+  "src/pages/admin/AdminSecurityPage.tsx::react-hooks/exhaustive-deps": 1
+}

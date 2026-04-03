@@ -1,5 +1,11 @@
 project_id = "taihdoldpcbovubzjjah"
 
+[functions.payment-reminder-cron]
+# Internal cron/invocation only.
+# Caller must send `Authorization: Bearer $INTERNAL_FUNCTION_SECRET`
+# or `x-internal-secret: $INTERNAL_FUNCTION_SECRET`.
+verify_jwt = false
+
 [functions.notify-unconfirmed-transfers]
 # Internal cron/invocation only.
 # Caller must send `Authorization: Bearer $INTERNAL_FUNCTION_SECRET`

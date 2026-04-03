@@ -84,33 +84,6 @@ export function PaymentDialog({
   
   const { calculateExtraPaymentPreview, processExtraPayment } = useExtraPayment();
 
-  // Fetch verification history when dialog opens
-  useEffect(() => {
-    if (open && installment) {
-      void fetchVerificationHistory();
-      setPaymentAmount(installment.amount.toString());
-      setVerifiedAmount("");
-      setSlipUrl(null);
-      setSignedSlipUrl(null);
-    }
-  }, [open, installment, fetchVerificationHistory]);
-
-  // Fetch signed URL when displaySlipUrl changes
-  useEffect(() => {
-    const fetchUrl = async () => {
-      const urlToSign = slipUrl || pendingVerification?.slip_url || installment?.payment_proof_url;
-      if (urlToSign && open) {
-        setLoadingSignedUrl(true);
-        const url = await getPaymentSlipSignedUrl(urlToSign, 600);
-        setSignedSlipUrl(url);
-        setLoadingSignedUrl(false);
-      } else {
-        setSignedSlipUrl(null);
-      }
-    };
-    fetchUrl();
-  }, [slipUrl, pendingVerification?.slip_url, installment?.payment_proof_url, open]);
-
   const fetchVerificationHistory = useCallback(async () => {
     if (!installment) return;
     
@@ -141,6 +114,33 @@ export function PaymentDialog({
       setLoadingHistory(false);
     }
   }, [installment, isLender]);
+
+  // Fetch verification history when dialog opens
+  useEffect(() => {
+    if (open && installment) {
+      void fetchVerificationHistory();
+      setPaymentAmount(installment.amount.toString());
+      setVerifiedAmount("");
+      setSlipUrl(null);
+      setSignedSlipUrl(null);
+    }
+  }, [open, installment, fetchVerificationHistory]);
+
+  // Fetch signed URL when displaySlipUrl changes
+  useEffect(() => {
+    const fetchUrl = async () => {
+      const urlToSign = slipUrl || pendingVerification?.slip_url || installment?.payment_proof_url;
+      if (urlToSign && open) {
+        setLoadingSignedUrl(true);
+        const url = await getPaymentSlipSignedUrl(urlToSign, 600);
+        setSignedSlipUrl(url);
+        setLoadingSignedUrl(false);
+      } else {
+        setSignedSlipUrl(null);
+      }
+    };
+    void fetchUrl();
+  }, [slipUrl, pendingVerification?.slip_url, installment?.payment_proof_url, open]);
 
   const numericAmount = useMemo(() => {
     const num = parseFloat(paymentAmount);
