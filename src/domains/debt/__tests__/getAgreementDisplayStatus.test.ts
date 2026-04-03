@@ -23,6 +23,10 @@ describe('getAgreementDisplayStatus', () => {
     expect(getAgreementDisplayStatus(createAgreement())).toBe('active');
   });
 
+  it('returns cancelled for cancelled agreements', () => {
+    expect(getAgreementDisplayStatus(createAgreement({ status: 'cancelled' }))).toBe('cancelled');
+  });
+
   it('returns overdue when next installment is overdue', () => {
     expect(
       getAgreementDisplayStatus(

@@ -32,11 +32,11 @@ export function toMoneyCents(value: number): number {
 
 export function sumMoney(...values: number[]): number {
   const totalCents = values.reduce((sum, value) => sum + toMoneyCents(value), 0);
-  return totalCents / MONEY_MULTIPLIER;
+  return roundMoney(totalCents / MONEY_MULTIPLIER);
 }
 
 export function subtractMoney(a: number, b: number): number {
-  return (toMoneyCents(a) - toMoneyCents(b)) / MONEY_MULTIPLIER;
+  return roundMoney((toMoneyCents(a) - toMoneyCents(b)) / MONEY_MULTIPLIER);
 }
 
 export function moneyEquals(a: number, b: number, tolerance: number = 0.01): boolean {

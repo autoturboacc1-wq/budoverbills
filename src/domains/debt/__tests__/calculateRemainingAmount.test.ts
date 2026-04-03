@@ -26,6 +26,15 @@ describe('calculateRemainingAmount', () => {
     ];
     expect(calculateRemainingAmount(installments)).toBe(1000);
   });
+
+  it('keeps decimal sums stable for unpaid installments', () => {
+    const installments = [
+      createInstallment({ amount: 0.1, status: 'pending' }),
+      createInstallment({ id: '2', amount: 0.2, status: 'overdue' }),
+    ];
+
+    expect(calculateRemainingAmount(installments)).toBe(0.3);
+  });
 });
 
 describe('other installment totals', () => {

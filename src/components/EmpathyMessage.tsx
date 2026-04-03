@@ -61,6 +61,12 @@ const empathyConfig: Record<Status, {
     icon: Heart,
     colorClass: "text-status-paid",
   },
+  cancelled: {
+    message: "ข้อตกลงนี้ถูกยกเลิกแล้ว",
+    subMessage: "สามารถเริ่มต้นข้อตกลงใหม่ได้เมื่อทั้งสองฝ่ายพร้อม",
+    icon: HandHeart,
+    colorClass: "text-muted-foreground",
+  },
 };
 
 export function EmpathyMessage({ status, role, className }: EmpathyMessageProps) {

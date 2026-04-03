@@ -63,7 +63,7 @@ export function mapAgreementToDebtCard(
     partnerName,
     partnerInitial: partnerName.charAt(0).toUpperCase(),
     partnerAvatarUrl,
-    amount: agreement.total_amount,
+    amount: remainingAmount,
     remainingAmount,
     nextPaymentDate: nextInstallment 
       ? formatDueDate(nextInstallment.due_date)
@@ -74,7 +74,7 @@ export function mapAgreementToDebtCard(
     },
     status,
     isLender,
-    delay: 0.4 + index * 0.1,
+    delay: Math.min(1.2, 0.4 + index * 0.1),
   };
 }
 
@@ -113,7 +113,7 @@ export function mapToUpcomingInstallments(
       const daysUntilDue = calculateDaysUntilDue(installment.due_date);
       
       // Include overdue and upcoming within maxDaysAhead
-      if (daysUntilDue <= maxDaysAhead) {
+      if (daysUntilDue >= -maxDaysAhead && daysUntilDue <= maxDaysAhead) {
         upcoming.push({
           agreementId: agreement.id,
           partnerName,

@@ -1,4 +1,5 @@
 import { Installment } from '@/domains/debt/types';
+import { sumMoney } from '@/utils/money';
 
 /**
  * SINGLE SOURCE OF TRUTH for calculating remaining amount to be paid.
@@ -10,10 +11,10 @@ export function calculateRemainingAmount(installments: Installment[] | undefined
   if (!installments || installments.length === 0) {
     return 0;
   }
-  
-  return installments
-    .filter(installment => installment.status !== 'paid')
-    .reduce((sum, installment) => sum + installment.amount, 0);
+
+  return sumMoney(
+    ...installments.filter((installment) => installment.status !== 'paid').map((installment) => installment.amount)
+  );
 }
 
 /**
@@ -23,10 +24,8 @@ export function calculatePaidAmount(installments: Installment[] | undefined): nu
   if (!installments || installments.length === 0) {
     return 0;
   }
-  
-  return installments
-    .filter(installment => installment.status === 'paid')
-    .reduce((sum, installment) => sum + installment.amount, 0);
+
+  return sumMoney(...installments.filter((installment) => installment.status === 'paid').map((installment) => installment.amount));
 }
 
 /**
@@ -36,10 +35,10 @@ export function calculateInterestPaid(installments: Installment[] | undefined): 
   if (!installments || installments.length === 0) {
     return 0;
   }
-  
-  return installments
-    .filter(installment => installment.status === 'paid')
-    .reduce((sum, installment) => sum + (installment.interest_portion || 0), 0);
+
+  return sumMoney(
+    ...installments.filter((installment) => installment.status === 'paid').map((installment) => installment.interest_portion || 0)
+  );
 }
 
 /**
@@ -49,10 +48,10 @@ export function calculatePrincipalPaid(installments: Installment[] | undefined):
   if (!installments || installments.length === 0) {
     return 0;
   }
-  
-  return installments
-    .filter(installment => installment.status === 'paid')
-    .reduce((sum, installment) => sum + installment.principal_portion, 0);
+
+  return sumMoney(
+    ...installments.filter((installment) => installment.status === 'paid').map((installment) => installment.principal_portion)
+  );
 }
 
 /**
@@ -62,8 +61,8 @@ export function countPaidInstallments(installments: Installment[] | undefined): 
   if (!installments || installments.length === 0) {
     return 0;
   }
-  
-  return installments.filter(installment => installment.status === 'paid').length;
+
+  return installments.filter((installment) => installment.status === 'paid').length;
 }
 
 /**
@@ -75,6 +74,6 @@ export function isAgreementEffectivelyCompleted(installments: Installment[] | un
   if (!installments || installments.length === 0) {
     return false;
   }
-  
-  return installments.every(installment => installment.status === 'paid');
+
+  return installments.every((installment) => installment.status === 'paid');
 }

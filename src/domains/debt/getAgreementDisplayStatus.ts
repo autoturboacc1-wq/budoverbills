@@ -27,7 +27,7 @@ export function getAgreementDisplayStatus(agreement: DebtAgreement): DebtDisplay
   }
   
   if (agreement.status === 'cancelled') {
-    return 'pending'; // Fallback for cancelled
+    return 'cancelled';
   }
   
   if (agreement.status === 'rescheduling') {

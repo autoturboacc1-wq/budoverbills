@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-export type Status = "paid" | "pending" | "overdue" | "negotiating" | "pending_confirmation" | "active" | "completed" | "awaiting_transfer_confirmation";
+export type Status = "paid" | "pending" | "overdue" | "negotiating" | "pending_confirmation" | "active" | "completed" | "awaiting_transfer_confirmation" | "cancelled";
 
 interface StatusBadgeProps {
   status: Status;
@@ -48,6 +48,11 @@ const statusConfig: Record<Status, { label: string; dotClass: string; bgClass: s
     label: "เสร็จสิ้น",
     dotClass: "bg-status-paid",
     bgClass: "bg-status-paid/10 text-status-paid",
+  },
+  cancelled: {
+    label: "ยกเลิกแล้ว",
+    dotClass: "bg-muted-foreground",
+    bgClass: "bg-muted text-muted-foreground",
   },
 };
 

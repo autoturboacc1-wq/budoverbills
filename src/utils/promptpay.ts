@@ -2,7 +2,7 @@ function tlv(tag: string, value: string): string {
   return `${tag}${value.length.toString().padStart(2, "0")}${value}`;
 }
 
-function crc16(data: string): string {
+export function crc16(data: string): string {
   let crc = 0xffff;
 
   for (let index = 0; index < data.length; index += 1) {
@@ -10,6 +10,7 @@ function crc16(data: string): string {
 
     for (let bit = 0; bit < 8; bit += 1) {
       crc = (crc & 0x8000) !== 0 ? ((crc << 1) ^ 0x1021) : (crc << 1);
+      crc &= 0xffff;
     }
   }
 
@@ -26,14 +27,16 @@ function normalizePromptPayTarget(target: string): { accountType: "01" | "02"; v
     };
   }
 
-  if (sanitized.length === 10 && sanitized.startsWith("0")) {
+  if (sanitized.length === 10 && /^0[689]\d{8}$/.test(sanitized)) {
     return {
       accountType: "01",
       value: `0066${sanitized.slice(1)}`,
     };
   }
 
-  throw new Error("PromptPay รองรับเบอร์โทรศัพท์ 10 หลักหรือเลขบัตรประชาชน 13 หลัก");
+  throw new Error(
+    "PromptPay รองรับเบอร์โทรศัพท์มือถือ 10 หลัก (ขึ้นต้นด้วย 06, 08 หรือ 09) หรือเลขบัตรประชาชน 13 หลัก",
+  );
 }
 
 export function generatePromptPayPayload(target: string, amount?: number): string {

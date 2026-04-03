@@ -407,7 +407,7 @@ export default function DebtDetail() {
               agreement.status === 'active' ? 'active' :
               agreement.status === 'pending_confirmation' ? 'pending_confirmation' :
               agreement.status === 'completed' ? 'completed' :
-              agreement.status === 'cancelled' ? 'overdue' :
+              agreement.status === 'cancelled' ? 'cancelled' :
               'pending_confirmation'
             } />
           </div>
@@ -541,6 +541,7 @@ export default function DebtDetail() {
         >
           <BankAccountSection
             agreementId={agreement.id}
+            lenderId={agreement.lender_id}
             bankName={agreement.bank_name}
             accountNumber={agreement.account_number}
             accountName={agreement.account_name}

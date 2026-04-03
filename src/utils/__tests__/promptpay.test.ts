@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { generatePromptPayPayload } from "@/utils/promptpay";
+import { crc16, generatePromptPayPayload } from "@/utils/promptpay";
 
 describe("generatePromptPayPayload", () => {
+  it("calculates CRC-16/CCITT-FALSE correctly", () => {
+    expect(crc16("123456789")).toBe("29B1");
+  });
+
   it("builds a PromptPay payload from a Thai phone number", () => {
     const payload = generatePromptPayPayload("081-234-5678", 123.45);
 
@@ -22,7 +26,13 @@ describe("generatePromptPayPayload", () => {
 
   it("throws for unsupported PromptPay targets", () => {
     expect(() => generatePromptPayPayload("55555")).toThrow(
-      "PromptPay รองรับเบอร์โทรศัพท์ 10 หลักหรือเลขบัตรประชาชน 13 หลัก",
+      "PromptPay รองรับเบอร์โทรศัพท์มือถือ 10 หลัก (ขึ้นต้นด้วย 06, 08 หรือ 09) หรือเลขบัตรประชาชน 13 หลัก",
+    );
+  });
+
+  it("rejects Thai landline numbers for phone-based PromptPay", () => {
+    expect(() => generatePromptPayPayload("0212345678")).toThrow(
+      "PromptPay รองรับเบอร์โทรศัพท์มือถือ 10 หลัก (ขึ้นต้นด้วย 06, 08 หรือ 09) หรือเลขบัตรประชาชน 13 หลัก",
     );
   });
 });

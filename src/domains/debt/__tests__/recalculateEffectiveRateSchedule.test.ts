@@ -37,4 +37,17 @@ describe('recalculateEffectiveRateSchedule', () => {
     expect(schedule[0].interest).toBeGreaterThan(0);
     expect(schedule.reduce((sum, item) => sum + item.principal, 0)).toBeCloseTo(1000, 2);
   });
+
+  it('preserves annual rate precision beyond 2 decimal places', () => {
+    const schedule = buildEffectiveRateSchedule({
+      principal: 10000,
+      annualRatePercent: 12.345,
+      installments: 1,
+      frequency: 'monthly',
+    });
+
+    expect(schedule).toHaveLength(1);
+    expect(schedule[0].interest).toBe(102.88);
+    expect(schedule[0].total).toBe(10102.88);
+  });
 });

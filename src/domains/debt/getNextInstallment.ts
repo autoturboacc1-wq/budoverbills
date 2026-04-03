@@ -1,5 +1,24 @@
 import { Installment } from '@/domains/debt/types';
 
+const THAI_TIMEZONE = 'Asia/Bangkok';
+
+function getThaiDateKey(date: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: THAI_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function getThaiMidnightTimestamp(dateKey: string): number {
+  return new Date(`${dateKey}T00:00:00+07:00`).getTime();
+}
+
+function compareDueDates(a: string, b: string): number {
+  return getThaiMidnightTimestamp(a) - getThaiMidnightTimestamp(b);
+}
+
 /**
  * SINGLE SOURCE OF TRUTH for getting the next unpaid installment.
  * 
@@ -18,18 +37,17 @@ export function getNextInstallment(installments: Installment[] | undefined): Ins
   }
   
   // Sort by due date ascending and return the first one
-  return unpaidInstallments.sort(
-    (a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
-  )[0];
+  return unpaidInstallments.sort((a, b) => compareDueDates(a.due_date, b.due_date))[0];
 }
 
 /**
  * Format due date for display
  */
 export function formatDueDate(dueDate: string, locale: string = 'th-TH'): string {
-  return new Date(dueDate).toLocaleDateString(locale, { 
+  return new Date(`${dueDate}T12:00:00+07:00`).toLocaleDateString(locale, {
     day: 'numeric', 
-    month: 'short' 
+    month: 'short',
+    timeZone: THAI_TIMEZONE,
   });
 }
 
@@ -37,9 +55,9 @@ export function formatDueDate(dueDate: string, locale: string = 'th-TH'): string
  * Calculate days until due date
  */
 export function calculateDaysUntilDue(dueDate: string): number {
-  const now = new Date();
-  const due = new Date(dueDate);
-  return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const todayKey = getThaiDateKey(new Date());
+  const diffMs = getThaiMidnightTimestamp(dueDate) - getThaiMidnightTimestamp(todayKey);
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 }
 
 /**
@@ -50,7 +68,7 @@ export function isInstallmentOverdue(installment: Installment): boolean {
     return false;
   }
   
-  return new Date(installment.due_date) < new Date();
+  return installment.due_date < getThaiDateKey(new Date());
 }
 
 /**

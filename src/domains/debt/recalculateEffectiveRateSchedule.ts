@@ -27,10 +27,10 @@ export function buildEffectiveRateSchedule(params: {
   frequency: AgreementFrequency;
 }): EffectiveInstallmentBreakdown[] {
   const principal = toMoney(params.principal);
-  const annualRatePercent = toMoney(params.annualRatePercent);
+  const annualRatePercent = params.annualRatePercent;
   const installments = Math.max(0, Math.trunc(params.installments));
 
-  if (principal <= 0 || installments <= 0) {
+  if (!Number.isFinite(annualRatePercent) || annualRatePercent < 0 || principal <= 0 || installments <= 0) {
     return [];
   }
 
@@ -68,7 +68,7 @@ export function buildEffectiveRateSchedule(params: {
     const principalPortion = isLast
       ? roundMoney(remainingPrincipal)
       : roundMoney(payment - interestPortion);
-    const total = roundMoney(sumMoney(principalPortion, interestPortion));
+    const total = sumMoney(principalPortion, interestPortion);
 
     remainingPrincipal = roundMoney(Math.max(0, remainingPrincipal - principalPortion));
 
