@@ -108,28 +108,70 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
   const pendingUpload = useRef<{ installmentId: string; agreementId: string } | null>(null);
   const { agreements, refresh: refreshAgreements, uploadSlip, confirmPayment } = useDebtAgreements();
   const { user } = useAuth();
+  const agreementIds = useMemo(
+    () => agreements.map((agreement) => agreement.id),
+    [agreements]
+  );
 
-  // Realtime subscription for installments
+  // Realtime subscription for user-scoped agreement and installment changes
   useEffect(() => {
-    const installmentsChannel = supabase
-      .channel('calendar-installments')
+    if (!user?.id) return;
+
+    const channels: Array<ReturnType<typeof supabase.channel>> = [];
+    const invalidateAgreements = () => {
+      void refreshAgreements();
+    };
+
+    const debtAgreementsChannel = supabase
+      .channel(`calendar-debt-agreements-${user.id}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'installments'
+          table: 'debt_agreements',
+          filter: `lender_id=eq.${user.id}`,
         },
-        () => {
-          refreshAgreements();
-        }
+        invalidateAgreements
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'debt_agreements',
+          filter: `borrower_id=eq.${user.id}`,
+        },
+        invalidateAgreements
       )
       .subscribe();
 
+    channels.push(debtAgreementsChannel);
+
+    for (const agreementId of agreementIds) {
+      const installmentChannel = supabase
+        .channel(`calendar-installments-${user.id}-${agreementId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'installments',
+            filter: `agreement_id=eq.${agreementId}`,
+          },
+          invalidateAgreements
+        )
+        .subscribe();
+
+      channels.push(installmentChannel);
+    }
+
     return () => {
-      supabase.removeChannel(installmentsChannel);
+      channels.forEach((channel) => {
+        void supabase.removeChannel(channel);
+      });
     };
-  }, [refreshAgreements]);
+  }, [agreementIds, refreshAgreements, user?.id]);
 
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();

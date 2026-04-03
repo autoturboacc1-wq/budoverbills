@@ -39,6 +39,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { hasAdminSession } from "@/utils/adminSession";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -119,6 +120,19 @@ export default function Profile() {
           event: '*',
           schema: 'public',
           table: 'debt_agreements',
+          filter: `lender_id=eq.${user.id}`,
+        },
+        () => {
+          refetchStats();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'debt_agreements',
+          filter: `borrower_id=eq.${user.id}`,
         },
         () => {
           refetchStats();
@@ -411,8 +425,7 @@ export default function Profile() {
           {(isAdmin || isModerator) && (
             <button
               onClick={() => {
-                const verified = sessionStorage.getItem("admin_verified") === user?.id;
-                if (hasAdminAccess && verified) {
+                if (hasAdminAccess && hasAdminSession(user?.id)) {
                   navigate("/admin");
                 } else {
                   navigate("/admin/login");

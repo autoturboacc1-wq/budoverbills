@@ -1,8 +1,17 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChatNotificationSound } from "./useChatNotificationSound";
+
+interface ChatTargets {
+  agreementIds: string[];
+  directChatIds: string[];
+}
+
+function uniqueStrings(values?: Array<string | null | undefined>): string[] {
+  return Array.from(new Set((values ?? []).filter((value): value is string => Boolean(value))));
+}
 
 /**
  * Global hook to play notification sound when a new message arrives
@@ -12,43 +21,163 @@ export const useGlobalChatNotification = () => {
   const { user } = useAuth();
   const location = useLocation();
   const { playNotificationSound } = useChatNotificationSound({ enabled: true, userId: user?.id });
+  const [chatTargets, setChatTargets] = useState<ChatTargets>({
+    agreementIds: [],
+    directChatIds: [],
+  });
   const isInChatPage = location.pathname.startsWith("/chat");
   const isInChatPageRef = useRef(isInChatPage);
+  const userId = user?.id ?? null;
 
   // Keep ref updated
   useEffect(() => {
     isInChatPageRef.current = isInChatPage;
   }, [isInChatPage]);
 
-  // Subscribe to new messages globally
-  useEffect(() => {
-    if (!user) return;
+  const refreshChatTargets = useCallback(async () => {
+    if (!userId) {
+      setChatTargets({ agreementIds: [], directChatIds: [] });
+      return;
+    }
 
-    const channel = supabase
-      .channel("global-chat-notifications")
+    const [agreementsResult, directChatsResult] = await Promise.all([
+      supabase
+        .from("debt_agreements")
+        .select("id")
+        .or(`lender_id.eq.${userId},borrower_id.eq.${userId}`)
+        .in("status", ["active", "pending", "pending_transfer", "pending_confirmation"]),
+      supabase
+        .from("direct_chats")
+        .select("id")
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
+    ]);
+
+    setChatTargets({
+      agreementIds: uniqueStrings(agreementsResult.data?.map((agreement) => agreement.id)),
+      directChatIds: uniqueStrings(directChatsResult.data?.map((chat) => chat.id)),
+    });
+  }, [userId]);
+
+  useEffect(() => {
+    void refreshChatTargets();
+  }, [refreshChatTargets]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const roomUpdatesChannel = supabase
+      .channel(`global-chat-rooms-${userId}`)
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
-          table: "messages",
+          table: "debt_agreements",
+          filter: `lender_id=eq.${userId}`,
         },
-        (payload) => {
-          const message = payload.new as { sender_id: string; direct_chat_id?: string; agreement_id?: string };
-          
-          // Don't play sound for own messages
-          if (message.sender_id === user.id) return;
-          
-          // Only play sound if NOT in chat page
-          if (!isInChatPageRef.current) {
-            playNotificationSound();
-          }
+        () => {
+          void refreshChatTargets();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "debt_agreements",
+          filter: `borrower_id=eq.${userId}`,
+        },
+        () => {
+          void refreshChatTargets();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "direct_chats",
+          filter: `user1_id=eq.${userId}`,
+        },
+        () => {
+          void refreshChatTargets();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "direct_chats",
+          filter: `user2_id=eq.${userId}`,
+        },
+        () => {
+          void refreshChatTargets();
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(roomUpdatesChannel);
     };
-  }, [user, playNotificationSound]);
+  }, [refreshChatTargets, userId]);
+
+  useEffect(() => {
+    if (!userId || (chatTargets.agreementIds.length === 0 && chatTargets.directChatIds.length === 0)) {
+      return;
+    }
+
+    const channels: Array<ReturnType<typeof supabase.channel>> = [];
+
+    const handleMessage = (payload: { new: { sender_id: string } }) => {
+      const message = payload.new;
+
+      if (message.sender_id === userId) return;
+      if (!isInChatPageRef.current) {
+        playNotificationSound();
+      }
+    };
+
+    chatTargets.agreementIds.forEach((agreementId) => {
+      const channel = supabase
+        .channel(`global-chat-agreement-${userId}-${agreementId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "messages",
+            filter: `agreement_id=eq.${agreementId}`,
+          },
+          handleMessage
+        )
+        .subscribe();
+
+      channels.push(channel);
+    });
+
+    chatTargets.directChatIds.forEach((directChatId) => {
+      const channel = supabase
+        .channel(`global-chat-direct-${userId}-${directChatId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "messages",
+            filter: `direct_chat_id=eq.${directChatId}`,
+          },
+          handleMessage
+        )
+        .subscribe();
+
+      channels.push(channel);
+    });
+
+    return () => {
+      channels.forEach((channel) => {
+        void supabase.removeChannel(channel);
+      });
+    };
+  }, [chatTargets.agreementIds, chatTargets.directChatIds, playNotificationSound, userId]);
 };

@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 interface PendingAction {
   id: string;
@@ -174,6 +174,13 @@ export const PendingActionsCard = () => {
     enabled: !!user,
   });
 
+  const agreementIds = useMemo(() => {
+    const uniqueIds = new Set(
+      (pendingActions || []).map((action) => action.agreementId).filter(Boolean)
+    );
+    return Array.from(uniqueIds);
+  }, [pendingActions]);
+
   useEffect(() => {
     if (!user?.id) return;
 
@@ -181,21 +188,74 @@ export const PendingActionsCard = () => {
       void queryClient.invalidateQueries({ queryKey: ["pending-actions", user.id] });
     };
 
-    const channel = supabase
-      .channel(`pending-actions-${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "chat_rooms" }, invalidatePendingActions)
-      .on("postgres_changes", { event: "*", schema: "public", table: "installments" }, invalidatePendingActions)
-      .on("postgres_changes", { event: "*", schema: "public", table: "debt_agreements" }, invalidatePendingActions)
-      .subscribe((status) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          invalidatePendingActions();
-        }
-      });
+    const channels: Array<ReturnType<typeof supabase.channel>> = [];
+
+    const chatRoomsChannel = supabase
+      .channel(`pending-actions-${user.id}-chat-rooms`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_rooms",
+          filter: `pending_action_for=eq.${user.id}`,
+        },
+        invalidatePendingActions
+      )
+      .subscribe();
+
+    channels.push(chatRoomsChannel);
+
+    const debtAgreementsChannel = supabase
+      .channel(`pending-actions-${user.id}-debt-agreements`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "debt_agreements",
+          filter: `lender_id=eq.${user.id}`,
+        },
+        invalidatePendingActions
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "debt_agreements",
+          filter: `borrower_id=eq.${user.id}`,
+        },
+        invalidatePendingActions
+      )
+      .subscribe();
+
+    channels.push(debtAgreementsChannel);
+
+    agreementIds.forEach((agreementId) => {
+      const installmentsChannel = supabase
+        .channel(`pending-actions-${user.id}-installments-${agreementId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "installments",
+            filter: `agreement_id=eq.${agreementId}`,
+          },
+          invalidatePendingActions
+        )
+        .subscribe();
+
+      channels.push(installmentsChannel);
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      channels.forEach((channel) => {
+        void supabase.removeChannel(channel);
+      });
     };
-  }, [queryClient, user?.id]);
+  }, [agreementIds, queryClient, user?.id]);
 
   if (isLoading) {
     return (

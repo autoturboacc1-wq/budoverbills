@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { CalendarCheck, User, Bell, MessageCircle } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useNotifications } from "@/hooks/useNotifications";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -14,82 +14,191 @@ interface NavItem {
   badge?: number;
 }
 
+interface ChatTargets {
+  agreementIds: string[];
+  directChatIds: string[];
+}
+
+function uniqueStrings(values?: Array<string | null | undefined>): string[] {
+  return Array.from(new Set((values ?? []).filter((value): value is string => Boolean(value))));
+}
+
 export function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
   const { notifications } = useNotifications();
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [chatTargets, setChatTargets] = useState<ChatTargets>({
+    agreementIds: [],
+    directChatIds: [],
+  });
 
   const unreadNotifications = notifications?.filter(n => !n.is_read).length || 0;
+  const userId = user?.id ?? null;
 
-  // Fetch unread message count for both agreement chats and direct chats
-  useEffect(() => {
-    if (!user) return;
+  const refreshChatTargets = useCallback(async () => {
+    if (!userId) {
+      setUnreadMessages(0);
+      setChatTargets({ agreementIds: [], directChatIds: [] });
+      return;
+    }
 
-    const fetchUnreadCount = async () => {
-      let totalUnread = 0;
-
-      // Get unread from agreement chats
-      const { data: agreements } = await supabase
+    const [agreementsResult, directChatsResult] = await Promise.all([
+      supabase
         .from("debt_agreements")
         .select("id")
-        .or(`lender_id.eq.${user.id},borrower_id.eq.${user.id}`)
-        .in("status", ["active", "pending", "pending_transfer"]);
-
-      if (agreements?.length) {
-        const agreementIds = agreements.map(a => a.id);
-        const { count: agreementCount } = await supabase
-          .from("messages")
-          .select("id", { count: "exact" })
-          .in("agreement_id", agreementIds)
-          .neq("sender_id", user.id)
-          .is("read_at", null);
-        totalUnread += agreementCount || 0;
-      }
-
-      // Get unread from direct chats
-      const { data: directChats } = await supabase
+        .or(`lender_id.eq.${userId},borrower_id.eq.${userId}`)
+        .in("status", ["active", "pending", "pending_transfer", "pending_confirmation"]),
+      supabase
         .from("direct_chats")
         .select("id")
-        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
+    ]);
 
-      if (directChats?.length) {
-        const directChatIds = directChats.map(c => c.id);
-        const { count: directCount } = await supabase
-          .from("messages")
-          .select("id", { count: "exact" })
-          .in("direct_chat_id", directChatIds)
-          .neq("sender_id", user.id)
-          .is("read_at", null);
-        totalUnread += directCount || 0;
-      }
+    const agreementIds = uniqueStrings(agreementsResult.data?.map((agreement) => agreement.id));
+    const directChatIds = uniqueStrings(directChatsResult.data?.map((chat) => chat.id));
 
-      setUnreadMessages(totalUnread);
-    };
+    const [agreementCountResult, directCountResult] = await Promise.all([
+      agreementIds.length > 0
+        ? supabase
+            .from("messages")
+            .select("id", { count: "exact" })
+            .in("agreement_id", agreementIds)
+            .neq("sender_id", userId)
+            .is("read_at", null)
+        : Promise.resolve({ count: 0 }),
+      directChatIds.length > 0
+        ? supabase
+            .from("messages")
+            .select("id", { count: "exact" })
+            .in("direct_chat_id", directChatIds)
+            .neq("sender_id", userId)
+            .is("read_at", null)
+        : Promise.resolve({ count: 0 }),
+    ]);
 
-    fetchUnreadCount();
+    setUnreadMessages((agreementCountResult.count || 0) + (directCountResult.count || 0));
+    setChatTargets({ agreementIds, directChatIds });
+  }, [userId]);
 
-    // Subscribe to new messages (both types)
+  useEffect(() => {
+    void refreshChatTargets();
+  }, [refreshChatTargets]);
+
+  useEffect(() => {
+    if (!userId) return;
+
     const channel = supabase
-      .channel("unread-messages-all")
+      .channel(`bottom-nav-room-updates-${userId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "messages"
+          table: "debt_agreements",
+          filter: `lender_id=eq.${userId}`,
         },
         () => {
-          fetchUnreadCount();
+          void refreshChatTargets();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "debt_agreements",
+          filter: `borrower_id=eq.${userId}`,
+        },
+        () => {
+          void refreshChatTargets();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "direct_chats",
+          filter: `user1_id=eq.${userId}`,
+        },
+        () => {
+          void refreshChatTargets();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "direct_chats",
+          filter: `user2_id=eq.${userId}`,
+        },
+        () => {
+          void refreshChatTargets();
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [refreshChatTargets, userId]);
+
+  useEffect(() => {
+    if (!userId || (chatTargets.agreementIds.length === 0 && chatTargets.directChatIds.length === 0)) {
+      return;
+    }
+
+    const channels: Array<ReturnType<typeof supabase.channel>> = [];
+
+    const invalidateUnreadCount = () => {
+      void refreshChatTargets();
+    };
+
+    chatTargets.agreementIds.forEach((agreementId) => {
+      const channel = supabase
+        .channel(`bottom-nav-agreement-${userId}-${agreementId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "messages",
+            filter: `agreement_id=eq.${agreementId}`,
+          },
+          invalidateUnreadCount
+        )
+        .subscribe();
+
+      channels.push(channel);
+    });
+
+    chatTargets.directChatIds.forEach((directChatId) => {
+      const channel = supabase
+        .channel(`bottom-nav-direct-${userId}-${directChatId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "messages",
+            filter: `direct_chat_id=eq.${directChatId}`,
+          },
+          invalidateUnreadCount
+        )
+        .subscribe();
+
+      channels.push(channel);
+    });
+
+    return () => {
+      channels.forEach((channel) => {
+        void supabase.removeChannel(channel);
+      });
+    };
+  }, [chatTargets.agreementIds, chatTargets.directChatIds, refreshChatTargets, userId]);
 
   const navItems: NavItem[] = [
     { icon: CalendarCheck, label: "ปฏิทิน", path: "/" },

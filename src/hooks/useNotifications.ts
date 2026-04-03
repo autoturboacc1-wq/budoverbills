@@ -137,7 +137,7 @@ export function useNotifications() {
     let cancelled = false;
 
     const channel = supabase
-      .channel("notifications-realtime")
+      .channel(`notifications-realtime-${userId}`)
       .on(
         "postgres_changes",
         {
