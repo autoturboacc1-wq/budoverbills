@@ -10,6 +10,54 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 
+type ChatProfileRow = {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+};
+
+type ChatMessageRow = {
+  agreement_id: string | null;
+  direct_chat_id: string | null;
+  sender_id: string;
+  read_at: string | null;
+  content: string | null;
+  created_at: string;
+};
+
+type ThreadSummary = {
+  last_message: string | null;
+  last_message_at: string | null;
+  unread_count: number;
+};
+
+function updateThreadSummary(
+  summaryMap: Map<string, ThreadSummary>,
+  threadId: string,
+  message: ChatMessageRow,
+  currentUserId: string
+) {
+  const existing = summaryMap.get(threadId) ?? {
+    last_message: null,
+    last_message_at: null,
+    unread_count: 0,
+  };
+
+  if (
+    !existing.last_message_at ||
+    new Date(message.created_at).getTime() > new Date(existing.last_message_at).getTime()
+  ) {
+    existing.last_message = message.content;
+    existing.last_message_at = message.created_at;
+  }
+
+  if (message.sender_id !== currentUserId && message.read_at === null) {
+    existing.unread_count += 1;
+  }
+
+  summaryMap.set(threadId, existing);
+}
+
 const Chat = () => {
   const { chatId } = useParams(); // Can be agreementId or directChatId
   const navigate = useNavigate();
@@ -27,159 +75,187 @@ const Chat = () => {
       setLoading(true);
       const allThreads: ChatThread[] = [];
 
-      // 1. Fetch agreement-based chats
-      const { data: agreements, error: aggError } = await supabase
-        .from("debt_agreements")
-        .select(`
-          id,
-          lender_id,
-          borrower_id,
-          borrower_name,
-          status,
-          principal_amount
-        `)
-        .or(`lender_id.eq.${user.id},borrower_id.eq.${user.id}`)
-        .in("status", ["active", "pending_confirmation"]);
+      const [agreementsResult, directChatsResult] = await Promise.all([
+        supabase
+          .from("debt_agreements")
+          .select(`
+            id,
+            lender_id,
+            borrower_id,
+            borrower_name,
+            status,
+            principal_amount
+          `)
+          .or(`lender_id.eq.${user.id},borrower_id.eq.${user.id}`)
+          .in("status", ["active", "pending_confirmation"]),
+        supabase
+          .from("direct_chats")
+          .select("id, user1_id, user2_id")
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`),
+      ]);
 
-      if (aggError) throw aggError;
+      if (agreementsResult.error) throw agreementsResult.error;
+      if (directChatsResult.error) throw directChatsResult.error;
 
-      // 1b. Fetch chat_rooms for agreement metadata
-      const agreementIds = (agreements || []).map(a => a.id);
-      const { data: chatRooms } = agreementIds.length > 0 ? await supabase
-        .from("chat_rooms")
-        .select("agreement_id, room_type, has_pending_action, pending_action_type, pending_action_for")
-        .in("agreement_id", agreementIds) : { data: [] };
+      const agreements = agreementsResult.data || [];
+      const directChats = directChatsResult.data || [];
+      const agreementIds = agreements.map((agreement) => agreement.id);
+      const directChatIds = directChats.map((chat) => chat.id);
 
-      const chatRoomMap = new Map(
-        (chatRooms || []).map(r => [r.agreement_id, r])
-      );
+      const chatRoomsResult = agreementIds.length > 0
+        ? await supabase
+            .from("chat_rooms")
+            .select("agreement_id, room_type, has_pending_action, pending_action_type, pending_action_for")
+            .in("agreement_id", agreementIds)
+        : {
+            data: [] as Array<{
+              agreement_id: string;
+              room_type: string;
+              has_pending_action: boolean;
+              pending_action_type: string | null;
+              pending_action_for: string | null;
+            }>,
+            error: null,
+          };
 
-      // Process agreement threads
-      const agreementPromises = (agreements || []).map(async (agreement) => {
+      if (chatRoomsResult.error) throw chatRoomsResult.error;
+
+      const counterpartyIds = new Set<string>();
+      agreements.forEach((agreement) => {
+        if (agreement.lender_id === user.id && agreement.borrower_id) {
+          counterpartyIds.add(agreement.borrower_id);
+        } else if (agreement.borrower_id) {
+          counterpartyIds.add(agreement.lender_id);
+        }
+      });
+
+      directChats.forEach((chat) => {
+        const counterpartyId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id;
+        counterpartyIds.add(counterpartyId);
+      });
+
+      const profilesResult = counterpartyIds.size > 0
+        ? await supabase
+            .from("profiles")
+            .select("user_id, display_name, avatar_url")
+            .in("user_id", Array.from(counterpartyIds))
+        : {
+            data: [] as ChatProfileRow[],
+            error: null,
+          };
+
+      if (profilesResult.error) throw profilesResult.error;
+
+      const agreementMessagesResult = agreementIds.length > 0
+        ? await supabase
+            .from("messages")
+            .select("agreement_id, sender_id, read_at, content, created_at")
+            .in("agreement_id", agreementIds)
+            .order("created_at", { ascending: true })
+        : {
+            data: [] as ChatMessageRow[],
+            error: null,
+          };
+
+      if (agreementMessagesResult.error) throw agreementMessagesResult.error;
+
+      const directChatRoomsResult = directChatIds.length > 0
+        ? await supabase
+            .from("chat_rooms")
+            .select("direct_chat_id, room_type")
+            .in("direct_chat_id", directChatIds)
+        : {
+            data: [] as Array<{ direct_chat_id: string; room_type: string }>,
+            error: null,
+          };
+
+      if (directChatRoomsResult.error) throw directChatRoomsResult.error;
+
+      const directMessagesResult = directChatIds.length > 0
+        ? await supabase
+            .from("messages")
+            .select("direct_chat_id, sender_id, read_at, content, created_at")
+            .in("direct_chat_id", directChatIds)
+            .order("created_at", { ascending: true })
+        : {
+            data: [] as ChatMessageRow[],
+            error: null,
+          };
+
+      if (directMessagesResult.error) throw directMessagesResult.error;
+
+      const chatRoomMap = new Map<string, (typeof chatRoomsResult.data)[number]>();
+      (chatRoomsResult.data || []).forEach((room) => {
+        chatRoomMap.set(room.agreement_id, room);
+      });
+
+      const directRoomMap = new Map<string, (typeof directChatRoomsResult.data)[number]>();
+      (directChatRoomsResult.data || []).forEach((room) => {
+        directRoomMap.set(room.direct_chat_id, room);
+      });
+      const profileMap = new Map<string, ChatProfileRow>();
+      (profilesResult.data || []).forEach((profile) => {
+        profileMap.set(profile.user_id, profile);
+      });
+
+      const agreementSummaries = new Map<string, ThreadSummary>();
+      (agreementMessagesResult.data || []).forEach((message) => {
+        if (!message.agreement_id) return;
+        updateThreadSummary(agreementSummaries, message.agreement_id, message, user.id);
+      });
+
+      const directSummaries = new Map<string, ThreadSummary>();
+      (directMessagesResult.data || []).forEach((message) => {
+        if (!message.direct_chat_id) return;
+        updateThreadSummary(directSummaries, message.direct_chat_id, message, user.id);
+      });
+
+      agreements.forEach((agreement) => {
         const isLender = agreement.lender_id === user.id;
         const counterpartyId = isLender ? agreement.borrower_id : agreement.lender_id;
         const roomMeta = chatRoomMap.get(agreement.id);
+        const summary = agreementSummaries.get(agreement.id);
+        const counterpartyProfile = counterpartyId ? profileMap.get(counterpartyId) : null;
 
-        let counterpartyName = agreement.borrower_name || "ผู้ยืม";
-        let counterpartyAvatar: string | null = null;
-
-        if (counterpartyId) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("display_name, avatar_url")
-            .eq("user_id", counterpartyId)
-            .single();
-
-          if (profile) {
-            counterpartyName = profile.display_name || counterpartyName;
-            counterpartyAvatar = profile.avatar_url;
-          }
-        }
-
-        const { data: lastMsg } = await supabase
-          .from("messages")
-          .select("content, created_at")
-          .eq("agreement_id", agreement.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        const { count: unreadCount } = await supabase
-          .from("messages")
-          .select("id", { count: "exact" })
-          .eq("agreement_id", agreement.id)
-          .neq("sender_id", user.id)
-          .is("read_at", null);
-
-        return {
+        allThreads.push({
           chat_id: agreement.id,
           chat_type: "agreement" as const,
           agreement_id: agreement.id,
-          // Room metadata from chat_rooms
           room_type: (roomMeta?.room_type || "agreement") as RoomType,
           has_pending_action: roomMeta?.has_pending_action || false,
           pending_action_type: (roomMeta?.pending_action_type || "none") as PendingActionType,
           pending_action_for: roomMeta?.pending_action_for || undefined,
-          // Other fields
           counterparty_id: counterpartyId || "",
-          counterparty_name: counterpartyName,
-          counterparty_avatar: counterpartyAvatar,
-          last_message: lastMsg?.content || null,
-          last_message_at: lastMsg?.created_at || null,
-          unread_count: unreadCount || 0,
+          counterparty_name: counterpartyProfile?.display_name || agreement.borrower_name || "ผู้ยืม",
+          counterparty_avatar: counterpartyProfile?.avatar_url || null,
+          last_message: summary?.last_message || null,
+          last_message_at: summary?.last_message_at || null,
+          unread_count: summary?.unread_count || 0,
           role: isLender ? "lender" as const : "borrower" as const,
           agreement_status: agreement.status,
           principal_amount: agreement.principal_amount,
-        };
+        });
       });
 
-      // 2. Fetch direct chats
-      const { data: directChats, error: dcError } = await supabase
-        .from("direct_chats")
-        .select("*")
-        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
+      directChats.forEach((chat) => {
+        const counterpartyId = chat.user1_id === user.id ? chat.user2_id : chat.user1_id;
+        const roomMeta = directRoomMap.get(chat.id);
+        const summary = directSummaries.get(chat.id);
+        const profile = profileMap.get(counterpartyId);
 
-      if (dcError) throw dcError;
-
-      // 2b. Fetch chat_rooms for direct chat metadata
-      const directChatIds = (directChats || []).map(dc => dc.id);
-      const { data: directChatRooms } = directChatIds.length > 0 ? await supabase
-        .from("chat_rooms")
-        .select("direct_chat_id, room_type")
-        .in("direct_chat_id", directChatIds) : { data: [] };
-
-      const directRoomMap = new Map(
-        (directChatRooms || []).map(r => [r.direct_chat_id, r])
-      );
-
-      // Process direct chat threads
-      const directChatPromises = (directChats || []).map(async (dc) => {
-        const counterpartyId = dc.user1_id === user.id ? dc.user2_id : dc.user1_id;
-        const roomMeta = directRoomMap.get(dc.id);
-
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("display_name, avatar_url")
-          .eq("user_id", counterpartyId)
-          .single();
-
-        const { data: lastMsg } = await supabase
-          .from("messages")
-          .select("content, created_at")
-          .eq("direct_chat_id", dc.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        const { count: unreadCount } = await supabase
-          .from("messages")
-          .select("id", { count: "exact" })
-          .eq("direct_chat_id", dc.id)
-          .neq("sender_id", user.id)
-          .is("read_at", null);
-
-        return {
-          chat_id: dc.id,
+        allThreads.push({
+          chat_id: chat.id,
           chat_type: "direct" as const,
-          direct_chat_id: dc.id,
-          // Room metadata
+          direct_chat_id: chat.id,
           room_type: (roomMeta?.room_type || "casual") as RoomType,
-          // Common fields
           counterparty_id: counterpartyId,
           counterparty_name: profile?.display_name || "ผู้ใช้",
           counterparty_avatar: profile?.avatar_url || null,
-          last_message: lastMsg?.content || null,
-          last_message_at: lastMsg?.created_at || null,
-          unread_count: unreadCount || 0,
-        };
+          last_message: summary?.last_message || null,
+          last_message_at: summary?.last_message_at || null,
+          unread_count: summary?.unread_count || 0,
+        });
       });
-
-      const [agreementThreads, directThreads] = await Promise.all([
-        Promise.all(agreementPromises),
-        Promise.all(directChatPromises),
-      ]);
-
-      allThreads.push(...agreementThreads, ...directThreads);
 
       // Sort: pending actions first (debt with pending action), then by last message time
       allThreads.sort((a, b) => {
@@ -375,42 +451,65 @@ const FriendsList = ({ onStartChat }: FriendsListProps) => {
 
         if (error) throw error;
 
-        const friendsWithDetails = await Promise.all(
-          (friendsData || []).map(async (friend) => {
-            let avatar_url: string | null = null;
-            let unreadCount = 0;
+        const friendIds = (friendsData || [])
+          .map((friend) => friend.friend_user_id)
+          .filter((friendId): friendId is string => Boolean(friendId));
 
-            if (friend.friend_user_id) {
-              const { data: profile } = await supabase
+        const [profilesResult, directChatsResult] = await Promise.all([
+          friendIds.length > 0
+            ? supabase
                 .from("profiles")
-                .select("avatar_url")
-                .eq("user_id", friend.friend_user_id)
-                .single();
-              avatar_url = profile?.avatar_url || null;
+                .select("user_id, avatar_url")
+                .in("user_id", friendIds)
+            : Promise.resolve({ data: [] as Array<{ user_id: string; avatar_url: string | null }> }),
+          supabase
+            .from("direct_chats")
+            .select("id, user1_id, user2_id")
+            .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`),
+        ]);
 
-              // Check for unread messages in direct chats
-              const [id1, id2] = [user.id, friend.friend_user_id].sort();
-              const { data: directChat } = await supabase
-                .from("direct_chats")
-                .select("id")
-                .eq("user1_id", id1)
-                .eq("user2_id", id2)
-                .single();
+        if (directChatsResult.error) throw directChatsResult.error;
+        if (profilesResult && "error" in profilesResult && profilesResult.error) {
+          throw profilesResult.error;
+        }
 
-              if (directChat) {
-                const { count } = await supabase
-                  .from("messages")
-                  .select("id", { count: "exact" })
-                  .eq("direct_chat_id", directChat.id)
-                  .neq("sender_id", user.id)
-                  .is("read_at", null);
-                unreadCount = count || 0;
-              }
-            }
+        const directChatByCounterparty = new Map<string, string>();
+        (directChatsResult.data || []).forEach((directChat) => {
+          const counterpartyId = directChat.user1_id === user.id ? directChat.user2_id : directChat.user1_id;
+          directChatByCounterparty.set(counterpartyId, directChat.id);
+        });
 
-            return { ...friend, avatar_url, unreadCount };
-          })
-        );
+        const directChatIds = Array.from(directChatByCounterparty.values());
+        const unreadMessagesResult = directChatIds.length > 0
+          ? await supabase
+              .from("messages")
+              .select("direct_chat_id, sender_id, read_at")
+              .in("direct_chat_id", directChatIds)
+          : { data: [] as Array<{ direct_chat_id: string | null; sender_id: string; read_at: string | null }> };
+
+        if ("error" in unreadMessagesResult && unreadMessagesResult.error) {
+          throw unreadMessagesResult.error;
+        }
+
+        const profileMap = new Map<string, string | null>();
+        (profilesResult.data || []).forEach((profile) => {
+          profileMap.set(profile.user_id, profile.avatar_url);
+        });
+
+        const unreadCountMap = new Map<string, number>();
+        (unreadMessagesResult.data || []).forEach((message) => {
+          if (!message.direct_chat_id) return;
+          if (message.sender_id === user.id || message.read_at !== null) return;
+          unreadCountMap.set(message.direct_chat_id, (unreadCountMap.get(message.direct_chat_id) || 0) + 1);
+        });
+
+        const friendsWithDetails = (friendsData || []).map((friend) => {
+          const avatar_url = friend.friend_user_id ? profileMap.get(friend.friend_user_id) || null : null;
+          const directChatId = friend.friend_user_id ? directChatByCounterparty.get(friend.friend_user_id) : null;
+          const unreadCount = directChatId ? unreadCountMap.get(directChatId) || 0 : 0;
+
+          return { ...friend, avatar_url, unreadCount };
+        });
 
         setFriends(friendsWithDetails);
       } catch (error) {
@@ -439,7 +538,11 @@ const FriendsList = ({ onStartChat }: FriendsListProps) => {
         .select("*")
         .eq("user1_id", user1_id)
         .eq("user2_id", user2_id)
-        .single();
+        .maybeSingle();
+
+      if (findError) {
+        throw findError;
+      }
 
       if (existingChat) {
         // Direct chat exists, navigate to it
@@ -463,10 +566,15 @@ const FriendsList = ({ onStartChat }: FriendsListProps) => {
         .from("direct_chats")
         .insert({ user1_id, user2_id })
         .select()
-        .single();
+        .maybeSingle();
 
       if (createError) {
         console.error("Error creating direct chat:", createError);
+        toast.error("ไม่สามารถเริ่มการสนทนาได้");
+        return;
+      }
+
+      if (!newChat) {
         toast.error("ไม่สามารถเริ่มการสนทนาได้");
         return;
       }
