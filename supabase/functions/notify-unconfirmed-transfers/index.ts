@@ -1,45 +1,22 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { constantTimeEquals } from "../_shared/validation.ts";
 
 const NOTIFICATION_TYPE = "transfer_unconfirmed_reminder";
-const NOTIFICATION_WINDOW_HOURS = 24;
 const MAX_AGREEMENTS_PER_RUN = 200;
+const INTERNAL_SECRET_HEADER = "x-internal-secret";
+const REMINDER_DELAY_HOURS = 24;
 
 function getInternalSecret(req: Request): string | null {
-  const headerSecret = req.headers.get("x-internal-secret");
-  if (headerSecret) {
-    return headerSecret;
-  }
-
-  const authorization = req.headers.get("authorization");
-  if (!authorization) {
-    return null;
-  }
-
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
-  return match?.[1] ?? null;
-}
-
-function constantTimeEquals(left: string, right: string): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  let mismatch = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-
-  return mismatch === 0;
+  const headerSecret = req.headers.get(INTERNAL_SECRET_HEADER);
+  return headerSecret || null;
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   try {
@@ -48,7 +25,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Internal function secret is not configured" }),
         {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json" },
           status: 500,
         }
       );
@@ -59,8 +36,8 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 401,
+          headers: { "Content-Type": "application/json" },
         }
       );
     }
@@ -69,8 +46,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    const cutoffAt = new Date(Date.now() - NOTIFICATION_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
+    const cutoffAt = new Date(Date.now() - REMINDER_DELAY_HOURS * 60 * 60 * 1000).toISOString();
 
     const { data: unconfirmedAgreements, error: fetchError } = await supabase
       .from("debt_agreements")
@@ -107,7 +83,7 @@ Deno.serve(async (req) => {
       recipients.push({
         userId: agreement.lender_id,
         title: "⏰ ยังไม่ได้รับการยืนยัน",
-        message: `ผู้ยืม ฿${amount} ยังไม่ได้ยืนยันรับเงิน - ผ่านไปแล้ว ${NOTIFICATION_WINDOW_HOURS} ชั่วโมง`,
+        message: `ผู้ยืม ฿${amount} ยังไม่ได้ยืนยันรับเงิน - ผ่านไปแล้ว ${REMINDER_DELAY_HOURS} ชั่วโมง`,
       });
 
       for (const recipient of recipients) {
@@ -115,10 +91,9 @@ Deno.serve(async (req) => {
           .from("notifications")
           .select("id")
           .eq("user_id", recipient.userId)
+          .eq("type", NOTIFICATION_TYPE)
           .eq("related_id", agreement.id)
           .eq("related_type", "debt_agreement")
-          .eq("type", NOTIFICATION_TYPE)
-          .gte("created_at", cutoffAt)
           .limit(1);
 
         if (dedupeError) {
@@ -163,7 +138,6 @@ Deno.serve(async (req) => {
     console.log("Sent notifications", {
       checked: unconfirmedAgreements?.length || 0,
       notificationsSent,
-      cutoffAt,
     });
 
     return new Response(
@@ -171,10 +145,9 @@ Deno.serve(async (req) => {
         success: true,
         checked: unconfirmedAgreements?.length || 0,
         notificationsSent,
-        cutoffAt,
       }),
       {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         status: 200,
       }
     );
@@ -184,7 +157,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ error: errorMessage }),
       {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         status: 500,
       }
     );

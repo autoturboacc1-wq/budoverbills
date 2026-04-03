@@ -1,9 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "null",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
-};
+import { constantTimeEquals } from "../_shared/validation.ts";
 
 const REMINDER_OFFSETS = [0, 1, 3] as const;
 const REMINDER_TYPE = "payment_reminder";
@@ -23,6 +19,20 @@ type ReminderInstallment = {
     lender_id: string;
   }>;
 };
+
+async function buildReminderRelatedId(installmentId: string, offset: ReminderOffset): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`payment-reminder:${installmentId}:${offset}`)
+  );
+
+  const bytes = new Uint8Array(digest).slice(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
 
 function formatDateInTimeZone(date: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -63,11 +73,6 @@ function addDaysInTimeZone(date: Date, days: number, timeZone: string): string {
   return formatDateInTimeZone(next, timeZone);
 }
 
-function startOfDayInTimeZone(date: Date, timeZone: string): string {
-  const dateString = formatDateInTimeZone(date, timeZone);
-  return new Date(`${dateString}T00:00:00+07:00`).toISOString();
-}
-
 function formatMoney(amount: number): string {
   return Number(amount).toLocaleString("th-TH", {
     minimumFractionDigits: 2,
@@ -89,32 +94,9 @@ function getReminderOffset(dueDate: string, today: string, inOneDay: string, inT
   return null;
 }
 
-function constantTimeEquals(left: string, right: string): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  let mismatch = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-
-  return mismatch === 0;
-}
-
 function getInternalSecret(req: Request): string | null {
   const headerSecret = req.headers.get(INTERNAL_SECRET_HEADER);
-  if (headerSecret) {
-    return headerSecret;
-  }
-
-  const authorization = req.headers.get("authorization");
-  if (!authorization) {
-    return null;
-  }
-
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
-  return match?.[1] ?? null;
+  return headerSecret || null;
 }
 
 function buildReminderContent(installment: ReminderInstallment, offset: ReminderOffset) {
@@ -131,14 +113,10 @@ function buildReminderContent(installment: ReminderInstallment, offset: Reminder
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   }
 
@@ -152,7 +130,7 @@ Deno.serve(async (req) => {
     if (!requestSecret || !constantTimeEquals(requestSecret, internalSecret)) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -169,7 +147,6 @@ Deno.serve(async (req) => {
     const today = formatDateInTimeZone(now, BANGKOK_TIME_ZONE);
     const inOneDay = addDaysInTimeZone(now, 1, BANGKOK_TIME_ZONE);
     const inThreeDays = addDaysInTimeZone(now, 3, BANGKOK_TIME_ZONE);
-    const todayStart = startOfDayInTimeZone(now, BANGKOK_TIME_ZONE);
 
     const { data: installments, error: fetchError } = await supabase
       .from("installments")
@@ -209,16 +186,15 @@ Deno.serve(async (req) => {
       }
 
       const { title, message } = buildReminderContent(installment, reminderOffset);
-      const reminderKey = `${installment.id}:${reminderOffset}`;
+      const relatedId = await buildReminderRelatedId(installment.id, reminderOffset);
 
       const { data: existingReminder, error: dedupeError } = await supabase
         .from("notifications")
         .select("id")
         .eq("user_id", borrowerId)
         .eq("type", REMINDER_TYPE)
-        .eq("related_id", reminderKey)
+        .eq("related_id", relatedId)
         .eq("related_type", "installment")
-        .gte("created_at", todayStart)
         .limit(1);
 
       if (dedupeError) {
@@ -240,7 +216,7 @@ Deno.serve(async (req) => {
         type: REMINDER_TYPE,
         title,
         message,
-        related_id: reminderKey,
+        related_id: relatedId,
         related_type: "installment",
       });
 
@@ -270,7 +246,7 @@ Deno.serve(async (req) => {
       }),
       {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       },
     );
   } catch (error: unknown) {
@@ -279,7 +255,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   }
 });

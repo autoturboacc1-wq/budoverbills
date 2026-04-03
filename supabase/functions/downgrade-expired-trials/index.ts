@@ -1,52 +1,20 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "null",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-secret",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { constantTimeEquals } from "../_shared/validation.ts";
 
 const INTERNAL_SECRET_HEADER = "x-internal-secret";
 
-function constantTimeEquals(left: string, right: string): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  let mismatch = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-
-  return mismatch === 0;
-}
-
 function getInternalSecret(req: Request): string | null {
   const headerSecret = req.headers.get(INTERNAL_SECRET_HEADER);
-  if (headerSecret) {
-    return headerSecret;
-  }
-
-  const authorization = req.headers.get("authorization");
-  if (!authorization) {
-    return null;
-  }
-
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
-  return match?.[1] ?? null;
+  return headerSecret || null;
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
   if (req.method !== "POST") {
     return new Response(
       JSON.stringify({ error: "Method not allowed" }),
       {
         status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       }
     );
   }
@@ -64,7 +32,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "Unauthorized" }),
         { 
           status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+          headers: { "Content-Type": "application/json" }
         }
       );
     }
@@ -81,7 +49,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: error.message }),
         { 
           status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+          headers: { "Content-Type": "application/json" }
         }
       );
     }
@@ -94,7 +62,7 @@ Deno.serve(async (req) => {
       }),
       { 
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" }
       }
     );
   } catch (err) {
@@ -103,7 +71,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: "Internal server error" }),
       { 
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" }
       }
     );
   }
