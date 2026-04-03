@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
 export type Language = 'th' | 'en' | 'zh' | 'vi' | 'es' | 'ru' | 'ja' | 'ko' | 'id' | 'hi';
 
@@ -982,23 +982,44 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const language: Language = 'th';
+const LANGUAGE_STORAGE_KEY = 'app-language';
+const FALLBACK_LANGUAGE: Language = 'th';
 
-  const setLanguage = () => {
-    localStorage.setItem('app-language', 'th');
+function isLanguage(value: string | null): value is Language {
+  return value !== null && languages.some((language) => language.code === value);
+}
+
+function getInitialLanguage(): Language {
+  if (typeof window === 'undefined') {
+    return FALLBACK_LANGUAGE;
+  }
+
+  const storedLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+  if (isLanguage(storedLanguage)) {
+    return storedLanguage;
+  }
+
+  return FALLBACK_LANGUAGE;
+}
+
+export function LanguageProvider({ children }: { children: ReactNode }) {
+  const [language, setLanguageState] = useState<Language>(getInitialLanguage);
+
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
   };
 
   const t = (key: keyof TranslationKeys): string => {
-    return translations.th[key] || key;
+    return translations[language]?.[key] || translations[FALLBACK_LANGUAGE][key] || key;
   };
 
-  const currentLanguage = languages.find(l => l.code === 'th') || languages[0];
+  const currentLanguage = languages.find((l) => l.code === language) || languages[0];
 
   useEffect(() => {
-    localStorage.setItem('app-language', 'th');
-    document.documentElement.lang = 'th';
-  }, []);
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+    document.documentElement.lang = language;
+  }, [language]);
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t, currentLanguage }}>
