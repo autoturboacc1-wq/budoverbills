@@ -11,30 +11,56 @@ interface TypingUser {
 export function useTypingIndicator(chatId: string | undefined, isDirectChat: boolean = false) {
   const { user } = useAuth();
   const [isCounterpartyTyping, setIsCounterpartyTyping] = useState(false);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const counterpartyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingRef = useRef<number>(0);
+  const requestIdRef = useRef(0);
 
   // Determine filter column based on chat type
   const filterColumn = isDirectChat ? 'direct_chat_id' : 'agreement_id';
 
+  const clearCounterpartyResetTimer = useCallback(() => {
+    if (counterpartyResetTimeoutRef.current) {
+      clearTimeout(counterpartyResetTimeoutRef.current);
+      counterpartyResetTimeoutRef.current = null;
+    }
+  }, []);
+
   // Track counterparty typing status
   useEffect(() => {
-    if (!chatId || !user) return;
+    if (!chatId || !user) {
+      setIsCounterpartyTyping(false);
+      clearCounterpartyResetTimer();
+      return;
+    }
+    const requestId = ++requestIdRef.current;
+    let cancelled = false;
 
     // Fetch initial typing status
     const fetchTypingStatus = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('chat_typing')
         .select('*')
         .eq(filterColumn, chatId)
         .neq('user_id', user.id)
-        .single();
+        .maybeSingle();
+
+      if (cancelled || requestId !== requestIdRef.current) {
+        return;
+      }
+
+      if (error) {
+        console.error('Error fetching typing status:', error);
+        return;
+      }
 
       if (data && data.is_typing) {
         // Check if typing status is recent (within 5 seconds)
         const updatedAt = new Date(data.updated_at).getTime();
         const now = Date.now();
         setIsCounterpartyTyping(now - updatedAt < 5000);
+      } else {
+        setIsCounterpartyTyping(false);
       }
     };
 
@@ -52,14 +78,21 @@ export function useTypingIndicator(chatId: string | undefined, isDirectChat: boo
           filter: `${filterColumn}=eq.${chatId}`,
         },
         (payload) => {
+          if (cancelled || requestId !== requestIdRef.current) {
+            return;
+          }
+
           const data = payload.new as TypingUser;
           if (data && data.user_id !== user.id) {
+            clearCounterpartyResetTimer();
             setIsCounterpartyTyping(data.is_typing);
             
             // Auto-reset after 5 seconds if still typing
             if (data.is_typing) {
-              setTimeout(() => {
-                setIsCounterpartyTyping(false);
+              counterpartyResetTimeoutRef.current = setTimeout(() => {
+                if (!cancelled && requestId === requestIdRef.current) {
+                  setIsCounterpartyTyping(false);
+                }
               }, 5000);
             }
           }
@@ -68,9 +101,12 @@ export function useTypingIndicator(chatId: string | undefined, isDirectChat: boo
       .subscribe();
 
     return () => {
+      cancelled = true;
+      requestIdRef.current += 1;
+      clearCounterpartyResetTimer();
       supabase.removeChannel(channel);
     };
-  }, [chatId, user, filterColumn]);
+  }, [chatId, user, filterColumn, clearCounterpartyResetTimer]);
 
   // Send typing status with debounce
   const sendTypingStatus = useCallback(async (isTyping: boolean) => {
@@ -82,27 +118,14 @@ export function useTypingIndicator(chatId: string | undefined, isDirectChat: boo
     lastTypingRef.current = now;
 
     try {
-      // Build upsert data based on chat type
-      const upsertData: Record<string, unknown> = {
-        user_id: user.id,
-        is_typing: isTyping,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (isDirectChat) {
-        upsertData.direct_chat_id = chatId;
-      } else {
-        upsertData.agreement_id = chatId;
-      }
-
       // For direct chats, we need to handle the unique constraint differently
       // First try to find existing record
       const { data: existing } = await supabase
         .from('chat_typing')
         .select('id')
-        .eq(filterColumn, chatId)
-        .eq('user_id', user.id)
-        .single();
+      .eq(filterColumn, chatId)
+      .eq('user_id', user.id)
+      .maybeSingle();
 
       if (existing) {
         // Update existing
@@ -147,6 +170,7 @@ export function useTypingIndicator(chatId: string | undefined, isDirectChat: boo
     // Clear existing timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
     }
 
     // Auto-stop typing after 3 seconds of no activity
@@ -159,6 +183,7 @@ export function useTypingIndicator(chatId: string | undefined, isDirectChat: boo
   const stopTyping = useCallback(() => {
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
     }
     sendTypingStatus(false);
   }, [sendTypingStatus]);
@@ -168,7 +193,9 @@ export function useTypingIndicator(chatId: string | undefined, isDirectChat: boo
     return () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
       }
+      clearCounterpartyResetTimer();
       // Reset typing status when leaving chat
       if (chatId && user) {
         supabase
@@ -178,7 +205,7 @@ export function useTypingIndicator(chatId: string | undefined, isDirectChat: boo
           .eq('user_id', user.id);
       }
     };
-  }, [chatId, user, filterColumn]);
+  }, [chatId, user, filterColumn, clearCounterpartyResetTimer]);
 
   return {
     isCounterpartyTyping,

@@ -6,20 +6,15 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const Notifications = () => {
   const navigate = useNavigate();
-  const { notifications, loading, refetch } = useNotifications();
+  const { notifications, loading, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
 
   const handleMarkAsRead = async (id: string) => {
     try {
-      await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .eq("id", id);
-      refetch();
+      await markAsRead(id);
     } catch (error) {
       console.error("Error marking as read:", error);
     }
@@ -27,16 +22,8 @@ const Notifications = () => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const unreadIds = notifications?.filter(n => !n.is_read).map(n => n.id) || [];
-      if (unreadIds.length === 0) return;
-
-      await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .in("id", unreadIds);
-
-      toast.success("อ่านทั้งหมดแล้ว");
-      refetch();
+      if (!notifications?.some(n => !n.is_read)) return;
+      await markAllAsRead();
     } catch (error) {
       console.error("Error marking all as read:", error);
       toast.error("เกิดข้อผิดพลาด");
@@ -45,11 +32,7 @@ const Notifications = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await supabase
-        .from("notifications")
-        .delete()
-        .eq("id", id);
-      refetch();
+      await deleteNotification(id);
     } catch (error) {
       console.error("Error deleting notification:", error);
     }

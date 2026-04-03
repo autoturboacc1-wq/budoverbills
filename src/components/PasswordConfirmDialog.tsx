@@ -44,18 +44,26 @@ export function PasswordConfirmDialog({
 
   // Check if user is OAuth (Google) user - they don't have a password
   useEffect(() => {
+    let cancelled = false;
+
     const checkAuthMethod = async () => {
-      if (!open) return;
+      if (!open) {
+        setIsCheckingAuth(false);
+        return;
+      }
       
       setIsCheckingAuth(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
+
+        if (cancelled) return;
         
         if (user) {
           // Check if user has identity from OAuth provider
           const hasOAuthIdentity = user.app_metadata?.provider === 'google' ||
             user.identities?.some(identity => identity.provider === 'google');
           
+          if (cancelled) return;
           setIsOAuthUser(Boolean(hasOAuthIdentity));
           
           if (hasOAuthIdentity) {
@@ -65,14 +73,21 @@ export function PasswordConfirmDialog({
           }
         }
       } catch (err) {
+        if (cancelled) return;
         console.error("Error checking auth method:", err);
         setStep('password');
       } finally {
-        setIsCheckingAuth(false);
+        if (!cancelled) {
+          setIsCheckingAuth(false);
+        }
       }
     };
     
-    checkAuthMethod();
+    void checkAuthMethod();
+
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   const handleVerifyPassword = async () => {

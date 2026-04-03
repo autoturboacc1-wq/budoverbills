@@ -74,8 +74,13 @@ export function useActivityFeed() {
 
         if (agreementsError) throw agreementsError;
 
-        // Fetch recent installments with payment updates - use secure view
-        const { data: installments, error: installmentsError } = await supabase
+        const agreementIds = (agreements as ActivityAgreement[] | null)
+          ?.map((agreement) => agreement.id)
+          .filter((agreementId): agreementId is string => Boolean(agreementId)) ?? [];
+
+        // Fetch installments for the agreements we already know belong to this user.
+        // This avoids PostgREST cross-table filters that can behave inconsistently.
+        const installmentsQuery = supabase
           .from("installments")
           .select(`
             id,
@@ -94,9 +99,12 @@ export function useActivityFeed() {
               borrower_id
             )
           `)
-          .or(`debt_agreements_secure.lender_id.eq.${user.id},debt_agreements_secure.borrower_id.eq.${user.id}`)
           .order("created_at", { ascending: false })
           .limit(30);
+
+        const { data: installments, error: installmentsError } = agreementIds.length > 0
+          ? await installmentsQuery.in("agreement_id", agreementIds)
+          : { data: [], error: null };
 
         if (installmentsError) throw installmentsError;
 

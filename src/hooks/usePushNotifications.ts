@@ -28,13 +28,18 @@ export function usePushNotifications() {
 
   const checkSubscription = useCallback(async () => {
     try {
+      if (!user || !isSupported) {
+        setIsSubscribed(false);
+        return;
+      }
+
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
-      setIsSubscribed(!!subscription);
+      setIsSubscribed(Boolean(subscription));
     } catch (error) {
       console.error('Error checking subscription:', error);
     }
-  }, []);
+  }, [isSupported, user]);
 
   useEffect(() => {
     if (isSupported && user) {
@@ -54,6 +59,7 @@ export function usePushNotifications() {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
         toast.error('กรุณาอนุญาตการแจ้งเตือนในเบราว์เซอร์');
+        setIsSubscribed(false);
         return;
       }
 
@@ -86,7 +92,7 @@ export function usePushNotifications() {
   }, [user, isSupported]);
 
   const unsubscribe = useCallback(async () => {
-    if (!user) return;
+    if (!user || !isSupported) return;
     
     setIsLoading(true);
     try {
@@ -94,9 +100,16 @@ export function usePushNotifications() {
       const subscription = await registration.pushManager.getSubscription();
       
       if (subscription) {
+        const endpoint = subscription.endpoint;
         await subscription.unsubscribe();
         
-        await supabase.from('push_subscriptions').delete().eq('user_id', user.id);
+        const { error } = await supabase
+          .from('push_subscriptions')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('endpoint', endpoint);
+
+        if (error) throw error;
       }
 
       setIsSubscribed(false);
@@ -107,7 +120,7 @@ export function usePushNotifications() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, isSupported]);
 
   return {
     isSupported,

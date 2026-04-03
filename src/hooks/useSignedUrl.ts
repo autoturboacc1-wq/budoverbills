@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export function normalizeStoragePath(path: string): string {
@@ -30,10 +30,16 @@ export function useSignedUrl(
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
+    const requestId = ++requestIdRef.current;
+    let cancelled = false;
+
     if (!path) {
       setSignedUrl(null);
+      setError(null);
+      setIsLoading(false);
       return;
     }
 
@@ -49,17 +55,29 @@ export function useSignedUrl(
           .createSignedUrl(filePath, expiresIn);
 
         if (signError) throw signError;
-        setSignedUrl(data.signedUrl);
+        if (!cancelled && requestIdRef.current === requestId) {
+          setSignedUrl(data.signedUrl);
+        }
       } catch (err) {
+        if (cancelled || requestIdRef.current !== requestId) {
+          return;
+        }
         console.error("Error creating signed URL:", err);
         setError(err instanceof Error ? err : new Error("Failed to create signed URL"));
         setSignedUrl(null);
       } finally {
-        setIsLoading(false);
+        if (!cancelled && requestIdRef.current === requestId) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchSignedUrl();
+    void fetchSignedUrl();
+
+    return () => {
+      cancelled = true;
+      requestIdRef.current += 1;
+    };
   }, [bucket, path, expiresIn]);
 
   return { signedUrl, isLoading, error };

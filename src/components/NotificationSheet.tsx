@@ -59,6 +59,40 @@ const priorityConfig: Record<NotificationPriority, {
   },
 };
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function isSafeInternalPath(value: string): boolean {
+  return value.startsWith("/") && !value.startsWith("//") && !/[\s\\]/.test(value) && !/^[a-z][a-z0-9+.-]*:/i.test(value);
+}
+
+function getSafeNotificationTarget(notif: Notification): string | null {
+  if (notif.action_url && isSafeInternalPath(notif.action_url)) {
+    return notif.action_url;
+  }
+
+  if (!notif.related_id || !isUuid(notif.related_id)) {
+    return null;
+  }
+
+  switch (notif.related_type) {
+    case "agreement":
+    case "reschedule":
+      return `/debt/${notif.related_id}`;
+    case "installment":
+      return `/debt/${notif.related_id}`;
+    case "friend_request":
+      return "/friends";
+    case "feed_post":
+      return "/";
+    case "chat":
+      return `/chat/${notif.related_id}`;
+    default:
+      return null;
+  }
+}
+
 export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps) {
   const { notifications, loading, markAsRead, markAllAsRead, unreadCount } = useNotifications();
   const navigate = useNavigate();
@@ -79,41 +113,15 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
     
     // Close sheet first
     onOpenChange(false);
-    
-    // Use action_url if available (direct deep link)
-    if (notif.action_url) {
-      navigate(notif.action_url);
-      return;
-    }
-    
-    // Fallback: Navigate based on notification type and related type
-    if (notif.related_id) {
-      switch (notif.related_type) {
-        case "agreement":
-          navigate(`/debt/${notif.related_id}`);
-          break;
-        case "installment":
-          // For installment-related notifications, find the agreement first
-          await navigateToInstallment(notif.related_id);
-          break;
-        case "reschedule":
-          navigate(`/debt/${notif.related_id}`);
-          break;
-        case "friend_request":
-          navigate("/friends");
-          break;
-        case "feed_post":
-          navigate("/");
-          break;
-        case "chat":
-          navigate(`/chat/${notif.related_id}`);
-          break;
-        default:
-          // For other types, try to navigate to debt if it looks like a UUID
-          if (notif.related_id && notif.related_id.length === 36) {
-            navigate(`/debt/${notif.related_id}`);
-          }
+
+    const safeTarget = getSafeNotificationTarget(notif);
+    if (safeTarget) {
+      if (notif.related_type === "installment") {
+        await navigateToInstallment(notif.related_id as string);
+        return;
       }
+
+      navigate(safeTarget);
     }
   };
 

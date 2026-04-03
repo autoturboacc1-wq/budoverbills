@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -27,39 +27,64 @@ interface FriendSearchRow {
 
 export function useSearch(query: string) {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [agreements, setAgreements] = useState<AgreementSearchRow[]>([]);
   const [friends, setFriends] = useState<FriendSearchRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const requestIdRef = useRef(0);
 
-  // Fetch data once
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
+
+    const requestId = ++requestIdRef.current;
+    let cancelled = false;
 
     const fetchData = async () => {
       setLoading(true);
+      setAgreements([]);
+      setFriends([]);
       try {
         const [agreementsRes, friendsRes] = await Promise.all([
           // Use secure view that hides borrower info until confirmed
           supabase
             .from("debt_agreements_secure")
             .select("id, borrower_name, principal_amount, total_amount, status")
-            .or(`lender_id.eq.${user.id},borrower_id.eq.${user.id}`),
+            .or(`lender_id.eq.${userId},borrower_id.eq.${userId}`),
           supabase
             .from("friends")
             .select("id, friend_name, nickname, friend_phone")
-            .eq("user_id", user.id),
+            .eq("user_id", userId),
         ]);
+
+        if (cancelled || requestIdRef.current !== requestId) return;
 
         if (agreementsRes.data) setAgreements(agreementsRes.data as AgreementSearchRow[]);
         if (friendsRes.data) setFriends(friendsRes.data as FriendSearchRow[]);
       } catch (error) {
+        if (cancelled || requestIdRef.current !== requestId) return;
         console.error("Error fetching search data:", error);
       } finally {
-        setLoading(false);
+        if (!cancelled && requestIdRef.current === requestId) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchData();
+    void fetchData();
+
+    return () => {
+      cancelled = true;
+      requestIdRef.current += 1;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (user) return;
+
+    requestIdRef.current += 1;
+    setAgreements([]);
+    setFriends([]);
+    setLoading(false);
   }, [user]);
 
   // Filter results based on query

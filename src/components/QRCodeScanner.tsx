@@ -15,6 +15,23 @@ interface QRCodeScannerProps {
   onScan: (decodedText: string) => void;
 }
 
+function sanitizeDecodedText(decodedText: string): string | null {
+  const trimmed = decodedText.trim();
+
+  if (!trimmed || trimmed.length > 1024) {
+    return null;
+  }
+
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const charCode = trimmed.charCodeAt(index);
+    if (charCode < 32 || charCode === 127) {
+      return null;
+    }
+  }
+
+  return trimmed;
+}
+
 export function QRCodeScanner({ open, onClose, onScan }: QRCodeScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +66,14 @@ export function QRCodeScanner({ open, onClose, onScan }: QRCodeScannerProps) {
           qrbox: { width: 250, height: 250 },
         },
         (decodedText) => {
-          onScan(decodedText);
+          const safeText = sanitizeDecodedText(decodedText);
+          if (!safeText) {
+            setError("QR Code ไม่ถูกต้อง");
+            void stopScanner();
+            return;
+          }
+
+          onScan(safeText);
           stopScanner();
           onClose();
         },

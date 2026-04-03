@@ -70,16 +70,53 @@ const defaultSettings: SettingsState = {
   },
 };
 
+function isSettingsState(value: unknown): value is SettingsState {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<SettingsState>;
+
+  return Boolean(
+    candidate.notifications &&
+      candidate.privacy &&
+      candidate.appearance &&
+      typeof candidate.notifications.push === "boolean" &&
+      typeof candidate.notifications.email === "boolean" &&
+      typeof candidate.notifications.paymentReminders === "boolean" &&
+      typeof candidate.notifications.agreementUpdates === "boolean" &&
+      typeof candidate.privacy.showProfile === "boolean" &&
+      typeof candidate.privacy.showActivity === "boolean" &&
+      typeof candidate.appearance.darkMode === "boolean",
+  );
+}
+
+function getInitialSettings(): SettingsState {
+  if (typeof window === "undefined") {
+    return defaultSettings;
+  }
+
+  try {
+    const saved = localStorage.getItem("app-settings");
+    if (!saved) {
+      return defaultSettings;
+    }
+
+    const parsed = JSON.parse(saved) as unknown;
+    return isSettingsState(parsed) ? parsed : defaultSettings;
+  } catch (error) {
+    console.error("Failed to parse saved settings:", error);
+    return defaultSettings;
+  }
+}
+
 export default function Settings() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { theme, setTheme } = useTheme();
   const { limits, isPremium, isLoading: subscriptionLoading, isTrial, trialDaysRemaining, hasUsedTrial, startTrial, isStartingTrial } = useSubscription();
   const [mounted, setMounted] = useState(false);
-  const [settings, setSettings] = useState<SettingsState>(() => {
-    const saved = localStorage.getItem("app-settings");
-    return saved ? JSON.parse(saved) : defaultSettings;
-  });
+  const [settings, setSettings] = useState<SettingsState>(getInitialSettings);
   // Avoid hydration mismatch
   useEffect(() => {
     setMounted(true);

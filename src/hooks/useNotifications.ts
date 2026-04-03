@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -23,37 +23,58 @@ export function useNotifications() {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const requestIdRef = useRef(0);
 
-  const fetchNotifications = async () => {
-    if (!user) {
+  const userId = user?.id ?? null;
+
+  const fetchNotifications = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+
+    if (!userId) {
       setNotifications([]);
       setLoading(false);
       return;
     }
 
+    setLoading(true);
+
     try {
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(50);
 
       if (error) throw error;
+
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       setNotifications(data || []);
     } catch (error) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       console.error("Error fetching notifications:", error);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [userId]);
 
-  const markAsRead = async (notificationId: string) => {
+  const markAsRead = useCallback(async (notificationId: string) => {
+    if (!userId) return;
+
     try {
       const { error } = await supabase
         .from("notifications")
         .update({ is_read: true })
-        .eq("id", notificationId);
+        .eq("id", notificationId)
+        .eq("user_id", userId);
 
       if (error) throw error;
 
@@ -63,16 +84,16 @@ export function useNotifications() {
     } catch (error) {
       console.error("Error marking notification as read:", error);
     }
-  };
+  }, [userId]);
 
-  const markAllAsRead = async () => {
-    if (!user) return;
+  const markAllAsRead = useCallback(async () => {
+    if (!userId) return;
 
     try {
       const { error } = await supabase
         .from("notifications")
         .update({ is_read: true })
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("is_read", false);
 
       if (error) throw error;
@@ -82,15 +103,38 @@ export function useNotifications() {
     } catch (error) {
       console.error("Error marking all as read:", error);
     }
-  };
+  }, [userId]);
+
+  const deleteNotification = useCallback(async (notificationId: string) => {
+    if (!userId) return;
+
+    try {
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("id", notificationId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+    }
+  }, [userId]);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   // Subscribe to realtime updates
   useEffect(() => {
-    if (!user) return;
+    if (!userId) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
 
-    fetchNotifications();
+    void fetchNotifications();
+    let cancelled = false;
 
     const channel = supabase
       .channel("notifications-realtime")
@@ -100,9 +144,10 @@ export function useNotifications() {
           event: "INSERT",
           schema: "public",
           table: "notifications",
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${userId}`,
         },
         (payload) => {
+          if (cancelled) return;
           const newNotification = payload.new as Notification;
           setNotifications(prev => [newNotification, ...prev]);
           
@@ -118,9 +163,10 @@ export function useNotifications() {
           event: "UPDATE",
           schema: "public",
           table: "notifications",
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${userId}`,
         },
         (payload) => {
+          if (cancelled) return;
           const updated = payload.new as Notification;
           setNotifications(prev =>
             prev.map(n => (n.id === updated.id ? updated : n))
@@ -133,9 +179,10 @@ export function useNotifications() {
           event: "DELETE",
           schema: "public",
           table: "notifications",
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${userId}`,
         },
         (payload) => {
+          if (cancelled) return;
           const deleted = payload.old as Notification;
           setNotifications(prev => prev.filter(n => n.id !== deleted.id));
         }
@@ -143,9 +190,11 @@ export function useNotifications() {
       .subscribe();
 
     return () => {
+      cancelled = true;
+      requestIdRef.current += 1;
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [fetchNotifications, userId]);
 
   return {
     notifications,
@@ -153,6 +202,7 @@ export function useNotifications() {
     unreadCount,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
     refetch: fetchNotifications,
   };
 }
