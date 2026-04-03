@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
 import { BobLogo } from "@/components/BobLogo";
+import { InlineValidationMessage, PageHeader, PageSection } from "@/components/ux";
 
 const personalInfoSchema = z.object({
   firstName: z.string().min(1, "กรุณากรอกชื่อ").max(100),
@@ -79,35 +80,31 @@ export default function PersonalInfoOnboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-hero flex flex-col">
-      <div className="flex-1 flex flex-col justify-center px-6 py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-sm mx-auto w-full"
-        >
-          {/* Logo & Title */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
+    <div className="min-h-screen">
+      <div className="page-shell max-w-lg">
+        <PageHeader
+          eyebrow="Onboarding"
+          title="กรอกข้อมูลสำหรับเอกสารข้อตกลง"
+          description="ข้อมูลนี้จะใช้ในเอกสารและหลักฐานการยืนยันตัวตนภายในระบบ"
+        />
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+          <div className="surface-panel text-center">
+            <div className="mb-4 flex justify-center">
               <BobLogo size="lg" />
             </div>
-            <h1 className="text-2xl font-heading font-semibold text-foreground mb-2">
-              เกือบเสร็จแล้ว! 🎉
-            </h1>
-            <p className="text-muted-foreground">
-              กรอกข้อมูลเพื่อใช้ในเอกสารข้อตกลง
+            <p className="text-sm text-muted-foreground">
+              ขั้นตอนนี้ใช้เวลาไม่นาน แต่สำคัญต่อความถูกต้องของข้อมูลในเอกสารข้อตกลง
             </p>
           </div>
 
-          {/* Info Box */}
-          <div className="bg-primary/10 rounded-xl p-4 mb-6">
-            <p className="text-sm text-foreground">
-              📝 ข้อมูลนี้จะแสดงในบันทึกข้อตกลงการยืมเงิน เพื่อให้สามารถใช้เป็นหลักฐานทางกฎหมายได้
-            </p>
-          </div>
+          <PageSection>
+            <InlineValidationMessage
+              tone="info"
+              message="ชื่อ นามสกุล และเบอร์โทรจะถูกใช้ในเอกสารข้อตกลงเพื่อให้ข้อมูลคู่สัญญาตรงกัน"
+            />
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5">
             {/* First Name */}
             <div>
               <Label htmlFor="firstName" className="text-foreground">
@@ -201,14 +198,14 @@ export default function PersonalInfoOnboarding() {
                 </>
               )}
             </Button>
-          </form>
+            </form>
+          </PageSection>
 
-          {/* Privacy Note */}
-          <p className="text-center text-xs text-muted-foreground mt-6">
-            ข้อมูลของคุณจะถูกเก็บรักษาอย่างปลอดภัย ตาม
-            <br />
-            นโยบายความเป็นส่วนตัว และ พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล
-          </p>
+          <div className="surface-panel">
+            <p className="text-center text-xs text-muted-foreground">
+              ข้อมูลของคุณจะถูกเก็บรักษาอย่างปลอดภัยตามนโยบายความเป็นส่วนตัวและ พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล
+            </p>
+          </div>
         </motion.div>
       </div>
     </div>

@@ -38,6 +38,7 @@ import {
   validatePaymentSlipFile,
 } from "@/utils/paymentSlipStorage";
 import { PromptPayQR } from "@/components/PromptPayQR";
+import { AsyncResultState, PageSection, ReviewPanel, StatusTimeline, type StatusTimelineItem } from "@/components/ux";
 
 interface PaymentDialogProps {
   open: boolean;
@@ -534,6 +535,30 @@ export function PaymentDialog({
   // Check if this is a fee installment (reschedule fee)
   const isFeeInstallment = installment.principal_portion === 0 && installment.amount > 0;
   const installmentLabel = isFeeInstallment ? 'ค่าเลื่อนงวด' : `งวดที่ ${installment.installment_number}`;
+  const paymentTimelineItems: StatusTimelineItem[] = [
+    {
+      id: "amount",
+      title: isLender ? "ตรวจยอดที่แสดงบนสลิป" : "กรอกยอดที่โอนจริง",
+      description: isLender
+        ? "เปรียบเทียบยอดที่ผู้ยืมกรอกกับยอดที่เห็นในสลิป"
+        : "ยอดที่กรอกควรตรงกับหลักฐานการโอนและไม่น้อยกว่าค่างวด",
+      status: pendingVerification ? "verifying" : "pending",
+    },
+    {
+      id: "evidence",
+      title: isLender ? "ตรวจสอบหลักฐาน" : "อัปโหลดหลักฐานการโอน",
+      description: isLender ? "ดูสลิปหรือ PDF ให้ครบก่อนยืนยัน" : "แนบไฟล์ภาพหรือ PDF เพื่อให้เจ้าหนี้ตรวจสอบ",
+      status: displaySlipUrl ? "verifying" : "pending",
+    },
+    {
+      id: "result",
+      title: isLender ? "ยืนยันหรือปฏิเสธ" : "ส่งรอตรวจสอบ",
+      description: isLender
+        ? "เมื่อกดยืนยัน ระบบจะบันทึกผลทันทีและอัปเดตสถานะงวด"
+        : "เมื่อส่งแล้ว ระบบจะล็อกคำขอนี้ไว้จนกว่าเจ้าหนี้จะตรวจสอบเสร็จ",
+      status: pendingVerification ? "verifying" : "pending",
+    },
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -546,6 +571,36 @@ export function PaymentDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          <PageSection
+            title={isLender ? "Lender Review Flow" : "Borrower Payment Flow"}
+            description={
+              isLender
+                ? "ตรวจจำนวนเงิน หลักฐาน และตัดสินใจอนุมัติหรือปฏิเสธจากหน้าจอเดียว"
+                : "กรอกยอด อัปโหลดสลิป และตรวจข้อมูลปลายทางก่อนส่งยืนยัน"
+            }
+          >
+            <ReviewPanel
+              title="Payment Summary"
+              rows={[
+                { label: isFeeInstallment ? "ค่าเลื่อนงวด" : "ค่างวด", value: `฿${installment.amount.toLocaleString()}` },
+                {
+                  label: "ประเภท",
+                  value: isFeeInstallment ? "Reschedule Fee" : "Installment Payment",
+                },
+                pendingVerification
+                  ? {
+                      label: isLender ? "ยอดที่ผู้ยืมกรอก" : "ยอดที่ส่งไว้",
+                      value: `฿${pendingVerification.submitted_amount.toLocaleString()}`,
+                    }
+                  : {
+                      label: isLender ? "สถานะ" : "สถานะ",
+                      value: "ยังไม่มีรายการรอตรวจสอบ",
+                    },
+              ]}
+            />
+            <StatusTimeline items={paymentTimelineItems} />
+          </PageSection>
+
           {/* Rejection History Warning */}
           {rejectionCount > 0 && (
             <motion.div
@@ -1046,14 +1101,11 @@ export function PaymentDialog({
 
           {/* Waiting for verification message for borrower */}
           {!isLender && pendingVerification && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-center">
-              <Loader2 className="w-5 h-5 animate-spin text-amber-600 mx-auto mb-2" />
-              <p className="text-sm font-medium text-amber-600">รอเจ้าหนี้ตรวจสอบ</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                ส่งยอด ฿{pendingVerification.submitted_amount.toLocaleString()} เมื่อ{' '}
-                {format(parseISO(pendingVerification.created_at), 'd MMM HH:mm', { locale: th })}
-              </p>
-            </div>
+            <AsyncResultState
+              tone="warning"
+              title="รอเจ้าหนี้ตรวจสอบ"
+              description={`ส่งยอด ฿${pendingVerification.submitted_amount.toLocaleString()} เมื่อ ${format(parseISO(pendingVerification.created_at), 'd MMM HH:mm', { locale: th })}`}
+            />
           )}
 
           {/* Action Buttons */}

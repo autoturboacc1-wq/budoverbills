@@ -39,12 +39,11 @@ export function DebtCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay }}
       onClick={() => navigate(`/debt/${id}`)}
-      className="bg-card rounded-2xl p-5 shadow-card hover:shadow-elevated transition-shadow duration-300 cursor-pointer group"
+      className="surface-panel cursor-pointer transition-shadow duration-300 group hover:shadow-elevated"
     >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground font-semibold text-sm overflow-hidden">
+          <div className="h-11 w-11 overflow-hidden rounded-full bg-secondary text-sm font-semibold text-secondary-foreground">
             {partnerAvatarUrl ? (
               <img 
                 src={partnerAvatarUrl} 
@@ -56,8 +55,8 @@ export function DebtCard({
             )}
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">
-              {isLender ? "ผู้ยืม" : "ผู้ให้ยืม"}
+            <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+              {isLender ? "Borrower" : "Lender"}
             </p>
             <p className="font-medium text-foreground">{partnerName}</p>
           </div>
@@ -65,19 +64,24 @@ export function DebtCard({
         <StatusBadge status={status} />
       </div>
 
-      {/* Amount */}
       <div className="mb-4">
+        <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">ยอดคงเหลือ</p>
         <p className="text-2xl font-heading font-semibold text-foreground">
           ฿{remainingAmount.toLocaleString()}
         </p>
         <p className="text-sm text-muted-foreground">
-          จากทั้งหมด ฿{amount.toLocaleString()}
+          จากวงเงินทั้งหมด ฿{amount.toLocaleString()}
         </p>
       </div>
 
-      {/* Progress Bar */}
       <div className="mb-4">
-        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+        <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+          <span>ความคืบหน้า</span>
+          <span>
+            งวด {installmentProgress.current} / {installmentProgress.total}
+          </span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-secondary">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${progressPercent}%` }}
@@ -85,13 +89,9 @@ export function DebtCard({
             className="h-full bg-primary rounded-full"
           />
         </div>
-        <p className="text-xs text-muted-foreground mt-1.5">
-          งวดที่ {installmentProgress.current} / {installmentProgress.total}
-        </p>
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-3 border-t border-border">
+      <div className="flex items-center justify-between border-t border-border pt-3">
         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <Calendar className="w-4 h-4" />
           <span>งวดถัดไป {nextPaymentDate}</span>

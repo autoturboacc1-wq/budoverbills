@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -20,7 +20,19 @@ export interface Notification {
   action_url: string | null;
 }
 
-export function useNotifications() {
+interface NotificationsContextValue {
+  notifications: Notification[];
+  loading: boolean;
+  unreadCount: number;
+  markAsRead: (notificationId: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  deleteNotification: (notificationId: string) => Promise<void>;
+  refetch: () => Promise<void>;
+}
+
+const NotificationsContext = createContext<NotificationsContextValue | undefined>(undefined);
+
+function useNotificationsState(): NotificationsContextValue {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -217,4 +229,20 @@ export function useNotifications() {
     deleteNotification,
     refetch: fetchNotifications,
   };
+}
+
+export function NotificationsProvider({ children }: { children: ReactNode }) {
+  const value = useNotificationsState();
+
+  return createElement(NotificationsContext.Provider, { value }, children);
+}
+
+export function useNotifications() {
+  const context = useContext(NotificationsContext);
+
+  if (!context) {
+    throw new Error("useNotifications must be used within a NotificationsProvider");
+  }
+
+  return context;
 }

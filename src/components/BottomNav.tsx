@@ -213,9 +213,9 @@ export function BottomNav() {
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.4, delay: 0.5 }}
-      className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-lg border-t border-border px-2 pb-safe z-50"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/80 bg-card/92 px-2 pb-safe backdrop-blur-xl"
     >
-      <div className="flex items-center justify-between max-w-md mx-auto py-1">
+      <div className="mx-auto flex max-w-md items-end justify-between py-1.5">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -227,13 +227,13 @@ export function BottomNav() {
                 onClick={() => navigate(item.path)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="relative -mt-8 flex flex-col items-center px-2"
+                className="relative -mt-7 flex flex-col items-center px-2"
               >
-                <div className="w-14 h-14 flex flex-col items-center justify-center ring-4 ring-background rounded-full shadow-elevated bg-primary">
+                <div className="flex h-14 w-14 flex-col items-center justify-center rounded-full bg-primary shadow-elevated ring-4 ring-background">
                   <span className="font-cherry text-white text-base leading-none">BOB</span>
                   <span className="font-cherry text-white text-[5px] leading-tight">Bud Over Bills</span>
                 </div>
-                <span className="text-[9px] font-semibold text-primary mt-1">{item.label}</span>
+                <span className="mt-1 text-[10px] font-semibold text-primary">{item.label}</span>
               </motion.button>
             );
           }
@@ -242,7 +242,7 @@ export function BottomNav() {
             <button
               key={item.label}
               onClick={() => navigate(item.path)}
-              className={`relative flex flex-col items-center py-2 px-3 transition-colors ${
+              className={`relative flex min-w-[62px] flex-col items-center px-2 py-2 transition-colors ${
                 isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -254,7 +254,7 @@ export function BottomNav() {
                   </span>
                 )}
               </div>
-              <span className="text-[9px] font-medium mt-0.5">{item.label}</span>
+              <span className="mt-0.5 text-[10px] font-medium leading-none">{item.label}</span>
             </button>
           );
         })}

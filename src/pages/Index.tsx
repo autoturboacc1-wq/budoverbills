@@ -12,6 +12,7 @@ import { useDebtAgreements } from "@/hooks/useDebtAgreements";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { EmptyState, PageSection } from "@/components/ux";
 
 // Domain imports - SINGLE SOURCE OF TRUTH
 import { mapAgreementsToDebtCards, AgreementRole, isAgreementEffectivelyCompleted } from "@/domains/debt";
@@ -52,56 +53,92 @@ const Index = () => {
   const borrowerCount = debtCards.filter(c => !c.isLender).length;
 
   return (
-    <div className="min-h-screen bg-gradient-hero pb-24">
-      <div className="max-w-lg mx-auto px-4">
+    <div className="min-h-screen pb-24">
+      <div className="page-shell section-stack max-w-lg">
         <Header userName={displayName} />
 
-        {/* Dashboard Stats - New comprehensive stats */}
-        <DashboardStats />
+        <section className="surface-panel space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Mission Control
+              </p>
+              <h2 className="text-xl font-heading font-semibold text-foreground">
+                วันนี้คุณต้องจัดการอะไรบ้าง
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                ดูงานค้าง ภาพรวมยอดเงิน และสัญญาที่กำลังเดินอยู่ในหน้าเดียว
+              </p>
+            </div>
+            <Button onClick={() => navigate("/create")} className="rounded-2xl">
+              <Plus className="mr-2 h-4 w-4" />
+              สร้างใหม่
+            </Button>
+          </div>
 
-        {/* 🔴 PRIORITY 1: Pending Money Actions - สิ่งที่ต้องทำเกี่ยวกับเงิน */}
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-secondary/55 p-1">
+            {(["lender", "borrower"] as AgreementRole[]).map((role) => {
+              const isActive = agreementRoleFilter === role;
+              return (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => setAgreementRoleFilter(role)}
+                  className={`rounded-[1rem] px-4 py-3 text-sm font-medium transition-colors ${
+                    isActive ? "bg-card text-foreground shadow-card" : "text-muted-foreground"
+                  }`}
+                >
+                  {role === "lender" ? "มุมผู้ให้ยืม" : "มุมผู้ยืม"}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
         {!isLoading && !authLoading && <PendingActionsCard />}
 
-        {/* 🟡 PRIORITY 2: Pending Agreements that need confirmation */}
         {!isLoading && !authLoading && (
           <PendingAgreements agreements={agreements} userId={user?.id} />
         )}
 
-        {/* 🟢 PRIORITY 3: Payment Calendar */}
-        <section className="mb-6">
-          <PaymentCalendar onRoleChange={handleCalendarRoleChange} />
-        </section>
+        <DashboardStats roleFilter={agreementRoleFilter} />
 
-        {/* Active Agreements */}
-        <motion.section 
-          className={`mb-6 rounded-2xl p-4 transition-colors duration-300 ${
-            agreementRoleFilter === "lender"
-              ? "bg-green-50/50 dark:bg-green-950/20"
-              : "bg-orange-50/50 dark:bg-orange-950/20"
-          }`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
+        <PageSection
+          title="Payment Calendar"
+          description="มองเห็นกำหนดชำระถัดไปตามมุมมองที่คุณเลือก"
         >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-heading font-semibold text-lg text-foreground flex items-center gap-2">
-              ข้อตกลงที่ใช้งาน
-              <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${
-                agreementRoleFilter === "lender"
-                  ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400"
-                  : "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-400"
-              }`}>
-                {agreementRoleFilter === "lender" ? lenderCount : borrowerCount}
-              </span>
-            </h2>
-            {filteredDebtCards.length > 5 && (
-              <button 
-                onClick={() => navigate('/agreements')}
-                className="text-sm text-primary font-medium hover:underline"
+          <PaymentCalendar onRoleChange={handleCalendarRoleChange} />
+        </PageSection>
+
+        <PageSection
+          title="Active Agreements"
+          description={
+            agreementRoleFilter === "lender"
+              ? "ติดตามคู่สัญญาที่คุณให้ยืมและยอดที่ยังคงค้าง"
+              : "ติดตามภาระชำระของคุณและงวดถัดไปที่ต้องจ่าย"
+          }
+          action={
+            filteredDebtCards.length > 5 ? (
+              <button
+                type="button"
+                onClick={() => navigate("/history")}
+                className="text-sm font-medium text-primary hover:underline"
               >
                 ดูทั้งหมด
               </button>
-            )}
+            ) : null
+          }
+        >
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                agreementRoleFilter === "lender"
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400"
+                  : "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-400"
+              }`}
+            >
+              {agreementRoleFilter === "lender" ? lenderCount : borrowerCount} รายการ
+            </span>
           </div>
 
           {isLoading || authLoading ? (
@@ -109,39 +146,29 @@ const Index = () => {
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : filteredDebtCards.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-card rounded-2xl p-8 shadow-card text-center"
-            >
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                agreementRoleFilter === "lender" 
-                  ? "bg-green-100 dark:bg-green-900/30" 
-                  : "bg-orange-100 dark:bg-orange-900/30"
-              }`}>
-                {agreementRoleFilter === "lender" ? (
-                  <ArrowDownLeft className="w-8 h-8 text-green-600" />
+            <EmptyState
+              icon={
+                agreementRoleFilter === "lender" ? (
+                  <ArrowDownLeft className="h-7 w-7" />
                 ) : (
-                  <ArrowUpRight className="w-8 h-8 text-orange-500" />
-                )}
-              </div>
-              <p className="text-foreground font-medium mb-2">
-                {agreementRoleFilter === "lender" 
-                  ? "ยังไม่มีการให้ยืม" 
-                  : "ยังไม่มีการยืม"}
-              </p>
-              <p className="text-sm text-muted-foreground mb-4">
-                {agreementRoleFilter === "lender" 
-                  ? "สร้างข้อตกลงใหม่เพื่อเริ่มให้ยืมเงิน" 
-                  : "คุณยังไม่มีการยืมเงินจากผู้อื่น"}
-              </p>
-              {agreementRoleFilter === "lender" && (
-                <Button onClick={() => navigate('/create')}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  สร้างข้อตกลงใหม่
-                </Button>
-              )}
-            </motion.div>
+                  <ArrowUpRight className="h-7 w-7" />
+                )
+              }
+              title={agreementRoleFilter === "lender" ? "ยังไม่มีสัญญาที่คุณให้ยืม" : "ยังไม่มีสัญญาที่คุณยืม"}
+              description={
+                agreementRoleFilter === "lender"
+                  ? "เริ่มต้นด้วยการสร้างข้อตกลงใหม่เพื่อบันทึกยอดเงิน รอบชำระ และเงื่อนไขให้ชัดเจน"
+                  : "เมื่อคุณเป็นผู้ยืม ระบบจะแสดงยอดคงเหลือ งวดถัดไป และสถานะการชำระในส่วนนี้"
+              }
+              action={
+                agreementRoleFilter === "lender" ? (
+                  <Button onClick={() => navigate("/create")}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    สร้างข้อตกลงใหม่
+                  </Button>
+                ) : null
+              }
+            />
           ) : (
             <AnimatePresence mode="wait">
               <motion.div
@@ -153,16 +180,12 @@ const Index = () => {
                 className="space-y-4"
               >
                 {filteredDebtCards.slice(0, 5).map((debt) => (
-                  <DebtCard
-                    key={debt.id}
-                    {...debt}
-                    id={debt.id}
-                  />
+                  <DebtCard key={debt.id} {...debt} id={debt.id} />
                 ))}
               </motion.div>
             </AnimatePresence>
           )}
-        </motion.section>
+        </PageSection>
       </div>
 
       <BottomNav />

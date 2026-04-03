@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { THAI_BANKS } from "@/constants/thaibanks";
 import { useAuth } from "@/contexts/AuthContext";
+import { getBankAccountError, normalizeBankAccountForStorage } from "@/lib/validation";
 
 interface BankAccountSectionProps {
   agreementId: string;
@@ -48,6 +49,7 @@ export function BankAccountSection({
     accountNumber: accountNumber || "",
     accountName: accountName || "",
   });
+  const [accountError, setAccountError] = useState<string | null>(null);
   const canEditBankAccount = isLender && user?.id === lenderId;
 
   const handleSave = async () => {
@@ -57,7 +59,16 @@ export function BankAccountSection({
     }
 
     if (!formData.bankName || !formData.accountNumber || !formData.accountName) {
-      toast.error("กรุณากรอกข้อมูลให้ครบ");
+      const message = "กรุณากรอกข้อมูลให้ครบ";
+      setAccountError(message);
+      toast.error(message);
+      return;
+    }
+
+    const validationError = getBankAccountError(formData.bankName, formData.accountNumber);
+    if (validationError) {
+      setAccountError(validationError);
+      toast.error(validationError);
       return;
     }
 
@@ -67,7 +78,7 @@ export function BankAccountSection({
         .from("debt_agreements")
         .update({
           bank_name: formData.bankName,
-          account_number: formData.accountNumber,
+          account_number: normalizeBankAccountForStorage(formData.bankName, formData.accountNumber),
           account_name: formData.accountName,
         })
         .eq("id", agreementId)
@@ -81,6 +92,7 @@ export function BankAccountSection({
       }
 
       toast.success("อัปเดตบัญชีรับเงินแล้ว");
+      setAccountError(null);
       setIsEditing(false);
       onUpdate();
     } catch (error) {
@@ -116,6 +128,7 @@ export function BankAccountSection({
                   accountNumber: accountNumber || "",
                   accountName: accountName || "",
                 });
+                setAccountError(null);
                 setIsEditing(true);
               }}
             >
@@ -170,9 +183,10 @@ export function BankAccountSection({
               <Label>ธนาคาร</Label>
               <Select
                 value={formData.bankName}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, bankName: value })
-                }
+                onValueChange={(value) => {
+                  setFormData({ ...formData, bankName: value });
+                  setAccountError(null);
+                }}
               >
                 <SelectTrigger className="rounded-xl">
                   <SelectValue placeholder="เลือกธนาคาร" />
@@ -195,24 +209,30 @@ export function BankAccountSection({
               </Label>
               <Input
                 value={formData.accountNumber}
-                onChange={(e) =>
-                  setFormData({ ...formData, accountNumber: e.target.value })
-                }
+                onChange={(e) => {
+                  setFormData({ ...formData, accountNumber: e.target.value });
+                  setAccountError(null);
+                }}
                 placeholder={
                   formData.bankName === "promptpay"
                     ? "0812345678"
                     : "123-4-56789-0"
                 }
+                inputMode="numeric"
               />
             </div>
+            {accountError ? (
+              <p className="text-xs text-destructive -mt-2">{accountError}</p>
+            ) : null}
 
             <div className="space-y-2">
               <Label>ชื่อบัญชี</Label>
               <Input
                 value={formData.accountName}
-                onChange={(e) =>
-                  setFormData({ ...formData, accountName: e.target.value })
-                }
+                onChange={(e) => {
+                  setFormData({ ...formData, accountName: e.target.value });
+                  setAccountError(null);
+                }}
                 placeholder="ชื่อ-นามสกุล ตามบัญชี"
               />
             </div>
@@ -221,7 +241,10 @@ export function BankAccountSection({
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => setIsEditing(false)}
+                onClick={() => {
+                  setAccountError(null);
+                  setIsEditing(false);
+                }}
                 disabled={isSubmitting}
               >
                 <X className="w-4 h-4 mr-1" />

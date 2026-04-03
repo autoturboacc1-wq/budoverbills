@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { EmptyState, PageHeader } from "@/components/ux";
 
 type ChatProfileRow = {
   user_id: string;
@@ -361,17 +362,19 @@ const Chat = () => {
   // Thread list view with tabs
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20">
-      {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="sticky top-0 z-10 bg-background/95 backdrop-blur-lg border-b border-border"
       >
-        <div className="px-4 py-3">
-          <h1 className="text-2xl font-bold font-outfit text-foreground">แชท</h1>
+        <div className="px-4">
+          <PageHeader
+            title="Inbox"
+            description="Thread ที่เกี่ยวกับการเงินจะถูกจัดไว้ด้านบนก่อนการคุยทั่วไป"
+            className="py-4"
+          />
         </div>
 
-        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "chats" | "friends")} className="w-full">
           <TabsList className="w-full grid grid-cols-2 bg-transparent border-b border-border rounded-none h-auto p-0">
             <TabsTrigger
@@ -397,7 +400,6 @@ const Chat = () => {
         </Tabs>
       </motion.header>
 
-      {/* Content */}
       <main className="flex-1">
         {activeTab === "chats" ? (
           <ChatThreadList
@@ -620,27 +622,27 @@ const FriendsList = ({ onStartChat }: FriendsListProps) => {
 
   if (friends.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 px-4">
-        <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
-          <Users className="w-10 h-10 text-muted-foreground" />
-        </div>
-        <h3 className="font-semibold text-foreground mb-2">ยังไม่มีเพื่อน</h3>
-        <p className="text-sm text-muted-foreground text-center max-w-xs mb-4">
-          เพิ่มเพื่อนจากหน้าโปรไฟล์เพื่อเริ่มสนทนา
-        </p>
-        <button
-          onClick={() => navigate("/profile")}
-          className="text-sm text-primary font-medium hover:underline"
-        >
-          ไปที่โปรไฟล์
-        </button>
+      <div className="px-4 py-10">
+        <EmptyState
+          icon={<Users className="h-7 w-7" />}
+          title="ยังไม่มีเพื่อน"
+          description="เพิ่มเพื่อนจากหน้าโปรไฟล์ก่อน แล้วคุณจะเริ่มคุยหรือสร้างข้อตกลงได้ทันที"
+          action={
+            <button
+              type="button"
+              onClick={() => navigate("/profile")}
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              ไปที่โปรไฟล์
+            </button>
+          }
+        />
       </div>
     );
   }
 
   return (
     <div className="flex flex-col">
-      {/* Search bar */}
       <div className="px-4 py-3 border-b border-border sticky top-0 bg-background z-10">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -724,7 +726,7 @@ const FriendsList = ({ onStartChat }: FriendsListProps) => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate("/create-agreement", { 
+                    navigate("/create", { 
                       state: { 
                         selectedFriend: { 
                           id: friend.id, 

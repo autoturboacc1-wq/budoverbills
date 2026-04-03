@@ -1,6 +1,6 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -12,6 +12,8 @@ import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { GlobalChatNotificationProvider } from "@/components/GlobalChatNotificationProvider";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppErrorBoundary } from "@/components/shared/AppErrorBoundary";
+import { NotificationsProvider } from "@/hooks/useNotifications";
+import { FriendRequestsProvider } from "@/hooks/useFriendRequests";
 
 const Index = lazy(() => import("./pages/Index"));
 const CreateAgreement = lazy(() => import("./pages/CreateAgreement"));
@@ -49,6 +51,12 @@ function RouteFallback() {
   );
 }
 
+function AppErrorBoundaryWithReset({ children }: { children: ReactNode }) {
+  const location = useLocation();
+
+  return <AppErrorBoundary key={location.key}>{children}</AppErrorBoundary>;
+}
+
 const App = () => {
   const [queryClient] = useState(
     () =>
@@ -72,12 +80,14 @@ const App = () => {
             <TooltipProvider>
               <Toaster />
               <Sonner />
-              <PWAInstallPrompt />
               <BrowserRouter>
-                <GlobalChatNotificationProvider>
-                  <AppErrorBoundary>
-                    <Suspense fallback={<RouteFallback />}>
-                      <Routes>
+                <PWAInstallPrompt />
+                <AppErrorBoundaryWithReset>
+                  <NotificationsProvider>
+                    <FriendRequestsProvider>
+                      <GlobalChatNotificationProvider>
+                        <Suspense fallback={<RouteFallback />}>
+                          <Routes>
                         <Route path="/auth" element={<Auth />} />
                         <Route path="/admin/login" element={<AdminLogin />} />
                         <Route path="/admin/code" element={<AdminCodeLogin />} />
@@ -113,10 +123,12 @@ const App = () => {
                         </Route>
 
                         <Route path="*" element={<NotFound />} />
-                      </Routes>
-                    </Suspense>
-                  </AppErrorBoundary>
-                </GlobalChatNotificationProvider>
+                          </Routes>
+                        </Suspense>
+                      </GlobalChatNotificationProvider>
+                    </FriendRequestsProvider>
+                  </NotificationsProvider>
+                </AppErrorBoundaryWithReset>
               </BrowserRouter>
             </TooltipProvider>
           </LanguageProvider>

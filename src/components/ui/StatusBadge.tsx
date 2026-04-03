@@ -1,6 +1,18 @@
 import { cn } from "@/lib/utils";
 
-export type Status = "paid" | "pending" | "overdue" | "negotiating" | "pending_confirmation" | "active" | "completed" | "awaiting_transfer_confirmation" | "cancelled";
+export type Status =
+  | "paid"
+  | "pending"
+  | "overdue"
+  | "negotiating"
+  | "pending_confirmation"
+  | "active"
+  | "completed"
+  | "awaiting_transfer_confirmation"
+  | "cancelled"
+  | "due_soon"
+  | "verifying"
+  | "rejected";
 
 interface StatusBadgeProps {
   status: Status;
@@ -23,6 +35,21 @@ const statusConfig: Record<Status, { label: string; dotClass: string; bgClass: s
     label: "เลยกำหนด",
     dotClass: "bg-status-overdue",
     bgClass: "bg-status-overdue/10 text-status-overdue",
+  },
+  due_soon: {
+    label: "ใกล้ครบกำหนด",
+    dotClass: "bg-amber-500",
+    bgClass: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  },
+  verifying: {
+    label: "รอตรวจสอบ",
+    dotClass: "bg-primary",
+    bgClass: "bg-primary/10 text-primary",
+  },
+  rejected: {
+    label: "ต้องแก้ไข",
+    dotClass: "bg-destructive",
+    bgClass: "bg-destructive/10 text-destructive",
   },
   negotiating: {
     label: "อยู่ระหว่างตกลง",

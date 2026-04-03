@@ -147,11 +147,15 @@ export async function generateAgreementPDF(data: AgreementPDFData): Promise<Blob
   ) => {
     const lines = doc.splitTextToSize(text, maxWidth);
     const lineHeight = options?.lineHeight ?? 4.2;
+    const requiredHeight = lines.length * lineHeight;
+
+    ensureSpace(requiredHeight + 2);
+    const drawY = yPosition === y ? y : yPosition;
 
     setFont(options?.style ?? "normal", options?.size ?? 9, options?.color ?? 20);
-    doc.text(lines, x, yPosition);
+    doc.text(lines, x, drawY);
 
-    return lines.length * lineHeight;
+    return requiredHeight;
   };
 
   const drawRule = () => {
@@ -203,16 +207,20 @@ export async function generateAgreementPDF(data: AgreementPDFData): Promise<Blob
     name: string,
     details: string[],
   ) => {
+    const displayName = truncateText(name, 32) ?? "Not specified";
+    const detailLines = details.flatMap((detail) => doc.splitTextToSize(detail, width - 6));
+    const cardHeight = Math.max(34, 17 + detailLines.length * 3.8 + 5);
+
+    ensureSpace(cardHeight + 2);
     const cardY = y;
 
     doc.setFillColor(247, 248, 250);
-    doc.roundedRect(x, cardY, width, 34, 3, 3, "F");
+    doc.roundedRect(x, cardY, width, cardHeight, 3, 3, "F");
 
     setFont("bold", 8, 90);
     doc.text(title.toUpperCase(), x + 3, cardY + 5.5);
 
     setFont("bold", 11, 20);
-    const displayName = truncateText(name, 32) ?? "Not specified";
     doc.text(displayName, x + 3, cardY + 12);
 
     setFont("normal", 8, 80);
@@ -222,6 +230,8 @@ export async function generateAgreementPDF(data: AgreementPDFData): Promise<Blob
       doc.text(wrapped, x + 3, detailY);
       detailY += wrapped.length * 3.8;
     });
+
+    return cardHeight;
   };
 
   const drawTableHeader = () => {
@@ -305,17 +315,17 @@ export async function generateAgreementPDF(data: AgreementPDFData): Promise<Blob
   drawSectionTitle("Parties & Confirmation", "Digital evidence captured at agreement confirmation");
 
   const partyCardWidth = (contentWidth - 4) / 2;
-  drawPartyCard(margin, partyCardWidth, "Lender", data.lenderName, [
+  const lenderCardHeight = drawPartyCard(margin, partyCardWidth, "Lender", data.lenderName, [
     `Confirmed at: ${formatDateTime(data.lenderConfirmedAt)}`,
     `IP: ${data.lenderConfirmedIP ?? "-"}`,
     `Device: ${truncateText(data.lenderConfirmedDevice) ?? "-"}`,
   ]);
-  drawPartyCard(margin + partyCardWidth + 4, partyCardWidth, "Borrower", data.borrowerName, [
+  const borrowerCardHeight = drawPartyCard(margin + partyCardWidth + 4, partyCardWidth, "Borrower", data.borrowerName, [
     `Confirmed at: ${formatDateTime(data.borrowerConfirmedAt)}`,
     `IP: ${data.borrowerConfirmedIP ?? "-"}`,
     `Device: ${truncateText(data.borrowerConfirmedDevice) ?? "-"}`,
   ]);
-  y += 39;
+  y += Math.max(lenderCardHeight, borrowerCardHeight) + 5;
 
   drawRule();
   drawSectionTitle("Commercial Terms");

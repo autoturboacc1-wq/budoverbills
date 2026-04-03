@@ -6,6 +6,26 @@ import { th } from "date-fns/locale";
 import { getUserRoleInAgreement } from "@/domains/debt";
 import type { DebtAgreement } from "@/domains/debt/types";
 
+const THAI_TIME_ZONE = "Asia/Bangkok";
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function getBangkokDateKey(date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: THAI_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function getBangkokMidnightTimestamp(dateKey: string): number {
+  return new Date(`${dateKey}T00:00:00+07:00`).getTime();
+}
+
+function parseBangkokDate(dateKey: string): Date {
+  return new Date(`${dateKey}T12:00:00+07:00`);
+}
+
 type ActivityAgreement = Pick<
   DebtAgreement,
   "id" | "borrower_name" | "lender_id" | "borrower_id" | "lender_confirmed" | "borrower_confirmed"
@@ -194,9 +214,10 @@ export function useActivityFeed() {
           }
 
           // Payment due soon (within 3 days)
-          const dueDate = new Date(installment.due_date);
-          const now = new Date();
-          const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          const todayKey = getBangkokDateKey();
+          const dueDateMs = getBangkokMidnightTimestamp(installment.due_date);
+          const todayMs = getBangkokMidnightTimestamp(todayKey);
+          const daysUntilDue = Math.round((dueDateMs - todayMs) / DAY_MS);
           
           if (daysUntilDue >= 0 && daysUntilDue <= 3 && installment.status === "pending") {
             activityList.push({
@@ -207,7 +228,7 @@ export function useActivityFeed() {
               relatedId: installment.agreement_id,
               relatedType: "agreement",
               timestamp: installment.due_date,
-              timeAgo: formatDistanceToNow(dueDate, {
+              timeAgo: formatDistanceToNow(parseBangkokDate(installment.due_date), {
                 addSuffix: true,
                 locale: th,
               }),

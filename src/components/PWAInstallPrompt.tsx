@@ -8,6 +8,24 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+const DISMISS_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const DISMISS_STORAGE_KEY = "pwa-install-dismissed-at";
+
+function isWithinCooldown(): boolean {
+  const storedValue = localStorage.getItem(DISMISS_STORAGE_KEY);
+  if (!storedValue) {
+    return false;
+  }
+
+  const dismissedAt = Number(storedValue);
+  if (Number.isNaN(dismissedAt)) {
+    localStorage.removeItem(DISMISS_STORAGE_KEY);
+    return false;
+  }
+
+  return Date.now() - dismissedAt < DISMISS_COOLDOWN_MS;
+}
+
 export function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -15,38 +33,54 @@ export function PWAInstallPrompt() {
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
-    // Check if already installed
-    const standalone = window.matchMedia("(display-mode: standalone)").matches;
-    setIsStandalone(standalone);
+    const standaloneMediaQuery = window.matchMedia("(display-mode: standalone)");
+    const getStandaloneStatus = () =>
+      standaloneMediaQuery.matches ||
+      ((navigator as Navigator & { standalone?: boolean }).standalone === true);
+    const ios =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-    // Check if iOS
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    setIsStandalone(getStandaloneStatus());
     setIsIOS(ios);
 
-    // Listen for install prompt (Android/Desktop Chrome)
+    const timers: number[] = [];
+    const canShowPrompt = () => !getStandaloneStatus() && !isWithinCooldown();
+
+    const showPromptWithDelay = (delay: number) => {
+      const timer = window.setTimeout(() => {
+        if (canShowPrompt()) {
+          setShowPrompt(true);
+        }
+      }, delay);
+
+      timers.push(timer);
+    };
+
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      
-      // Show prompt after 3 seconds if not dismissed before
-      const dismissed = localStorage.getItem("pwa-install-dismissed");
-      if (!dismissed) {
-        setTimeout(() => setShowPrompt(true), 3000);
-      }
+
+      showPromptWithDelay(3000);
+    };
+
+    const handleAppInstalled = () => {
+      setShowPrompt(false);
+      setDeferredPrompt(null);
+      setIsStandalone(true);
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
 
-    // Show iOS prompt after delay if not installed
-    if (ios && !standalone) {
-      const dismissed = localStorage.getItem("pwa-install-dismissed");
-      if (!dismissed) {
-        setTimeout(() => setShowPrompt(true), 5000);
-      }
+    if (ios && !getStandaloneStatus()) {
+      showPromptWithDelay(5000);
     }
 
     return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
 
@@ -65,7 +99,7 @@ export function PWAInstallPrompt() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    localStorage.setItem("pwa-install-dismissed", Date.now().toString());
+    localStorage.setItem(DISMISS_STORAGE_KEY, Date.now().toString());
   };
 
   // Don't show if already installed

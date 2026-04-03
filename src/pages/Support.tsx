@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, Coffee, Heart, DollarSign, Sparkles, Gift, Star } from "lucide-react";
+import { ArrowLeft, Coffee, Heart, Sparkles, Gift, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 
 type Currency = "THB" | "USD";
@@ -20,6 +21,7 @@ const PRESET_AMOUNTS: Record<Currency, number[]> = {
 export default function Support() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { language } = useLanguage();
   const [currency, setCurrency] = useState<Currency>("THB");
   const [amount, setAmount] = useState<string>("");
   const [customAmount, setCustomAmount] = useState<string>("");
@@ -30,6 +32,70 @@ export default function Support() {
 
   const selectedAmount = customAmount || amount;
   const currencySymbol = currency === "THB" ? "฿" : "$";
+  const copy = language === "th"
+    ? {
+        title: "สนับสนุนเรา",
+        heroTitle: "เลี้ยงกาแฟทีมงาน ☕",
+        heroDescription: "ช่วยเราพัฒนาแอปให้ดียิ่งขึ้น",
+        selectAmount: "เลือกจำนวน",
+        customAmountLabel: "หรือใส่จำนวนเอง",
+        customAmountPlaceholder: "ใส่จำนวนที่ต้องการ",
+        messageTitle: "ข้อความถึงทีมงาน (ไม่บังคับ)",
+        displayNameLabel: "ชื่อที่แสดง",
+        displayNamePlaceholder: "ชื่อของคุณ (หรือเว้นว่างเพื่อไม่ระบุ)",
+        messageLabel: "ข้อความ",
+        messagePlaceholder: "ขอบคุณที่สร้างแอปดีๆ...",
+        anonymous: "ไม่แสดงชื่อ (Anonymous)",
+        amountLabel: "จำนวนเงิน",
+        processing: "กำลังดำเนินการ...",
+        supportButton: "สนับสนุน",
+        thankYou: "💝 ขอบคุณที่สนับสนุนเรา!",
+        whyTitle: "เงินสนับสนุนจะนำไปใช้ทำอะไร?",
+        whyItems: [
+          "พัฒนาฟีเจอร์ใหม่ๆ ตามความต้องการผู้ใช้",
+          "รักษาความปลอดภัยและความเสถียรของระบบ",
+          "ค่าเซิร์ฟเวอร์และโครงสร้างพื้นฐาน",
+          "เลี้ยงกาแฟทีมพัฒนา ☕",
+        ],
+        loginRequired: "กรุณาเข้าสู่ระบบก่อน",
+        amountRequired: "กรุณาเลือกหรือใส่จำนวนเงิน",
+        successTitle: "ขอบคุณสำหรับการสนับสนุน! 🙏",
+        successDescription: "เราจะนำไปพัฒนาแอปให้ดียิ่งขึ้น",
+        errorTitle: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+        currencyLabels: { THB: "บาท", USD: "USD" },
+      }
+    : {
+        title: "Support Us",
+        heroTitle: "Buy the team a coffee ☕",
+        heroDescription: "Help us make the app better",
+        thb: "Baht",
+        selectAmount: "Choose an amount",
+        customAmountLabel: "Or enter your own amount",
+        customAmountPlaceholder: "Enter your amount",
+        messageTitle: "Message to the team (optional)",
+        displayNameLabel: "Display name",
+        displayNamePlaceholder: "Your name (or leave blank to stay anonymous)",
+        messageLabel: "Message",
+        messagePlaceholder: "Thanks for building a great app...",
+        anonymous: "Hide my name (Anonymous)",
+        amountLabel: "Amount",
+        processing: "Processing...",
+        supportButton: "Support",
+        thankYou: "💝 Thanks for supporting us!",
+        whyTitle: "What will the support be used for?",
+        whyItems: [
+          "Build new features based on user needs",
+          "Keep the system secure and stable",
+          "Cover server and infrastructure costs",
+          "Buy coffee for the dev team ☕",
+        ],
+        loginRequired: "Please sign in first",
+        amountRequired: "Please choose or enter an amount",
+        successTitle: "Thanks for your support! 🙏",
+        successDescription: "We’ll use it to make the app better",
+        errorTitle: "Something went wrong. Please try again.",
+        currencyLabels: { THB: "Baht", USD: "USD" },
+      };
 
   const handleAmountSelect = (value: number) => {
     setAmount(String(value));
@@ -44,12 +110,12 @@ export default function Support() {
 
   const handleSubmit = async () => {
     if (!user?.id) {
-      toast.error("กรุณาเข้าสู่ระบบก่อน");
+      toast.error(copy.loginRequired);
       return;
     }
 
     if (!selectedAmount || Number(selectedAmount) <= 0) {
-      toast.error("กรุณาเลือกหรือใส่จำนวนเงิน");
+      toast.error(copy.amountRequired);
       return;
     }
 
@@ -68,8 +134,8 @@ export default function Support() {
 
       if (error) throw error;
 
-      toast.success("ขอบคุณสำหรับการสนับสนุน! 🙏", {
-        description: "เราจะนำไปพัฒนาแอปให้ดียิ่งขึ้น",
+      toast.success(copy.successTitle, {
+        description: copy.successDescription,
       });
 
       // Reset form
@@ -83,7 +149,7 @@ export default function Support() {
       
     } catch (error) {
       console.error("Error recording tip:", error);
-      toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+      toast.error(copy.errorTitle);
     } finally {
       setIsSubmitting(false);
     }
@@ -110,7 +176,7 @@ export default function Support() {
           >
             <ArrowLeft className="w-5 h-5 text-secondary-foreground" />
           </button>
-          <h1 className="text-xl font-heading font-semibold text-foreground">สนับสนุนเรา</h1>
+          <h1 className="text-xl font-heading font-semibold text-foreground">{copy.title}</h1>
         </motion.header>
 
         {/* Hero Section */}
@@ -124,11 +190,9 @@ export default function Support() {
             <Coffee className="w-12 h-12 text-white" />
           </div>
           <h2 className="text-2xl font-heading font-bold text-foreground mb-2">
-            เลี้ยงกาแฟทีมงาน ☕
+            {copy.heroTitle}
           </h2>
-          <p className="text-muted-foreground">
-            ช่วยเราพัฒนาแอปให้ดียิ่งขึ้น
-          </p>
+          <p className="text-muted-foreground">{copy.heroDescription}</p>
         </motion.div>
 
         {/* Currency Toggle */}
@@ -144,7 +208,7 @@ export default function Support() {
             onClick={() => setCurrency("THB")}
             className={currency === "THB" ? "bg-primary" : ""}
           >
-            🇹🇭 บาท
+            🇹🇭 {copy.currencyLabels.THB}
           </Button>
           <Button
             variant={currency === "USD" ? "default" : "outline"}
@@ -152,7 +216,7 @@ export default function Support() {
             onClick={() => setCurrency("USD")}
             className={currency === "USD" ? "bg-primary" : ""}
           >
-            🇺🇸 USD
+            🇺🇸 {copy.currencyLabels.USD}
           </Button>
         </motion.div>
 
@@ -165,7 +229,7 @@ export default function Support() {
         >
           <div className="flex items-center gap-2 text-foreground font-medium mb-4">
             <Gift className="w-5 h-5 text-primary" />
-            <span>เลือกจำนวน</span>
+            <span>{copy.selectAmount}</span>
           </div>
 
           {/* Preset Amounts */}
@@ -188,7 +252,7 @@ export default function Support() {
 
           {/* Custom Amount */}
           <div className="space-y-2">
-            <Label htmlFor="custom-amount">หรือใส่จำนวนเอง</Label>
+            <Label htmlFor="custom-amount">{copy.customAmountLabel}</Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                 {currencySymbol}
@@ -199,7 +263,7 @@ export default function Support() {
                 inputMode="numeric"
                 value={customAmount}
                 onChange={handleCustomAmountChange}
-                placeholder="ใส่จำนวนที่ต้องการ"
+                placeholder={copy.customAmountPlaceholder}
                 className="pl-8"
               />
             </div>
@@ -215,28 +279,28 @@ export default function Support() {
         >
           <div className="flex items-center gap-2 text-foreground font-medium">
             <Heart className="w-5 h-5 text-primary" />
-            <span>ข้อความถึงทีมงาน (ไม่บังคับ)</span>
+            <span>{copy.messageTitle}</span>
           </div>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="display-name">ชื่อที่แสดง</Label>
+              <Label htmlFor="display-name">{copy.displayNameLabel}</Label>
               <Input
                 id="display-name"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="ชื่อของคุณ (หรือเว้นว่างเพื่อไม่ระบุ)"
+                placeholder={copy.displayNamePlaceholder}
                 disabled={isAnonymous}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="message">ข้อความ</Label>
+              <Label htmlFor="message">{copy.messageLabel}</Label>
               <Textarea
                 id="message"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="ขอบคุณที่สร้างแอปดีๆ..."
+                placeholder={copy.messagePlaceholder}
                 rows={3}
               />
             </div>
@@ -248,9 +312,7 @@ export default function Support() {
                 onChange={(e) => setIsAnonymous(e.target.checked)}
                 className="rounded border-border"
               />
-              <span className="text-sm text-muted-foreground">
-                ไม่แสดงชื่อ (Anonymous)
-              </span>
+              <span className="text-sm text-muted-foreground">{copy.anonymous}</span>
             </label>
           </div>
         </motion.div>
@@ -263,7 +325,7 @@ export default function Support() {
           className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-5 mb-6"
         >
           <div className="flex items-center justify-between mb-4">
-            <span className="text-muted-foreground">จำนวนเงิน</span>
+            <span className="text-muted-foreground">{copy.amountLabel}</span>
             <span className="text-2xl font-bold text-amber-600">
               {currencySymbol}{selectedAmount || 0}
             </span>
@@ -277,18 +339,18 @@ export default function Support() {
             {isSubmitting ? (
               <span className="flex items-center gap-2">
                 <span className="animate-spin">⏳</span>
-                กำลังดำเนินการ...
+                {copy.processing}
               </span>
             ) : (
               <span className="flex items-center gap-2">
                 <Coffee className="w-5 h-5" />
-                สนับสนุน {currencySymbol}{selectedAmount || 0}
+                {copy.supportButton} {currencySymbol}{selectedAmount || 0}
               </span>
             )}
           </Button>
 
           <p className="text-xs text-center text-muted-foreground mt-3">
-            💝 ขอบคุณที่สนับสนุนเรา!
+            {copy.thankYou}
           </p>
         </motion.div>
 
@@ -301,25 +363,15 @@ export default function Support() {
         >
           <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
             <Star className="w-5 h-5 text-amber-500" />
-            เงินสนับสนุนจะนำไปใช้ทำอะไร?
+            {copy.whyTitle}
           </h3>
           <ul className="space-y-3 text-sm text-muted-foreground">
-            <li className="flex items-start gap-2">
-              <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-              <span>พัฒนาฟีเจอร์ใหม่ๆ ตามความต้องการผู้ใช้</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-              <span>รักษาความปลอดภัยและความเสถียรของระบบ</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-              <span>ค่าเซิร์ฟเวอร์และโครงสร้างพื้นฐาน</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-              <span>เลี้ยงกาแฟทีมพัฒนา ☕</span>
-            </li>
+            {copy.whyItems.map((item) => (
+              <li className="flex items-start gap-2" key={item}>
+                <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>{item}</span>
+              </li>
+            ))}
           </ul>
         </motion.div>
       </div>

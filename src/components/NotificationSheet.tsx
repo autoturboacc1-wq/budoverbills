@@ -176,7 +176,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
           </div>
         </SheetHeader>
         
-        <div className="mt-6 space-y-3">
+        <div className="mt-6 space-y-3" aria-live="polite" aria-relevant="additions text">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

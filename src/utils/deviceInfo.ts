@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 // Utility to get device/browser information for legal evidence logging
 
 export interface DeviceInfo {
@@ -51,18 +53,20 @@ export function getDeviceIdString(): string {
 // Get IP address - will be fetched from a service
 export async function getClientIP(): Promise<string> {
   try {
-    // Use a public API to get client IP
-    const response = await fetch("https://api.ipify.org?format=json", {
-      method: "GET",
-      headers: { "Accept": "application/json" },
+    const { data, error } = await supabase.functions.invoke<{ ip?: string }>("request-client-context", {
+      method: "POST",
+      body: {},
     });
-    
-    if (response.ok) {
-      const data = await response.json();
-      return data.ip || "unknown";
+
+    if (error) {
+      throw error;
+    }
+
+    if (data?.ip) {
+      return data.ip;
     }
   } catch (error) {
-    console.warn("Could not fetch IP address:", error);
+    console.warn("Could not fetch IP address from server context:", error);
   }
   
   return "unknown";

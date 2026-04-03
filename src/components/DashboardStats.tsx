@@ -3,6 +3,8 @@ import { TrendingUp, TrendingDown, FileText, Clock, AlertCircle } from "lucide-r
 import { useDebtAgreements } from "@/hooks/useDebtAgreements";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMemo } from "react";
+import { SummaryCard } from "@/components/ux";
+import { AgreementRole } from "@/domains/debt";
 
 // Domain imports - SINGLE SOURCE OF TRUTH
 import { mapToUpcomingInstallments, UpcomingInstallmentData } from "@/domains/debt";
@@ -22,7 +24,11 @@ function getDueLabelStyle(days: number): string {
   return "text-primary bg-primary/10";
 }
 
-export function DashboardStats() {
+interface DashboardStatsProps {
+  roleFilter?: AgreementRole;
+}
+
+export function DashboardStats({ roleFilter }: DashboardStatsProps) {
   const { agreements, stats } = useDebtAgreements();
   const { user } = useAuth();
 
@@ -31,112 +37,91 @@ export function DashboardStats() {
     return mapToUpcomingInstallments(agreements, user?.id, 7, 3);
   }, [agreements, user?.id]);
 
+  const filteredUpcomingInstallments = useMemo(() => {
+    if (!roleFilter) return upcomingInstallments;
+    return upcomingInstallments.filter((item) => (roleFilter === "lender" ? item.isLender : !item.isLender));
+  }, [roleFilter, upcomingInstallments]);
+
+  const roleSummary = useMemo(() => {
+    if (roleFilter === "lender") {
+      const count = agreements.filter((agreement) => agreement.lender_id === user?.id && agreement.status === "active").length;
+      return {
+        label: "สัญญาที่คุณให้ยืม",
+        value: count,
+        hint: "สัญญาที่กำลังติดตามการชำระ",
+      };
+    }
+
+    if (roleFilter === "borrower") {
+      const count = agreements.filter((agreement) => agreement.borrower_id === user?.id && agreement.status === "active").length;
+      return {
+        label: "สัญญาที่คุณยืม",
+        value: count,
+        hint: "สัญญาที่คุณต้องจัดการชำระ",
+      };
+    }
+
+    return {
+      label: "ข้อตกลงที่ใช้งาน",
+      value: stats.activeCount,
+      hint: "ทุกข้อตกลงที่ยังดำเนินอยู่",
+    };
+  }, [agreements, roleFilter, stats.activeCount, user?.id]);
+
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mb-6"
-    >
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        {/* Total Outstanding */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1 }}
-          className="bg-card rounded-2xl p-4 shadow-card"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-full bg-status-paid/10 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-status-paid" />
-            </div>
-            <span className="text-xs text-muted-foreground">ยอดรับ</span>
-          </div>
-          <p className="text-xl font-heading font-semibold text-foreground">
-            ฿{stats.totalToReceive.toLocaleString()}
-          </p>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.15 }}
-          className="bg-card rounded-2xl p-4 shadow-card"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-full bg-status-overdue/10 flex items-center justify-center">
-              <TrendingDown className="w-4 h-4 text-status-overdue" />
-            </div>
-            <span className="text-xs text-muted-foreground">ยอดจ่าย</span>
-          </div>
-          <p className="text-xl font-heading font-semibold text-foreground">
-            ฿{stats.totalToPay.toLocaleString()}
-          </p>
-        </motion.div>
-
-        {/* Agreements Count */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2 }}
-          className="bg-card rounded-2xl p-4 shadow-card"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <FileText className="w-4 h-4 text-primary" />
-            </div>
-            <span className="text-xs text-muted-foreground">ข้อตกลง</span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <p className="text-xl font-heading font-semibold text-foreground">
-              {stats.activeCount}
-            </p>
-            <span className="text-xs text-muted-foreground">ใช้งาน</span>
-          </div>
-        </motion.div>
-
-        {/* Pending Count */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.25 }}
-          className="bg-card rounded-2xl p-4 shadow-card"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-full bg-status-pending/10 flex items-center justify-center">
-              <Clock className="w-4 h-4 text-status-pending" />
-            </div>
-            <span className="text-xs text-muted-foreground">รอยืนยัน</span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <p className="text-xl font-heading font-semibold text-foreground">
-              {stats.pendingCount}
-            </p>
-            <span className="text-xs text-muted-foreground">รายการ</span>
-          </div>
-        </motion.div>
+    <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+      <div className="grid grid-cols-2 gap-3">
+        <SummaryCard
+          label="ยอดรับ"
+          value={`฿${stats.totalToReceive.toLocaleString()}`}
+          hint="เงินที่ยังรอรับจากสัญญาที่เปิดอยู่"
+          icon={TrendingUp}
+          priority="primary"
+        />
+        <SummaryCard
+          label="ยอดจ่าย"
+          value={`฿${stats.totalToPay.toLocaleString()}`}
+          hint="ยอดที่คุณยังต้องชำระ"
+          icon={TrendingDown}
+          priority="warning"
+        />
+        <SummaryCard
+          label={roleSummary.label}
+          value={roleSummary.value.toLocaleString()}
+          hint={roleSummary.hint}
+          icon={FileText}
+        />
+        <SummaryCard
+          label="รอยืนยัน"
+          value={stats.pendingCount.toLocaleString()}
+          hint="ข้อตกลงหรือการชำระที่ยังต้องมีคนกดต่อ"
+          icon={Clock}
+          priority={stats.pendingCount > 0 ? "warning" : "neutral"}
+        />
       </div>
 
-      {/* Upcoming Installments */}
-      {upcomingInstallments.length > 0 && (
+      {filteredUpcomingInstallments.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-card rounded-2xl p-4 shadow-card"
+          className="surface-panel"
         >
-          <div className="flex items-center gap-2 mb-3">
+          <div className="mb-3 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-status-pending" />
-            <h3 className="font-medium text-foreground text-sm">งวดที่ใกล้ครบกำหนด</h3>
+            <div>
+              <h3 className="text-sm font-medium text-foreground">งวดที่ใกล้ครบกำหนด</h3>
+              <p className="text-xs text-muted-foreground">รายการที่ควรจัดการภายใน 7 วัน</p>
+            </div>
           </div>
           <div className="space-y-2">
-            {upcomingInstallments.map((item, index) => (
+            {filteredUpcomingInstallments.map((item, index) => (
               <motion.div
                 key={`${item.agreementId}-${item.dueDate}`}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.35 + index * 0.05 }}
-                className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                className="flex items-center justify-between rounded-2xl border border-border/70 bg-secondary/35 px-3 py-3 last:border-border/70"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">

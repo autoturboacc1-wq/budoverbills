@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
+import { EmptyState, PageSection } from "@/components/ux";
 
 interface PendingAction {
   id: string;
@@ -259,7 +260,7 @@ export const PendingActionsCard = () => {
 
   if (isLoading) {
     return (
-      <div className="mb-6 bg-card rounded-2xl p-4 shadow-card">
+      <div className="surface-panel">
         <div className="flex items-center justify-center py-6">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
@@ -267,29 +268,36 @@ export const PendingActionsCard = () => {
     );
   }
 
-  if (!pendingActions || pendingActions.length === 0) return null;
+  if (!pendingActions || pendingActions.length === 0) {
+    return (
+      <PageSection
+        title="Primary Action Queue"
+        description="เมื่อไม่มีงานค้าง คุณจะเห็นคิวว่างและกลับมาติดตามได้จากที่นี่"
+      >
+        <EmptyState
+          icon={<CheckCircle className="h-6 w-6" />}
+          title="ไม่มีงานการเงินที่ต้องทำตอนนี้"
+          description="ยังไม่มีรายการค้างชำระ รอยืนยัน หรือคำขอเลื่อนกำหนดที่ต้องจัดการทันที"
+        />
+      </PageSection>
+    );
+  }
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("th-TH").format(amount);
   };
 
   return (
-    <motion.section
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mb-6"
-    >
-      <div className="flex items-center gap-2 mb-3">
-        <AlertTriangle className="w-5 h-5 text-red-500" />
-        <h2 className="font-heading font-semibold text-lg text-foreground">
-          สิ่งที่ต้องทำ
-        </h2>
-        <span className="px-2 py-0.5 text-xs font-medium bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400 rounded-full">
-          {pendingActions.length}
+    <PageSection
+      title="Primary Action Queue"
+      description="จัดลำดับงานที่ต้องกดทำตอนนี้ก่อนงานข้อมูลภาพรวม"
+      action={
+        <span className="rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-semibold text-destructive">
+          {pendingActions.length} รายการ
         </span>
-      </div>
-
-      <div className="space-y-3">
+      }
+    >
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
         {pendingActions.map((action, index) => {
           const Icon = actionIcons[action.type];
           const config = priorityConfig[action.priority];
@@ -345,7 +353,7 @@ export const PendingActionsCard = () => {
             </motion.button>
           );
         })}
-      </div>
-    </motion.section>
+      </motion.div>
+    </PageSection>
   );
 };

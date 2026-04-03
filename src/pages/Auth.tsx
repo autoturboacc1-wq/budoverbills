@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { BobLogo } from "@/components/BobLogo";
 import { getSafeInternalPath } from "@/utils/navigation";
+import { InlineValidationMessage } from "@/components/ux";
 
 const emailSchema = z.string().email("อีเมลไม่ถูกต้อง");
 const passwordSchema = z.string().min(6, "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
@@ -399,7 +400,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-hero flex flex-col">
+    <div className="min-h-screen flex flex-col">
       {/* Header */}
       <div className="p-4">
         <button
@@ -410,27 +411,30 @@ export default function Auth() {
         </button>
       </div>
 
-      <div className="flex-1 flex flex-col justify-center px-6 pb-12">
+      <div className="page-shell flex-1 max-w-lg px-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-sm mx-auto w-full"
+          className="mx-auto w-full max-w-md"
         >
-          {/* Logo & Title */}
-          <div className="text-center mb-8">
+          <div className="surface-panel mb-5 text-center">
             <div className="flex justify-center mb-4">
               <BobLogo size="lg" />
             </div>
-            <h1 className="text-2xl font-heading font-semibold text-foreground">
-              {isLogin ? "ยินดีต้อนรับกลับสู่ Bud Over Bills" : "สมัครสมาชิก Bud Over Bills"}
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Secure Access
+            </p>
+            <h1 className="mt-1 text-2xl font-heading font-semibold text-foreground">
+              {isLogin ? "เข้าสู่ระบบอย่างปลอดภัย" : "สร้างบัญชี Bud Over Bills"}
             </h1>
             <p className="text-muted-foreground mt-2">
-              {isLogin ? "เข้าสู่ระบบเพื่อจัดการข้อตกลงของคุณ" : "สร้างบัญชีใหม่เพื่อเริ่มต้นใช้งาน"}
+              {isLogin
+                ? "เข้าถึงข้อตกลง การชำระ และหลักฐานของคุณในมุมมองเดียว"
+                : "เริ่มต้นด้วยบัญชีสำหรับจัดการข้อตกลงทางการเงินอย่างเป็นระบบ"}
             </p>
           </div>
 
-          {/* Social Login Buttons */}
-          <div className="space-y-3 mb-6">
+          <div className="surface-panel space-y-3 mb-5">
             <Button variant="outline" className="w-full h-12 text-base" onClick={handleGoogleSignIn}>
               <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                 <path
@@ -465,18 +469,16 @@ export default function Auth() {
             </Button>
           </div>
 
-          {/* Divider */}
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-border"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-background text-muted-foreground">หรือ</span>
+              <span className="px-4 bg-background text-muted-foreground">หรือใช้อีเมลและรหัสผ่าน</span>
             </div>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="surface-panel space-y-4">
             {!isLogin && (
               <div>
                 <Label htmlFor="displayName" className="text-foreground">
@@ -553,18 +555,17 @@ export default function Auth() {
               )}
             </div>
 
-            {/* Rate Limit Warning */}
             {isLogin && isBlocked && (
-              <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
-                <ShieldAlert className="w-5 h-5 flex-shrink-0" />
-                <span>ลองผิดเกินกำหนด กรุณารอ {blockTimeRemaining} วินาที</span>
-              </div>
+              <InlineValidationMessage
+                message={`ลองผิดเกินกำหนด กรุณารอ ${blockTimeRemaining} วินาที`}
+              />
             )}
 
             {isLogin && !isBlocked && remainingAttempts < 5 && remainingAttempts > 0 && (
-              <p className="text-sm text-amber-600 text-center">
-                ⚠️ เหลือโอกาสอีก {remainingAttempts} ครั้ง
-              </p>
+              <InlineValidationMessage
+                tone="warning"
+                message={`เหลือโอกาสอีก ${remainingAttempts} ครั้งก่อนระบบพักการลองชั่วคราว`}
+              />
             )}
 
             <Button 
@@ -576,8 +577,8 @@ export default function Auth() {
             </Button>
           </form>
 
-          {/* Toggle */}
-          <p className="text-center text-muted-foreground mt-6">
+          <div className="surface-panel mt-5">
+            <p className="text-center text-muted-foreground">
             {isLogin ? "ยังไม่มีบัญชี?" : "มีบัญชีแล้ว?"}{" "}
             <button
               type="button"
@@ -589,21 +590,21 @@ export default function Auth() {
             >
               {isLogin ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}
             </button>
-          </p>
+            </p>
 
-          {/* Legal Links */}
-          <div className="flex flex-wrap justify-center gap-2 mt-4 text-sm text-muted-foreground">
-            <Link to="/terms" className="hover:text-foreground transition-colors">
-              ข้อกำหนดการใช้งาน
-            </Link>
-            <span>•</span>
-            <Link to="/privacy" className="hover:text-foreground transition-colors">
-              นโยบายความเป็นส่วนตัว
-            </Link>
-            <span>•</span>
-            <Link to="/pdpa-consent" className="hover:text-foreground transition-colors">
-              PDPA
-            </Link>
+            <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm text-muted-foreground">
+              <Link to="/terms" className="hover:text-foreground transition-colors">
+                ข้อกำหนดการใช้งาน
+              </Link>
+              <span>•</span>
+              <Link to="/privacy" className="hover:text-foreground transition-colors">
+                นโยบายความเป็นส่วนตัว
+              </Link>
+              <span>•</span>
+              <Link to="/pdpa-consent" className="hover:text-foreground transition-colors">
+                PDPA
+              </Link>
+            </div>
           </div>
         </motion.div>
       </div>

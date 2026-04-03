@@ -2,8 +2,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, User, Calendar, Percent, Calculator, Info, UserPlus, Check, X, AlertTriangle, ShieldCheck, Coins, Building } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
-import { useNavigate } from "react-router-dom";
-import { useState, useMemo, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  EmptyState,
+  InlineValidationMessage,
+  PageHeader,
+  PageSection,
+  PrimaryActionBar,
+  ReviewPanel,
+  StepFlowLayout,
+  SummaryCard,
+} from "@/components/ux";
 
 type InterestType = "none" | "flat" | "effective";
 
@@ -49,8 +59,48 @@ interface PaymentScheduleItem {
   interest: number;
 }
 
+const BANGKOK_TIME_ZONE = "Asia/Bangkok";
+const bangkokDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: BANGKOK_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+const formatBangkokDate = (date: Date) => {
+  const parts = bangkokDateFormatter.formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value ?? "1970";
+  const month = parts.find((part) => part.type === "month")?.value ?? "01";
+  const day = parts.find((part) => part.type === "day")?.value ?? "01";
+
+  return `${year}-${month}-${day}`;
+};
+
+const parseBangkokDate = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12, 0, 0, 0));
+};
+
+const getBangkokTodayDate = () => parseBangkokDate(formatBangkokDate(new Date())) ?? new Date();
+
+const addBangkokDays = (date: Date, days: number) => {
+  const nextDate = new Date(date.getTime());
+  nextDate.setUTCDate(nextDate.getUTCDate() + days);
+  return nextDate;
+};
+
+const addBangkokMonths = (date: Date, months: number) => {
+  const nextDate = new Date(date.getTime());
+  nextDate.setUTCMonth(nextDate.getUTCMonth() + months);
+  return nextDate;
+};
+
 export default function CreateAgreement() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { createAgreement } = useDebtAgreements();
   const { friends } = useDbFriends();
@@ -68,6 +118,7 @@ export default function CreateAgreement() {
   const [showFriendPicker, setShowFriendPicker] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<DbFriend | null>(null);
+  const [currentStep, setCurrentStep] = useState(0);
   
   const [formData, setFormData] = useState({
     partnerPhone: "",
@@ -77,7 +128,7 @@ export default function CreateAgreement() {
     frequency: "monthly",
     interest: "",
     interestType: "none" as InterestType,
-    startDate: new Date().toISOString().split("T")[0],
+    startDate: formatBangkokDate(new Date()),
     weeklyDay: "1", // 0=อาทิตย์, 1=จันทร์, ..., 6=เสาร์
     rescheduleFeeRate: "5", // Default 5% for reschedule fee (no-interest)
     rescheduleInterestPercent: "100", // Default 100% - pay full interest portion of that installment
@@ -85,6 +136,57 @@ export default function CreateAgreement() {
     accountNumber: "",
     accountName: "",
   });
+
+  const handleSelectFriend = useCallback((friend: DbFriend) => {
+    setSelectedFriend(friend);
+    setFormData((prev) => ({
+      ...prev,
+      partnerPhone: friend.friend_phone || "",
+      partnerName: friend.friend_name,
+    }));
+    setShowFriendPicker(false);
+  }, []);
+
+  const handleClearFriend = useCallback(() => {
+    setSelectedFriend(null);
+    setFormData((prev) => ({
+      ...prev,
+      partnerPhone: "",
+      partnerName: "",
+    }));
+  }, []);
+
+  useEffect(() => {
+    const state = location.state as { selectedFriend?: Partial<DbFriend> } | null;
+    const locationFriend = state?.selectedFriend;
+    if (!locationFriend?.friend_name || selectedFriend) return;
+
+    const preselected = friends.find((friend) => friend.id === locationFriend.id) ?? null;
+    if (preselected) {
+      setSelectedFriend(preselected);
+      setFormData((prev) => ({
+        ...prev,
+        partnerPhone: preselected.friend_phone || "",
+        partnerName: preselected.friend_name,
+      }));
+      return;
+    }
+
+    setSelectedFriend({
+      id: locationFriend.id ?? crypto.randomUUID(),
+      friend_user_id: locationFriend.friend_user_id ?? null,
+      friend_name: locationFriend.friend_name,
+      friend_phone: locationFriend.friend_phone ?? null,
+      nickname: null,
+      created_at: new Date().toISOString(),
+      user_id: user?.id ?? "",
+    });
+    setFormData((prev) => ({
+      ...prev,
+      partnerPhone: locationFriend.friend_phone || "",
+      partnerName: locationFriend.friend_name || "",
+    }));
+  }, [friends, location.state, selectedFriend, user?.id]);
 
   // Fetch bank account from previous agreements
   useEffect(() => {
@@ -139,25 +241,6 @@ export default function CreateAgreement() {
   const principalPerInstallment = useMemo(() => {
     return divideMoney(Math.max(principalAmount, 0), installmentCount);
   }, [principalAmount, installmentCount]);
-
-  const handleSelectFriend = (friend: DbFriend) => {
-    setSelectedFriend(friend);
-    setFormData({
-      ...formData,
-      partnerPhone: friend.friend_phone || "",
-      partnerName: friend.friend_name,
-    });
-    setShowFriendPicker(false);
-  };
-
-  const handleClearFriend = () => {
-    setSelectedFriend(null);
-    setFormData({
-      ...formData,
-      partnerPhone: "",
-      partnerName: "",
-    });
-  };
 
   // Validate form before showing password dialog
   const handleSubmitClick = (e: React.FormEvent) => {
@@ -240,7 +323,7 @@ export default function CreateAgreement() {
         account_name: formData.accountName,
         installments: paymentSchedule.map(item => ({
           installment_number: item.installment,
-          due_date: item.date.toISOString().split('T')[0],
+          due_date: formatBangkokDate(item.date),
           amount: item.amount,
           principal_portion: item.principal,
           interest_portion: item.interest,
@@ -414,17 +497,15 @@ export default function CreateAgreement() {
     // For weekly: calculate from selected day of week
     if (formData.frequency === "weekly") {
       const targetDay = Number(formData.weeklyDay);
-      const today = new Date();
-      const current = new Date(today);
+      const current = getBangkokTodayDate();
       
       // Find the first occurrence of targetDay from today
-      while (current.getDay() !== targetDay) {
-        current.setDate(current.getDate() + 1);
+      while (current.getUTCDay() !== targetDay) {
+        current.setUTCDate(current.getUTCDate() + 1);
       }
       
       for (let i = 0; i < numInstallments; i++) {
-        const paymentDate = new Date(current);
-        paymentDate.setDate(current.getDate() + i * 7);
+        const paymentDate = addBangkokDays(current, i * 7);
         
         const calcSchedule = selectedCalculation.schedule[i];
         schedule.push({
@@ -437,24 +518,30 @@ export default function CreateAgreement() {
       }
     } else {
       // Daily or Monthly
-      const startDate = new Date(formData.startDate);
+      const startDate = parseBangkokDate(formData.startDate) ?? getBangkokTodayDate();
       
       for (let i = 0; i < numInstallments; i++) {
-        const paymentDate = new Date(startDate);
         if (formData.frequency === "daily") {
-          paymentDate.setDate(startDate.getDate() + i);
+          const paymentDate = addBangkokDays(startDate, i);
+          const calcSchedule = selectedCalculation.schedule[i];
+          schedule.push({
+            installment: i + 1,
+            date: paymentDate,
+            amount: calcSchedule?.total || selectedCalculation.perInstallment,
+            principal: calcSchedule?.principal || principalPerInstallment,
+            interest: calcSchedule?.interest || 0,
+          });
         } else {
-          paymentDate.setMonth(startDate.getMonth() + i);
+          const paymentDate = addBangkokMonths(startDate, i);
+          const calcSchedule = selectedCalculation.schedule[i];
+          schedule.push({
+            installment: i + 1,
+            date: paymentDate,
+            amount: calcSchedule?.total || selectedCalculation.perInstallment,
+            principal: calcSchedule?.principal || principalPerInstallment,
+            interest: calcSchedule?.interest || 0,
+          });
         }
-        
-        const calcSchedule = selectedCalculation.schedule[i];
-        schedule.push({
-          installment: i + 1,
-          date: paymentDate,
-          amount: calcSchedule?.total || selectedCalculation.perInstallment,
-          principal: calcSchedule?.principal || principalPerInstallment,
-          interest: calcSchedule?.interest || 0,
-        });
       }
     }
     
@@ -467,23 +554,58 @@ export default function CreateAgreement() {
     monthly: "รายเดือน",
   };
 
+  const stepDefinitions = [
+    { title: "เลือกคู่สัญญา", description: "ระบุคนที่จะอยู่ในข้อตกลงนี้" },
+    { title: "กำหนดวงเงิน", description: "ตั้งเงินต้น งวด และดอกเบี้ย" },
+    { title: "ตรวจแผนชำระ", description: "ดูตารางผ่อนและบัญชีรับเงิน" },
+    { title: "ตรวจสอบก่อนส่ง", description: "สรุปเงื่อนไขและยืนยัน" },
+  ];
+
+  const canProceedByStep = [
+    !!selectedFriend,
+    !!formData.amount && principalAmount > 0 && installmentCount > 0,
+    !!selectedCalculation && paymentSchedule.length > 0 && !!formData.bankName && !!formData.accountNumber,
+    !!selectedCalculation && !!selectedFriend,
+  ];
+
+  const selectedBankLabel =
+    THAI_BANKS.find((bank) => bank.value === formData.bankName)?.label || formData.bankName || "ยังไม่ได้เลือก";
+
+  const reviewRows = selectedCalculation
+    ? [
+        { label: "คู่สัญญา", value: selectedFriend?.friend_name || "-" },
+        { label: "เงินต้น", value: `฿${principalAmount.toLocaleString()}` },
+        {
+          label: "โครงสร้างดอกเบี้ย",
+          value:
+            formData.interestType === "none"
+              ? "ไม่คิดดอกเบี้ย"
+              : `${interestTypeLabels[formData.interestType].title} ${annualInterestRate.toLocaleString()}% ต่อปี`,
+        },
+        {
+          label: "แผนการชำระ",
+          value: `${installmentCount} งวด / ${frequencyLabels[formData.frequency]}`,
+        },
+        { label: "ชำระต่องวด", value: `฿${selectedCalculation.perInstallment.toLocaleString()}` },
+        { label: "ยอดรวมทั้งหมด", value: `฿${selectedCalculation.totalAmount.toLocaleString()}` },
+        { label: "บัญชีรับเงิน", value: selectedBankLabel },
+      ]
+    : [];
+
+  useEffect(() => {
+    const sectionIds = ["agreement-step-0", "agreement-step-1", "agreement-step-2", "agreement-step-3"];
+    const target = document.getElementById(sectionIds[currentStep]);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [currentStep]);
+
   return (
-    <div className="min-h-screen bg-gradient-hero">
-      <div className="max-w-lg mx-auto px-4 pb-8">
-        {/* Header */}
-        <motion.header
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-4 py-4"
-        >
-          <button
-            onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-secondary-foreground" />
-          </button>
-          <h1 className="text-xl font-heading font-semibold text-foreground">สร้างข้อตกลงใหม่</h1>
-        </motion.header>
+    <div className="min-h-screen">
+      <div className="page-shell max-w-5xl">
+        <PageHeader
+          title="สร้างข้อตกลงใหม่"
+          description="สร้างข้อตกลงแบบเป็นขั้นตอน เพื่อให้วงเงิน เงื่อนไข และบัญชีรับเงินชัดเจนก่อนส่ง"
+          onBack={() => navigate(-1)}
+        />
 
         {/* Subscription Banner */}
         {quota && (
@@ -502,16 +624,26 @@ export default function CreateAgreement() {
           </motion.div>
         )}
 
-        {/* Form */}
-        <motion.form
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          onSubmit={handleSubmitClick}
-          className="space-y-6"
+        <StepFlowLayout
+          title="Guided Agreement Builder"
+          description="ใช้ปุ่มด้านล่างเพื่อเดินทีละขั้น ระบบจะเลื่อนไปยังส่วนที่เกี่ยวข้องให้อัตโนมัติ"
+          currentStep={currentStep}
+          steps={stepDefinitions}
         >
+          <motion.form
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            onSubmit={handleSubmitClick}
+            className="space-y-6"
+          >
           {/* Partner */}
-          <div className="bg-card rounded-2xl p-5 shadow-card space-y-4">
+          <div
+            id="agreement-step-0"
+            className={`bg-card rounded-2xl p-5 shadow-card space-y-4 transition-all ${
+              currentStep === 0 ? "ring-2 ring-primary/30 shadow-elevated" : ""
+            }`}
+          >
             <div className="flex items-center gap-2 text-foreground font-medium">
               <User className="w-5 h-5 text-primary" />
               <span>ข้อมูลคู่สัญญา</span>
@@ -557,7 +689,12 @@ export default function CreateAgreement() {
           </div>
 
           {/* Amount */}
-          <div className="bg-card rounded-2xl p-5 shadow-card space-y-4">
+          <div
+            id="agreement-step-1"
+            className={`bg-card rounded-2xl p-5 shadow-card space-y-4 transition-all ${
+              currentStep === 1 ? "ring-2 ring-primary/30 shadow-elevated" : ""
+            }`}
+          >
             <div className="flex items-center gap-2 text-foreground font-medium">
               <Calculator className="w-5 h-5 text-primary" />
               <span>จำนวนเงิน</span>
@@ -576,7 +713,11 @@ export default function CreateAgreement() {
 
 
           {/* Installments */}
-          <div className="bg-card rounded-2xl p-5 shadow-card space-y-4">
+          <div
+            className={`bg-card rounded-2xl p-5 shadow-card space-y-4 transition-all ${
+              currentStep === 1 ? "ring-2 ring-primary/30 shadow-elevated" : ""
+            }`}
+          >
             <div className="flex items-center gap-2 text-foreground font-medium">
               <Calendar className="w-5 h-5 text-primary" />
               <span>การผ่อนชำระ</span>
@@ -627,24 +768,28 @@ export default function CreateAgreement() {
                   <div className="flex flex-wrap gap-1.5">
                     {(() => {
                       const targetDay = Number(formData.weeklyDay);
-                      const today = new Date();
+                      const today = getBangkokTodayDate();
                       const dates: Date[] = [];
-                      const current = new Date(today);
+                      const current = new Date(today.getTime());
                       
                       // Find the first occurrence of targetDay from today
-                      while (current.getDay() !== targetDay) {
-                        current.setDate(current.getDate() + 1);
+                      while (current.getUTCDay() !== targetDay) {
+                        current.setUTCDate(current.getUTCDate() + 1);
                       }
                       
                       // Collect dates for all installments
                       for (let i = 0; i < Number(formData.installments); i++) {
-                        dates.push(new Date(current));
-                        current.setDate(current.getDate() + 7);
+                        dates.push(new Date(current.getTime()));
+                        current.setUTCDate(current.getUTCDate() + 7);
                       }
                       
                       return dates.map((date, idx) => (
                         <span key={idx} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                          {date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                          {date.toLocaleDateString('th-TH', {
+                            day: 'numeric',
+                            month: 'short',
+                            timeZone: BANGKOK_TIME_ZONE,
+                          })}
                         </span>
                       ));
                     })()}
@@ -669,7 +814,7 @@ export default function CreateAgreement() {
                 {formData.startDate && (
                   <p className="text-sm text-muted-foreground">
                     {formData.frequency === "monthly" && (() => {
-                      const dayOfMonth = new Date(formData.startDate).getDate();
+                      const dayOfMonth = parseBangkokDate(formData.startDate)?.getUTCDate() ?? 1;
                       return `→ ชำระทุกวันที่ ${dayOfMonth} ของเดือน`;
                     })()}
                     {formData.frequency === "daily" && "→ ชำระทุกวัน"}
@@ -1020,15 +1165,76 @@ export default function CreateAgreement() {
                     })}
                   </div>
                 </motion.div>
-              )}
+            )}
+          </div>
+
+          <div
+            className={`bg-card rounded-2xl p-5 shadow-card space-y-4 transition-all ${
+              currentStep === 2 ? "ring-2 ring-primary/30 shadow-elevated" : ""
+            }`}
+          >
+            <div className="flex items-center gap-2 text-foreground font-medium">
+              <Building className="w-5 h-5 text-primary" />
+              <span>บัญชีรับเงิน</span>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2 md:col-span-1">
+                <Label>ธนาคารหรือช่องทางรับเงิน</Label>
+                <Select value={formData.bankName} onValueChange={(value) => setFormData({ ...formData, bankName: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="เลือกธนาคาร" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {THAI_BANKS.map((bank) => (
+                      <SelectItem key={bank.value} value={bank.value}>
+                        {bank.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="accountNumber">
+                  {formData.bankName === "promptpay" ? "PromptPay ID" : "เลขบัญชี"}
+                </Label>
+                <Input
+                  id="accountNumber"
+                  value={formData.accountNumber}
+                  onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
+                  placeholder={formData.bankName === "promptpay" ? "0812345678" : "123-4-56789-0"}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="accountName">ชื่อบัญชี</Label>
+                <Input
+                  id="accountName"
+                  value={formData.accountName}
+                  onChange={(e) => setFormData({ ...formData, accountName: e.target.value })}
+                  placeholder="ชื่อผู้ถือบัญชี"
+                />
+              </div>
+            </div>
+
+            {currentStep === 2 && (!formData.bankName || !formData.accountNumber) ? (
+              <InlineValidationMessage
+                tone="warning"
+                message="กรุณาระบุบัญชีรับเงินให้ครบก่อนขยับไปขั้นตรวจสอบสุดท้าย"
+              />
+            ) : null}
           </div>
 
           {/* Real-time Calculation Summary */}
           {selectedCalculation && Number(formData.amount) > 0 && (
             <motion.div
+              id="agreement-step-2"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-card rounded-2xl p-5 shadow-card space-y-4 border-2 border-primary/20"
+              className={`bg-card rounded-2xl p-5 shadow-card space-y-4 border-2 border-primary/20 transition-all ${
+                currentStep === 2 ? "ring-2 ring-primary/30 shadow-elevated" : ""
+              }`}
             >
               <div className="flex items-center gap-2 text-foreground font-medium">
                 <Calculator className="w-5 h-5 text-primary" />
@@ -1197,9 +1403,12 @@ export default function CreateAgreement() {
           {/* Payment Summary before Submit */}
           {Number(formData.amount) > 0 && selectedCalculation && (
             <motion.div
+              id="agreement-step-3"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-card rounded-2xl p-5 shadow-card space-y-3"
+              className={`bg-card rounded-2xl p-5 shadow-card space-y-3 transition-all ${
+                currentStep === 3 ? "ring-2 ring-primary/30 shadow-elevated" : ""
+              }`}
             >
               <p className="text-sm font-medium text-foreground text-center">สรุปการชำระเงิน</p>
               <div className="space-y-2">
@@ -1246,21 +1455,47 @@ export default function CreateAgreement() {
             </motion.div>
           )}
 
-          {/* Submit */}
-          <Button 
-          type="submit" 
-          className="w-full h-12 text-base rounded-xl"
-          disabled={
-            isSubmitting ||
-            subscriptionLoading ||
-            (!formData.partnerName && !formData.partnerPhone) ||
-            !formData.amount
-          }
-        >
-            {isSubmitting ? "กำลังสร้าง..." : "ส่งคำขอข้อตกลง"}
-          </Button>
-          <p className="text-xs text-center text-muted-foreground">คู่สัญญาจะได้รับแจ้งเตือนเพื่อยืนยัน</p>
+          <PrimaryActionBar>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm text-muted-foreground">
+                {currentStep < stepDefinitions.length - 1
+                  ? `ขั้นถัดไป: ${stepDefinitions[currentStep + 1].title}`
+                  : "คู่สัญญาจะได้รับแจ้งเตือนเพื่อเข้ามายืนยันข้อตกลง"}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => (currentStep === 0 ? navigate(-1) : setCurrentStep((step) => step - 1))}
+                >
+                  {currentStep === 0 ? "ยกเลิก" : "ย้อนกลับ"}
+                </Button>
+                {currentStep < stepDefinitions.length - 1 ? (
+                  <Button
+                    type="button"
+                    onClick={() => setCurrentStep((step) => step + 1)}
+                    disabled={!canProceedByStep[currentStep]}
+                  >
+                    ถัดไป
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    disabled={
+                      isSubmitting ||
+                      subscriptionLoading ||
+                      (!formData.partnerName && !formData.partnerPhone) ||
+                      !formData.amount
+                    }
+                  >
+                    {isSubmitting ? "กำลังสร้าง..." : "ส่งคำขอข้อตกลง"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </PrimaryActionBar>
         </motion.form>
+        </StepFlowLayout>
 
         {/* Friend Picker Dialog */}
         <Dialog open={showFriendPicker} onOpenChange={setShowFriendPicker}>

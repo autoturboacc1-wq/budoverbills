@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, CircleAlert, CreditCard } from "lucide-react";
 import { ChatThread } from "./ChatRoom";
+import { EmptyState } from "@/components/ux";
 
 // Re-export types for compatibility
 export type { ChatThread };
@@ -30,12 +31,12 @@ export const ChatThreadList = ({
 
   if (threads.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-          <MessageCircle className="w-8 h-8 text-muted-foreground" />
-        </div>
-        <h3 className="font-semibold text-foreground mb-2">ยังไม่มีข้อความ</h3>
-        <p className="text-sm text-muted-foreground">เริ่มสนทนากับเพื่อนหรือสร้างข้อตกลงใหม่</p>
+      <div className="px-4 py-8">
+        <EmptyState
+          icon={<MessageCircle className="h-7 w-7" />}
+          title="ยังไม่มีข้อความ"
+          description="เริ่มสนทนากับเพื่อนหรือสร้างข้อตกลงใหม่ แล้ว thread การเงินจะปรากฏที่นี่"
+        />
       </div>
     );
   }
@@ -48,7 +49,7 @@ export const ChatThreadList = ({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           onClick={() => onSelectThread(thread)}
-          className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-colors ${
+          className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${
             selectedThreadId === thread.chat_id ? "bg-muted/50" : ""
           }`}
         >
@@ -68,9 +69,23 @@ export const ChatThreadList = ({
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-foreground truncate">
-                {thread.counterparty_name}
-              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="truncate font-semibold text-foreground">{thread.counterparty_name}</span>
+                  {thread.has_pending_action ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                      <CreditCard className="h-3 w-3" />
+                      Action
+                    </span>
+                  ) : null}
+                  {thread.room_type === "debt" ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+                      <CircleAlert className="h-3 w-3" />
+                      การเงิน
+                    </span>
+                  ) : null}
+                </div>
+              </div>
               {thread.last_message_at && (
                 <span className="text-xs text-muted-foreground shrink-0">
                   {new Date(thread.last_message_at).toLocaleDateString("th-TH", {
@@ -80,9 +95,7 @@ export const ChatThreadList = ({
                 </span>
               )}
             </div>
-            <p className="text-sm text-muted-foreground truncate">
-              {thread.last_message || "ยังไม่มีข้อความ"}
-            </p>
+            <p className="truncate text-sm text-muted-foreground">{thread.last_message || "ยังไม่มีข้อความ"}</p>
           </div>
 
           {/* Unread badge */}

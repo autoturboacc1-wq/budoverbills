@@ -213,7 +213,7 @@ export default function Subscription() {
             )}
 
             {/* Trial Badge */}
-            {isTrial && isPremium && (
+            {isTrial && (
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                 <Clock className="w-3.5 h-3.5" />
                 ทดลองใช้ • เหลือ {trialDaysRemaining} วัน

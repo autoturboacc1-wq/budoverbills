@@ -80,6 +80,29 @@ const thaiMonths = [
   "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
 ];
 
+const THAI_TIME_ZONE = "Asia/Bangkok";
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function getBangkokDateKey(date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: THAI_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function getBangkokMidnightTimestamp(dateKey: string): number {
+  return new Date(`${dateKey}T00:00:00+07:00`).getTime();
+}
+
+function formatBangkokDate(dateKey: string, options: Intl.DateTimeFormatOptions): string {
+  return new Date(`${dateKey}T12:00:00+07:00`).toLocaleDateString("th-TH", {
+    timeZone: THAI_TIME_ZONE,
+    ...options,
+  });
+}
+
 type RoleFilter = "lender" | "borrower";
 type StatusFilter = "all" | "paid" | "pending" | "overdue" | "waiting_confirm";
 
@@ -200,14 +223,10 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
 
   // Calculate calendar days with real data
   const calendarDays = useMemo<CalendarDay[]>(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const days: CalendarDay[] = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dayDate = new Date(currentYear, currentMonth, day);
       let items: PaymentItem[] = [];
 
       // Find installments for this day
@@ -350,8 +369,8 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
 
   // Calculate summary by frequency for the selected role
   const frequencySummary = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayKey = getBangkokDateKey();
+    const todayMs = getBangkokMidnightTimestamp(todayKey);
     
     const createEmptyFreqSummary = () => ({
       total: 0,
@@ -384,8 +403,12 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
           summaryByFreq[freq].pendingCount++;
           
           if (item.dueDate) {
-            const itemDate = new Date(item.dueDate);
-            if (itemDate >= today && (!summaryByFreq[freq].nextPayment || itemDate < new Date(summaryByFreq[freq].nextPayment!.date))) {
+            const itemMs = getBangkokMidnightTimestamp(item.dueDate);
+            const nextPaymentMs = summaryByFreq[freq].nextPayment
+              ? getBangkokMidnightTimestamp(summaryByFreq[freq].nextPayment!.date)
+              : null;
+
+            if (itemMs >= todayMs && (nextPaymentMs === null || itemMs < nextPaymentMs)) {
               summaryByFreq[freq].nextPayment = { date: item.dueDate, amount: item.amount };
             }
           }
@@ -431,18 +454,17 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
 
   // Calculate upcoming installments within 3 days
   const upcomingInstallments = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const threeDaysLater = new Date(today);
-    threeDaysLater.setDate(today.getDate() + 3);
+    const todayKey = getBangkokDateKey();
+    const todayMs = getBangkokMidnightTimestamp(todayKey);
+    const threeDaysLaterMs = todayMs + (3 * DAY_MS);
     
     const upcoming: PaymentItem[] = [];
     
     calendarDays.forEach(day => {
       day.items.forEach(item => {
         if (item.dueDate && item.status !== "paid") {
-          const itemDate = new Date(item.dueDate);
-          if (itemDate >= today && itemDate <= threeDaysLater && item.role === roleFilter) {
+          const itemMs = getBangkokMidnightTimestamp(item.dueDate);
+          if (itemMs >= todayMs && itemMs <= threeDaysLaterMs && item.role === roleFilter) {
             upcoming.push(item);
           }
         }
@@ -450,7 +472,7 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
     });
     
     // Sort by date
-    upcoming.sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
+    upcoming.sort((a, b) => getBangkokMidnightTimestamp(a.dueDate!) - getBangkokMidnightTimestamp(b.dueDate!));
     
     return upcoming;
   }, [calendarDays, roleFilter]);
@@ -845,7 +867,7 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
                     <div key={item.id} className="flex items-center justify-between gap-2 text-sm">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span className="text-muted-foreground shrink-0">
-                          {new Date(item.dueDate!).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                          {formatBangkokDate(item.dueDate!, { day: 'numeric', month: 'short' })}
                         </span>
                         <span className="text-foreground truncate">{item.partnerName}</span>
                         {/* Status Badge */}
@@ -1222,7 +1244,7 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      ครบกำหนด: {new Date(item.dueDate!).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
+                      ครบกำหนด: {formatBangkokDate(item.dueDate!, { day: 'numeric', month: 'short', year: '2-digit' })}
                     </p>
                   </div>
 

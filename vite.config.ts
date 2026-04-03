@@ -1,41 +1,29 @@
-import { defineConfig } from "vite";
+import { defineConfig, type PluginOption } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  test: {
-    globals: true,
-    environment: "jsdom",
-    setupFiles: "./src/test/setup.ts",
-    coverage: {
-      provider: "v8",
-      reporter: ["text", "html"],
-      include: ["src/domains/**/*.ts", "src/utils/**/*.ts"],
-    },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          react: ["react", "react-dom", "react-router-dom"],
-          query: ["@tanstack/react-query", "@supabase/supabase-js"],
-          charts: ["recharts", "framer-motion"],
-          pdf: ["jspdf", "html2canvas"],
-        },
-      },
-    },
-  },
-  plugins: [
-    react(),
-    mode === "development" && componentTagger(),
-    VitePWA({
+export default defineConfig(async ({ mode }) => {
+  const plugins: PluginOption[] = [];
+  const reactPlugins = react();
+
+  if (Array.isArray(reactPlugins)) {
+    plugins.push(...reactPlugins);
+  } else {
+    plugins.push(reactPlugins);
+  }
+
+  if (mode === "development") {
+    try {
+      const { componentTagger } = await import("lovable-tagger");
+      plugins.push(componentTagger());
+    } catch {
+      // The dev-only tagger is optional in this workspace.
+    }
+  }
+
+  const pwaPlugins = VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.png", "favicon.ico", "og-image.png"],
       workbox: {
@@ -127,11 +115,47 @@ export default defineConfig(({ mode }) => ({
       devOptions: {
         enabled: false
       }
-    })
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+    });
+
+  if (Array.isArray(pwaPlugins)) {
+    plugins.push(...pwaPlugins);
+  } else {
+    plugins.push(pwaPlugins);
+  }
+
+  return {
+    server: {
+      host: "::",
+      port: 8080,
     },
-  },
-}));
+    test: {
+      globals: true,
+      environment: "jsdom",
+      setupFiles: "./src/test/setup.ts",
+      coverage: {
+        provider: "v8",
+        reporter: ["text", "html"],
+        include: ["src/domains/**/*.ts", "src/utils/**/*.ts"],
+      },
+    },
+    build: {
+      sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            react: ["react", "react-dom", "react-router-dom"],
+            query: ["@tanstack/react-query", "@supabase/supabase-js"],
+            charts: ["recharts", "framer-motion"],
+            pdf: ["jspdf", "html2canvas"],
+          },
+        },
+      },
+    },
+    plugins,
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
+    },
+  };
+});

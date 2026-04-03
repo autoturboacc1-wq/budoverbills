@@ -792,8 +792,10 @@ export type Database = {
           free_agreements_used: number
           id: string
           last_name: string | null
+          notification_preferences: Json
           pdpa_accepted_at: string | null
           phone: string | null
+          privacy_settings: Json
           theme_preference: string
           updated_at: string
           user_code: string | null
@@ -808,8 +810,10 @@ export type Database = {
           free_agreements_used?: number
           id?: string
           last_name?: string | null
+          notification_preferences?: Json
           pdpa_accepted_at?: string | null
           phone?: string | null
+          privacy_settings?: Json
           theme_preference?: string
           updated_at?: string
           user_code?: string | null
@@ -824,8 +828,10 @@ export type Database = {
           free_agreements_used?: number
           id?: string
           last_name?: string | null
+          notification_preferences?: Json
           pdpa_accepted_at?: string | null
           phone?: string | null
+          privacy_settings?: Json
           theme_preference?: string
           updated_at?: string
           user_code?: string | null

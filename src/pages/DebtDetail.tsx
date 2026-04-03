@@ -21,6 +21,7 @@ import { th } from "date-fns/locale";
 import { getUserRoleInAgreement, isInstallmentOverdue, getAgreementDisplayStatus } from "@/domains/debt";
 import { generateAgreementPDF, downloadPDF } from "@/utils/pdfExport";
 import { divideMoney, roundMoney } from "@/utils/money";
+import { PageHeader, PageSection, ReviewPanel, StatusTimeline, type StatusTimelineItem } from "@/components/ux";
 
 export default function DebtDetail() {
   const navigate = useNavigate();
@@ -345,6 +346,39 @@ export default function DebtDetail() {
     return [...unpaidInstallments, ...paidInstallments];
   }, [agreement?.installments]);
 
+  const installmentTimelineItems = useMemo<StatusTimelineItem[]>(() => {
+    return sortedInstallments.slice(0, 5).map((inst) => {
+      const status = getInstallmentStatus(inst);
+      const isFeeInstallment = inst.principal_portion === 0 && inst.amount > 0;
+
+      return {
+        id: inst.id,
+        title: isFeeInstallment ? "ค่าเลื่อนงวด" : `งวดที่ ${inst.installment_number}`,
+        description: `${formatDueDate(inst.due_date)} · ฿${inst.amount.toLocaleString()}`,
+        meta:
+          status === "paid"
+            ? "Paid"
+            : status === "overdue"
+              ? "Overdue"
+              : status === "rejected"
+                ? "Rejected"
+                : status === "pending"
+                  ? "Verifying"
+                  : "Pending",
+        status:
+          status === "paid"
+            ? "paid"
+            : status === "overdue"
+              ? "overdue"
+              : status === "rejected"
+                ? "rejected"
+                : status === "pending"
+                  ? "verifying"
+                  : "due_soon",
+      };
+    });
+  }, [sortedInstallments]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
@@ -365,24 +399,13 @@ export default function DebtDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-hero pb-8">
-      <div className="max-w-lg mx-auto px-4">
-        {/* Header */}
-        <motion.header
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-4 py-4"
-        >
-          <button
-            onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-secondary-foreground" />
-          </button>
-          <h1 className="text-xl font-heading font-semibold text-foreground">
-            รายละเอียดข้อตกลง
-          </h1>
-        </motion.header>
+    <div className="min-h-screen pb-8">
+      <div className="page-shell max-w-lg">
+        <PageHeader
+          title="รายละเอียดข้อตกลง"
+          description="ดูสถานะยอดคงเหลือ ตารางงวด หลักฐาน และคำขอที่เกี่ยวข้องในมุมมองเดียว"
+          onBack={() => navigate(-1)}
+        />
 
         {/* Partner Info */}
         <motion.div
@@ -531,6 +554,10 @@ export default function DebtDetail() {
           </div>
 
         </motion.div>
+
+        <PageSection title="Installment Timeline" description="อ่านสถานะแต่ละงวดแบบต่อเนื่องก่อนลงไปดูรายละเอียดของแต่ละรายการ">
+          <StatusTimeline items={installmentTimelineItems} />
+        </PageSection>
 
         {/* Bank Account Section */}
         <motion.div

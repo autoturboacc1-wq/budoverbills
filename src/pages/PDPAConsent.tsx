@@ -65,7 +65,7 @@ export default function PDPAConsent() {
               การคุ้มครองข้อมูลส่วนบุคคล
             </h1>
             <p className="text-muted-foreground mt-2">
-              กรุณาอ่านและยอมรับก่อนใช้งาน OnMe
+              กรุณาอ่านและยอมรับก่อนใช้งาน Bud Over Bills
             </p>
           </div>
 
@@ -92,8 +92,8 @@ export default function PDPAConsent() {
                 className="px-5 pb-4"
               >
                 <div className="text-sm text-muted-foreground space-y-3 max-h-48 overflow-y-auto">
-                  <p><strong>OnMe</strong> เป็นแพลตฟอร์มดิจิทัลที่ช่วยบันทึกและจัดการคำมั่นและข้อตกลงส่วนบุคคลระหว่างผู้ใช้งาน</p>
-                  <p>OnMe ไม่ใช่สถาบันการเงิน, ไม่ให้กู้เงิน, และไม่เป็นคนกลางในการถือหรือโอนเงิน</p>
+                  <p><strong>Bud Over Bills</strong> เป็นแพลตฟอร์มดิจิทัลที่ช่วยบันทึกและจัดการคำมั่นและข้อตกลงส่วนบุคคลระหว่างผู้ใช้งาน</p>
+                  <p>Bud Over Bills ไม่ใช่สถาบันการเงิน, ไม่ให้กู้เงิน, และไม่เป็นคนกลางในการถือหรือโอนเงิน</p>
                   <p>• ❌ ไม่รับฝากเงิน</p>
                   <p>• ❌ ไม่โอนเงินแทนผู้ใช้</p>
                   <p>• ❌ ไม่รับประกันการชำระ</p>
@@ -181,7 +181,7 @@ export default function PDPAConsent() {
               <button onClick={() => navigate("/privacy")} className="text-primary hover:underline">
                 นโยบายความเป็นส่วนตัว
               </button>{" "}
-              ของ OnMe รวมถึงยินยอมให้เก็บและประมวลผลข้อมูลส่วนบุคคลตาม PDPA
+              ของ Bud Over Bills รวมถึงยินยอมให้เก็บและประมวลผลข้อมูลส่วนบุคคลตาม PDPA
             </label>
           </div>
 
@@ -227,7 +227,7 @@ export default function PDPAConsent() {
               </Button>
 
               <p className="text-center text-xs text-muted-foreground mt-4">
-                การกดยอมรับถือว่าคุณยินยอมตามข้อกำหนดและนโยบายของ OnMe
+                การกดยอมรับถือว่าคุณยินยอมตามข้อกำหนดและนโยบายของ Bud Over Bills
               </p>
             </>
           )}

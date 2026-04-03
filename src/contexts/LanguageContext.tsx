@@ -989,6 +989,37 @@ function isLanguage(value: string | null): value is Language {
   return value !== null && languages.some((language) => language.code === value);
 }
 
+function detectBrowserLanguage(): Language | null {
+  if (typeof navigator === 'undefined') {
+    return null;
+  }
+
+  const candidates = [
+    ...(navigator.languages || []),
+    navigator.language,
+  ].filter(Boolean) as string[];
+
+  for (const candidate of candidates) {
+    const normalized = candidate.toLowerCase().replace('_', '-');
+    const exactMatch = languages.find((language) => language.code === normalized);
+    if (exactMatch) {
+      return exactMatch.code;
+    }
+
+    const baseLanguage = normalized.split('-')[0];
+    const baseMatch = languages.find((language) => language.code === baseLanguage);
+    if (baseMatch) {
+      return baseMatch.code;
+    }
+
+    if (normalized.startsWith('zh')) {
+      return 'zh';
+    }
+  }
+
+  return null;
+}
+
 function getInitialLanguage(): Language {
   if (typeof window === 'undefined') {
     return FALLBACK_LANGUAGE;
@@ -997,6 +1028,11 @@ function getInitialLanguage(): Language {
   const storedLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY);
   if (isLanguage(storedLanguage)) {
     return storedLanguage;
+  }
+
+  const browserLanguage = detectBrowserLanguage();
+  if (browserLanguage) {
+    return browserLanguage;
   }
 
   return FALLBACK_LANGUAGE;

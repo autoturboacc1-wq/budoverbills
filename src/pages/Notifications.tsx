@@ -137,7 +137,7 @@ const Notifications = () => {
             </p>
           </motion.div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2" aria-live="polite" aria-relevant="additions text">
             {notifications.map((notification, index) => (
               <motion.div
                 key={notification.id}

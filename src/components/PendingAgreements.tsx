@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Clock, ArrowRight, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DebtAgreement } from "@/hooks/useDebtAgreements";
+import { PageSection } from "@/components/ux";
 
 // Domain imports - SINGLE SOURCE OF TRUTH
 import { 
@@ -25,21 +26,16 @@ export function PendingAgreements({ agreements, userId }: PendingAgreementsProps
   if (pendingAgreements.length === 0) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mb-6"
+    <PageSection
+      title="รอการยืนยัน"
+      description="ข้อตกลงที่ต้องมีอีกฝ่ายกดยืนยันก่อนเริ่มใช้งาน"
+      action={
+        <span className="rounded-full bg-status-pending/10 px-2.5 py-1 text-xs font-semibold text-status-pending">
+          {pendingAgreements.length} รายการ
+        </span>
+      }
     >
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-6 h-6 rounded-full bg-status-pending/20 flex items-center justify-center">
-          <Bell className="w-3.5 h-3.5 text-status-pending" />
-        </div>
-        <h2 className="font-heading font-semibold text-foreground">
-          รอการยืนยัน ({pendingAgreements.length})
-        </h2>
-      </div>
-
-      <div className="space-y-3">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
         {pendingAgreements.map((agreement, index) => {
           // Use domain functions instead of direct comparisons
           const isLender = isUserLender(agreement, userId);
@@ -56,7 +52,7 @@ export function PendingAgreements({ agreements, userId }: PendingAgreementsProps
               className={`rounded-xl p-4 cursor-pointer transition-all ${
                 needsMyConfirmation 
                   ? "bg-status-pending/10 border-2 border-status-pending/30 hover:border-status-pending/50" 
-                  : "bg-card border border-border hover:shadow-card"
+                  : "bg-secondary/35 border border-border hover:shadow-card"
               }`}
             >
               <div className="flex items-center justify-between">
@@ -87,7 +83,7 @@ export function PendingAgreements({ agreements, userId }: PendingAgreementsProps
             </motion.div>
           );
         })}
-      </div>
-    </motion.div>
+      </motion.div>
+    </PageSection>
   );
 }

@@ -25,11 +25,29 @@ const empathyConfig: Record<Status, {
     icon: Clock,
     colorClass: "text-status-pending",
   },
+  due_soon: {
+    message: "ใกล้ครบกำหนดแล้ว เตรียมตัวไว้ก่อนนะ",
+    subMessage: "วางแผนล่วงหน้านิดเดียว จะช่วยให้จัดการได้สบายขึ้น",
+    icon: Clock,
+    colorClass: "text-amber-600",
+  },
   overdue: {
     message: "เราเข้าใจ ค่อยๆ จัดการนะ 💙",
     subMessage: "ทุกคนมีช่วงเวลาที่ยากลำบาก เราอยู่ข้างคุณ",
     icon: HandHeart,
     colorClass: "text-status-overdue",
+  },
+  verifying: {
+    message: "กำลังตรวจสอบให้เรียบร้อย",
+    subMessage: "รอสักครู่ เมื่อเสร็จแล้วจะแจ้งให้ทราบทันที",
+    icon: Clock,
+    colorClass: "text-primary",
+  },
+  rejected: {
+    message: "ยังต้องแก้ไขอีกนิดนะ",
+    subMessage: "ตรวจสอบรายละเอียดแล้วลองส่งใหม่อีกครั้งได้เลย",
+    icon: MessageCircleHeart,
+    colorClass: "text-destructive",
   },
   negotiating: {
     message: "กำลังหาทางออกร่วมกัน",

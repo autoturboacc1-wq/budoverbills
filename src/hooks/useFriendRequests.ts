@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, createElement, useState, useEffect, useCallback, useRef, useContext, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -32,7 +32,21 @@ export interface FriendRequest {
   };
 }
 
-export function useFriendRequests() {
+interface FriendRequestsContextValue {
+  incomingRequests: FriendRequest[];
+  outgoingRequests: FriendRequest[];
+  isLoading: boolean;
+  sendRequest: (toUserId: string) => Promise<boolean>;
+  acceptRequest: (requestId: string) => Promise<boolean>;
+  rejectRequest: (requestId: string) => Promise<boolean>;
+  cancelRequest: (requestId: string) => Promise<boolean>;
+  refresh: () => Promise<void>;
+  pendingCount: number;
+}
+
+const FriendRequestsContext = createContext<FriendRequestsContextValue | undefined>(undefined);
+
+function useFriendRequestsState(): FriendRequestsContextValue {
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -318,4 +332,20 @@ export function useFriendRequests() {
     refresh: fetchRequests,
     pendingCount: incomingRequests.length,
   };
+}
+
+export function FriendRequestsProvider({ children }: { children: ReactNode }) {
+  const value = useFriendRequestsState();
+
+  return createElement(FriendRequestsContext.Provider, { value }, children);
+}
+
+export function useFriendRequests() {
+  const context = useContext(FriendRequestsContext);
+
+  if (!context) {
+    throw new Error('useFriendRequests must be used within a FriendRequestsProvider');
+  }
+
+  return context;
 }

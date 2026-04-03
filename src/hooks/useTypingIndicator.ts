@@ -15,9 +15,22 @@ export function useTypingIndicator(chatId: string | undefined, isDirectChat: boo
   const counterpartyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingRef = useRef<number>(0);
   const requestIdRef = useRef(0);
+  const latestTargetRef = useRef<{ chatId?: string; filterColumn: 'agreement_id' | 'direct_chat_id'; userId?: string | null }>({
+    chatId,
+    filterColumn: isDirectChat ? 'direct_chat_id' : 'agreement_id',
+    userId: user?.id ?? null,
+  });
 
   // Determine filter column based on chat type
   const filterColumn = isDirectChat ? 'direct_chat_id' : 'agreement_id';
+
+  useEffect(() => {
+    latestTargetRef.current = {
+      chatId,
+      filterColumn,
+      userId: user?.id ?? null,
+    };
+  }, [chatId, filterColumn, user?.id]);
 
   const clearCounterpartyResetTimer = useCallback(() => {
     if (counterpartyResetTimeoutRef.current) {
@@ -118,50 +131,33 @@ export function useTypingIndicator(chatId: string | undefined, isDirectChat: boo
     lastTypingRef.current = now;
 
     try {
-      // For direct chats, we need to handle the unique constraint differently
-      // First try to find existing record
-      const { data: existing } = await supabase
-        .from('chat_typing')
-        .select('id')
-      .eq(filterColumn, chatId)
-      .eq('user_id', user.id)
-      .maybeSingle();
+      const payload = {
+        user_id: user.id,
+        is_typing: isTyping,
+        updated_at: new Date().toISOString(),
+        agreement_id: isDirectChat ? null : chatId,
+        direct_chat_id: isDirectChat ? chatId : null,
+      };
 
-      if (existing) {
-        // Update existing
+      if (isDirectChat) {
         await supabase
           .from('chat_typing')
-          .update({
-            is_typing: isTyping,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id);
+          .upsert(payload, {
+            onConflict: 'direct_chat_id,user_id',
+            ignoreDuplicates: false,
+          });
       } else {
-        // Insert new - build proper typed object
-        if (isDirectChat) {
-          await supabase
-            .from('chat_typing')
-            .insert({
-              direct_chat_id: chatId,
-              user_id: user.id,
-              is_typing: isTyping,
-              updated_at: new Date().toISOString(),
-            });
-        } else {
-          await supabase
-            .from('chat_typing')
-            .insert({
-              agreement_id: chatId,
-              user_id: user.id,
-              is_typing: isTyping,
-              updated_at: new Date().toISOString(),
-            });
-        }
+        await supabase
+          .from('chat_typing')
+          .upsert(payload, {
+            onConflict: 'agreement_id,user_id',
+            ignoreDuplicates: false,
+          });
       }
     } catch (error) {
       console.error('Error sending typing status:', error);
     }
-  }, [chatId, user, isDirectChat, filterColumn]);
+  }, [chatId, user, isDirectChat]);
 
   // Called when user starts typing
   const startTyping = useCallback(() => {
@@ -191,21 +187,23 @@ export function useTypingIndicator(chatId: string | undefined, isDirectChat: boo
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      const { chatId: previousChatId, filterColumn: previousFilterColumn, userId: previousUserId } = latestTargetRef.current;
+
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = null;
       }
       clearCounterpartyResetTimer();
       // Reset typing status when leaving chat
-      if (chatId && user) {
+      if (previousChatId && previousUserId) {
         supabase
           .from('chat_typing')
           .delete()
-          .eq(filterColumn, chatId)
-          .eq('user_id', user.id);
+          .eq(previousFilterColumn, previousChatId)
+          .eq('user_id', previousUserId);
       }
     };
-  }, [chatId, user, filterColumn, clearCounterpartyResetTimer]);
+  }, [clearCounterpartyResetTimer]);
 
   return {
     isCounterpartyTyping,

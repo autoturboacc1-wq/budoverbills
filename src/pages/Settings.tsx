@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   ArrowLeft, 
   Bell, 
@@ -37,6 +37,9 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ThemePicker } from "@/components/ThemePicker";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { PageHeader, PageSection } from "@/components/ux";
 
 interface SettingsState {
   notifications: {
@@ -110,13 +113,19 @@ function getInitialSettings(): SettingsState {
   }
 }
 
+function sanitizeSettingsState(value: unknown): SettingsState | null {
+  return isSettingsState(value) ? value : null;
+}
+
 export default function Settings() {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const { limits, isPremium, isLoading: subscriptionLoading, isTrial, trialDaysRemaining, hasUsedTrial, startTrial, isStartingTrial } = useSubscription();
   const [mounted, setMounted] = useState(false);
   const [settings, setSettings] = useState<SettingsState>(getInitialSettings);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   // Avoid hydration mismatch
   useEffect(() => {
     setMounted(true);
@@ -127,19 +136,104 @@ export default function Settings() {
     localStorage.setItem("app-settings", JSON.stringify(settings));
   }, [settings]);
 
+  useEffect(() => {
+    if (!user?.id) {
+      setSettingsLoaded(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadPersistedSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("notification_preferences, privacy_settings")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (error || !data || cancelled) {
+          return;
+        }
+
+        setSettings((previous) => ({
+          ...previous,
+          notifications: sanitizeSettingsState({
+            notifications: data.notification_preferences,
+            privacy: previous.privacy,
+            appearance: previous.appearance,
+          })?.notifications ?? previous.notifications,
+          privacy: sanitizeSettingsState({
+            notifications: previous.notifications,
+            privacy: data.privacy_settings,
+            appearance: previous.appearance,
+          })?.privacy ?? previous.privacy,
+        }));
+      } catch (error) {
+        console.error("Failed to load persisted settings:", error);
+      } finally {
+        if (!cancelled) {
+          setSettingsLoaded(true);
+        }
+      }
+    };
+
+    void loadPersistedSettings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const persistSettings = async (nextSettings: SettingsState) => {
+    if (!user?.id) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        notification_preferences: nextSettings.notifications,
+        privacy_settings: nextSettings.privacy,
+      })
+      .eq("user_id", user.id);
+
+    if (error) {
+      throw error;
+    }
+  };
+
   const updateNotification = (key: keyof SettingsState["notifications"], value: boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      notifications: { ...prev.notifications, [key]: value },
-    }));
+    setSettings(prev => {
+      const nextSettings = {
+        ...prev,
+        notifications: { ...prev.notifications, [key]: value },
+      };
+
+      void persistSettings(nextSettings).catch((error) => {
+        console.error("Failed to persist notification settings:", error);
+        toast.error("บันทึกการตั้งค่าไม่สำเร็จ");
+      });
+
+      return nextSettings;
+    });
     toast.success("บันทึกการตั้งค่าแล้ว");
   };
 
   const updatePrivacy = (key: keyof SettingsState["privacy"], value: boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      privacy: { ...prev.privacy, [key]: value },
-    }));
+    setSettings(prev => {
+      const nextSettings = {
+        ...prev,
+        privacy: { ...prev.privacy, [key]: value },
+      };
+
+      void persistSettings(nextSettings).catch((error) => {
+        console.error("Failed to persist privacy settings:", error);
+        toast.error("บันทึกการตั้งค่าไม่สำเร็จ");
+      });
+
+      return nextSettings;
+    });
     toast.success("บันทึกการตั้งค่าแล้ว");
   };
 
@@ -150,43 +244,34 @@ export default function Settings() {
   };
 
   const isDarkMode = mounted && theme === "dark";
+  const usagePercent = useMemo(() => {
+    if (!limits || limits.agreements_limit <= 0) {
+      return 0;
+    }
+
+    return Math.min(100, Math.round((limits.agreements_used / limits.agreements_limit) * 100));
+  }, [limits]);
 
   return (
-    <div className="min-h-screen bg-gradient-hero pb-24">
-      <div className="max-w-lg mx-auto px-4">
-        {/* Header */}
-        <motion.header
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-4 py-4"
-        >
-          <button
-            onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
-            aria-label="ย้อนกลับ"
-          >
-            <ArrowLeft className="w-5 h-5 text-secondary-foreground" />
-          </button>
-          <h1 className="text-xl font-heading font-semibold text-foreground">
-            {t('profile.settings')}
-          </h1>
-        </motion.header>
+    <div className="min-h-screen pb-24">
+      <div className="page-shell max-w-lg">
+        <PageHeader
+          title={t('profile.settings')}
+          description="จัดการการแจ้งเตือน ความเป็นส่วนตัว การแสดงผล และสิทธิ์การใช้งานในหน้าเดียว"
+          onBack={() => navigate(-1)}
+        />
 
-        {/* Notifications Section */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-card rounded-2xl shadow-card overflow-hidden mb-6"
+          className="mb-6"
         >
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center gap-3">
-              <Bell className="w-5 h-5 text-primary" />
-              <h2 className="font-medium text-foreground">{t('profile.notifications')}</h2>
-            </div>
-          </div>
-          
-          <div className="divide-y divide-border">
+          <PageSection
+            title="Notifications"
+            description="การแจ้งเตือนบางรายการบันทึกบนอุปกรณ์นี้ ขณะที่ push notification ผูกกับสิทธิ์ของเบราว์เซอร์"
+          >
+            <div className="divide-y divide-border rounded-2xl border border-border/70">
             <div className="p-4">
               <PushNotificationToggle />
             </div>
@@ -202,6 +287,7 @@ export default function Settings() {
               <Switch
                 checked={settings.notifications.email}
                 onCheckedChange={(v) => updateNotification("email", v)}
+                disabled={!settingsLoaded}
               />
             </div>
 
@@ -216,6 +302,7 @@ export default function Settings() {
               <Switch
                 checked={settings.notifications.paymentReminders}
                 onCheckedChange={(v) => updateNotification("paymentReminders", v)}
+                disabled={!settingsLoaded}
               />
             </div>
 
@@ -230,26 +317,24 @@ export default function Settings() {
               <Switch
                 checked={settings.notifications.agreementUpdates}
                 onCheckedChange={(v) => updateNotification("agreementUpdates", v)}
+                disabled={!settingsLoaded}
               />
             </div>
-          </div>
+            </div>
+          </PageSection>
         </motion.section>
 
-        {/* Privacy Section */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-card rounded-2xl shadow-card overflow-hidden mb-6"
+          className="mb-6"
         >
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center gap-3">
-              <Shield className="w-5 h-5 text-primary" />
-              <h2 className="font-medium text-foreground">{t('profile.privacy')}</h2>
-            </div>
-          </div>
-          
-          <div className="divide-y divide-border">
+          <PageSection
+            title="Privacy"
+            description="การตั้งค่าส่วนนี้บันทึกในอุปกรณ์ปัจจุบันและใช้ควบคุมวิธีแสดงข้อมูลใน UI"
+          >
+            <div className="divide-y divide-border rounded-2xl border border-border/70">
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
                 {settings.privacy.showProfile ? (
@@ -265,6 +350,7 @@ export default function Settings() {
               <Switch
                 checked={settings.privacy.showProfile}
                 onCheckedChange={(v) => updatePrivacy("showProfile", v)}
+                disabled={!settingsLoaded}
               />
             </div>
 
@@ -283,26 +369,24 @@ export default function Settings() {
               <Switch
                 checked={settings.privacy.showActivity}
                 onCheckedChange={(v) => updatePrivacy("showActivity", v)}
+                disabled={!settingsLoaded}
               />
             </div>
-          </div>
+            </div>
+          </PageSection>
         </motion.section>
 
-        {/* Appearance Section */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
-          className="bg-card rounded-2xl shadow-card overflow-hidden mb-6"
+          className="mb-6"
         >
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center gap-3">
-              <Palette className="w-5 h-5 text-primary" />
-              <h2 className="font-medium text-foreground">ธีมและการแสดงผล</h2>
-            </div>
-          </div>
-          
-          <div className="divide-y divide-border">
+          <PageSection
+            title="Appearance"
+            description="โหมดมืดและธีมสีจะซิงก์ตามบัญชีเมื่อเป็นการตั้งค่าที่รองรับ"
+          >
+            <div className="divide-y divide-border rounded-2xl border border-border/70">
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
                 {isDarkMode ? (
@@ -324,24 +408,50 @@ export default function Settings() {
             <div className="p-4">
               <ThemePicker />
             </div>
-          </div>
+            </div>
+          </PageSection>
         </motion.section>
-
 
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-card rounded-2xl shadow-card overflow-hidden mb-6"
+          className="mb-6"
         >
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center gap-3">
-              <FileText className="w-5 h-5 text-primary" />
-              <h2 className="font-medium text-foreground">ข้อมูลทางกฎหมาย</h2>
+          <PageSection
+            title="Plan & Billing"
+            description="ตรวจสอบสถานะแพ็กเกจ สิทธิ์ทดลองใช้ และเอกสารด้านกฎหมายในส่วนเดียว"
+          >
+            <div className="rounded-2xl border border-border/70 bg-secondary/35 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {isPremium ? "Premium" : isTrial ? "Trial" : "Free"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {subscriptionLoading
+                      ? "กำลังตรวจสอบสถานะ"
+                      : isPremium
+                        ? "คุณใช้สิทธิ์แบบพรีเมียมอยู่"
+                        : isTrial
+                          ? `ทดลองใช้อีก ${trialDaysRemaining ?? 0} วัน`
+                          : "บัญชีใช้งานฟรี"}
+                  </p>
+                </div>
+                {!isPremium && !isTrial && !hasUsedTrial ? (
+                  <Button
+                    size="sm"
+                    onClick={() => void startTrial()}
+                    disabled={isStartingTrial}
+                  >
+                    {isStartingTrial ? "กำลังเริ่มทดลองใช้..." : "เริ่ม Trial"}
+                  </Button>
+                ) : null}
+              </div>
+              <Progress value={usagePercent} className="h-2" />
             </div>
-          </div>
-          
-          <div className="divide-y divide-border">
+
+            <div className="divide-y divide-border rounded-2xl border border-border/70">
             <Link
               to="/terms"
               className="flex items-center justify-between p-4 hover:bg-secondary/50 transition-colors"
@@ -374,18 +484,18 @@ export default function Settings() {
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </Link>
-          </div>
+            </div>
+          </PageSection>
         </motion.section>
 
-        {/* Info Note */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="bg-primary/5 rounded-xl p-4 border border-primary/10"
+          className="surface-panel"
         >
           <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">🔒 ความเป็นส่วนตัว: </span>
+            <span className="font-medium text-foreground">ความเป็นส่วนตัว: </span>
             ข้อมูลหนี้ของคุณจะแสดงเฉพาะระหว่างคู่สัญญาเท่านั้น ไม่มีใครอื่นสามารถเห็นได้
           </p>
         </motion.div>

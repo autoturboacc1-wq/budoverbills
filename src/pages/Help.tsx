@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, Calculator, BookOpen, HelpCircle, ChevronRight, Percent, Calendar, Users, FileText, CreditCard, Clock, RefreshCw, Shield, MessageCircle, CalendarCheck, Building2, UserCog } from "lucide-react";
+import { ArrowLeft, Calculator, BookOpen, HelpCircle, ChevronRight, Percent, Users, FileText, CreditCard, Clock, RefreshCw, Shield, MessageCircle, CalendarCheck, Building2, UserCog } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
 import { useState } from "react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Accordion,
   AccordionContent,
@@ -210,7 +211,7 @@ const financeArticles: HelpArticle[] = [
     title: "การคำนวณงวดชำระ",
     content: (
       <div className="space-y-4 text-sm text-muted-foreground">
-        <p>BOB ช่วยคำนวณงวดให้อัตโนมัติตามประเภทดอกเบี้ยที่เลือก</p>
+        <p>Bud Over Bills ช่วยคำนวณงวดให้อัตโนมัติตามประเภทดอกเบี้ยที่เลือก</p>
         
         <div>
           <h4 className="font-medium text-foreground mb-2">📐 สูตรคำนวณดอกเบี้ยคงที่</h4>
@@ -541,7 +542,7 @@ const faqArticles: HelpArticle[] = [
     title: "ข้อมูลปลอดภัยไหม?",
     content: (
       <div className="space-y-3 text-sm text-muted-foreground">
-        <p>BOB ใช้มาตรฐานความปลอดภัยระดับธนาคาร:</p>
+        <p>Bud Over Bills ใช้มาตรฐานความปลอดภัยระดับธนาคาร:</p>
         <ul className="space-y-2">
           <li>• การเข้ารหัสข้อมูลแบบ End-to-end</li>
           <li>• ไม่เก็บรหัสผ่านเป็น plain text</li>
@@ -593,7 +594,65 @@ const categoryInfo = {
 
 export default function Help() {
   const navigate = useNavigate();
+  const { language } = useLanguage();
   const [selectedCategory, setSelectedCategory] = useState<HelpCategory>(null);
+  const copy = language === "th"
+    ? {
+        title: "ช่วยเหลือ",
+        subtitle: "ความรู้และคู่มือการใช้งาน",
+        categories: {
+          finance: { title: "ความรู้การเงิน", description: "เรียนรู้เกี่ยวกับดอกเบี้ยและการคำนวณ" },
+          guide: { title: "คู่มือใช้งาน", description: "วิธีใช้งานฟีเจอร์ต่างๆ" },
+          faq: { title: "คำถามที่พบบ่อย", description: "คำตอบสำหรับคำถามทั่วไป" },
+        },
+        articleCount: "บทความ",
+        articleTitles: {
+          "interest-types": "ดอกเบี้ยคงที่ vs ลดต้นลดดอก",
+          "borrower-tips": "เคล็ดลับสำหรับผู้ยืม",
+          "installment-calculation": "การคำนวณงวดชำระ",
+          "reschedule-fee": "ค่าธรรมเนียมเลื่อนนัด",
+          "create-agreement": "วิธีสร้างข้อตกลง",
+          "confirm-payment": "วิธียืนยันการชำระ",
+          "add-friend": "วิธีเพิ่มเพื่อน",
+          "reschedule-request": "วิธีขอเลื่อนนัด",
+          "calendar-usage": "วิธีดูปฏิทินชำระ",
+          "bank-account-setup": "วิธีตั้งค่าบัญชีธนาคาร",
+          "edit-profile": "วิธีแก้ไขโปรไฟล์",
+          "forgot-password": "ลืมรหัสผ่าน ทำอย่างไร?",
+          "edit-agreement": "แก้ไขข้อตกลงได้ไหม?",
+          "contact-support": "ติดต่อทีมงานอย่างไร?",
+          "data-security": "ข้อมูลปลอดภัยไหม?",
+          "subscription-benefits": "สมัครสมาชิกได้อะไรบ้าง?",
+        },
+      }
+    : {
+        title: "Help",
+        subtitle: "Guides and support",
+        categories: {
+          finance: { title: "Finance", description: "Learn about interest and calculations" },
+          guide: { title: "How To", description: "How to use the app features" },
+          faq: { title: "FAQ", description: "Answers to common questions" },
+        },
+        articleCount: "articles",
+        articleTitles: {
+          "interest-types": "Fixed vs reducing balance interest",
+          "borrower-tips": "Tips for borrowers",
+          "installment-calculation": "Installment calculations",
+          "reschedule-fee": "Reschedule fees",
+          "create-agreement": "How to create an agreement",
+          "confirm-payment": "How to confirm payment",
+          "add-friend": "How to add a friend",
+          "reschedule-request": "How to request a reschedule",
+          "calendar-usage": "How to use the payment calendar",
+          "bank-account-setup": "How to set up a bank account",
+          "edit-profile": "How to edit your profile",
+          "forgot-password": "Forgot your password?",
+          "edit-agreement": "Can I edit an agreement?",
+          "contact-support": "How do I contact the team?",
+          "data-security": "Is my data safe?",
+          "subscription-benefits": "What do I get with a subscription?",
+        },
+      };
 
   const handleBack = () => {
     if (selectedCategory) {
@@ -622,10 +681,10 @@ export default function Help() {
           </button>
           <div>
             <h1 className="text-xl font-heading font-semibold text-foreground">
-              {selectedCategory ? categoryInfo[selectedCategory].title : "ช่วยเหลือ"}
+          {selectedCategory ? copy.categories[selectedCategory].title : copy.title}
             </h1>
             <p className="text-sm text-muted-foreground">
-              {selectedCategory ? categoryInfo[selectedCategory].description : "ความรู้และคู่มือการใช้งาน"}
+              {selectedCategory ? copy.categories[selectedCategory].description : copy.subtitle}
             </p>
           </div>
         </motion.header>
@@ -635,6 +694,7 @@ export default function Help() {
           <div className="space-y-4">
             {(Object.keys(categoryInfo) as HelpCategory[]).filter(Boolean).map((key, index) => {
               const category = categoryInfo[key!];
+              const categoryKey = key as keyof typeof copy.categories;
               return (
                 <motion.button
                   key={key}
@@ -651,13 +711,13 @@ export default function Help() {
                       </div>
                       <div>
                         <p className="font-heading font-semibold text-foreground">
-                          {category.title}
+                          {copy.categories[categoryKey].title}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {category.description}
+                          {copy.categories[categoryKey].description}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {category.articles.length} บทความ
+                          {category.articles.length} {copy.articleCount}
                         </p>
                       </div>
                     </div>
@@ -693,7 +753,7 @@ export default function Help() {
                           {article.icon}
                         </div>
                         <span className="font-medium text-foreground">
-                          {article.title}
+                          {copy.articleTitles[article.id as keyof typeof copy.articleTitles] || article.title}
                         </span>
                       </div>
                     </AccordionTrigger>

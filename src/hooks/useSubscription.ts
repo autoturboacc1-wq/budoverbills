@@ -32,6 +32,15 @@ function getTotalAvailable(freeRemaining: number, credits: number, totalAvailabl
   return Math.max(0, freeRemaining + credits);
 }
 
+function parseFutureDate(value: string | null | undefined): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export function useSubscription() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -63,8 +72,8 @@ export function useSubscription() {
           fee_amount: number;
           fee_currency: string;
         };
-        return {
-          can_create_free: result.can_create_free,
+      return {
+        can_create_free: result.can_create_free,
           free_used: result.free_used,
           free_limit: result.free_limit,
           free_remaining: result.free_remaining,
@@ -77,12 +86,12 @@ export function useSubscription() {
 
       // Default values
       return {
-        can_create_free: true,
+        can_create_free: false,
         free_used: 0,
         free_limit: 2,
-        free_remaining: 2,
+        free_remaining: 0,
         credits: 0,
-        total_available: 2,
+        total_available: 0,
         fee_amount: 29,
         fee_currency: 'THB',
       };
@@ -196,17 +205,15 @@ export function useSubscription() {
 
   // Backwards compatibility
   const isPremium = false; // No longer using premium tier
-  const isTrial = subscriptionInfo?.is_trial ?? false;
-  const trialEndsAt = subscriptionInfo?.trial_ends_at 
-    ? new Date(subscriptionInfo.trial_ends_at) 
-    : null;
+  const trialEndsAt = parseFutureDate(subscriptionInfo?.trial_ends_at);
+  const isTrial = Boolean(subscriptionInfo?.is_trial && trialEndsAt && trialEndsAt.getTime() > Date.now());
   
   const trialDaysRemaining = trialEndsAt 
-    ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    ? Math.max(0, Math.floor((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
 
   const hasUsedTrial = Boolean(
-    subscriptionInfo?.is_trial || subscriptionInfo?.trial_ends_at || subscriptionInfo?.expires_at,
+    subscriptionInfo?.is_trial || subscriptionInfo?.trial_ends_at,
   );
 
   return {

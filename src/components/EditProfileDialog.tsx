@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AvatarUpload } from "@/components/AvatarUpload";
+import { getThaiPhoneError, normalizeDigits } from "@/lib/validation";
 
 interface EditProfileDialogProps {
   currentAvatarUrl?: string | null;
@@ -39,6 +40,7 @@ export function EditProfileDialog({
   const [newLastName, setNewLastName] = useState(lastName || "");
   const [newPhone, setNewPhone] = useState(phone || "");
   const [isSaving, setIsSaving] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   // Sync state when props change
   useEffect(() => {
@@ -47,11 +49,19 @@ export function EditProfileDialog({
       setNewFirstName(firstName || "");
       setNewLastName(lastName || "");
       setNewPhone(phone || "");
+      setPhoneError(null);
     }
   }, [open, displayName, firstName, lastName, phone]);
 
   const handleSave = async () => {
     if (!user?.id || !newName.trim()) return;
+
+    const phoneValidationError = getThaiPhoneError(newPhone);
+    if (phoneValidationError) {
+      setPhoneError(phoneValidationError);
+      toast.error(phoneValidationError);
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -61,7 +71,7 @@ export function EditProfileDialog({
           display_name: newName.trim(),
           first_name: newFirstName.trim() || null,
           last_name: newLastName.trim() || null,
-          phone: newPhone.trim() || null,
+          phone: normalizeDigits(newPhone) || null,
         })
         .eq('user_id', user.id);
 
@@ -150,11 +160,19 @@ export function EditProfileDialog({
               id="phone"
               type="tel"
               value={newPhone}
-              onChange={(e) => setNewPhone(e.target.value)}
+              onChange={(e) => {
+                setNewPhone(e.target.value);
+                setPhoneError(null);
+              }}
               placeholder="0812345678"
               maxLength={15}
+              inputMode="numeric"
               autoComplete="tel"
+              aria-invalid={Boolean(phoneError)}
             />
+            {phoneError ? (
+              <p className="text-xs text-destructive">{phoneError}</p>
+            ) : null}
           </div>
         </div>
 

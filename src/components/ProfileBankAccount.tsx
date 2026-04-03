@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { THAI_BANKS } from "@/constants/thaibanks";
 import { useAuth } from "@/contexts/AuthContext";
+import { getBankAccountError, normalizeBankAccountForStorage } from "@/lib/validation";
 
 interface BankAccountData {
   bank_name: string | null;
@@ -40,6 +41,7 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
     accountNumber: "",
     accountName: "",
   });
+  const [accountError, setAccountError] = useState<string | null>(null);
 
   // Fetch bank account from the most recent agreement where user is lender
   const fetchBankAccount = useCallback(async () => {
@@ -86,7 +88,16 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
     }
 
     if (!formData.bankName || !formData.accountNumber || !formData.accountName) {
-      toast.error("กรุณากรอกข้อมูลให้ครบ");
+      const message = "กรุณากรอกข้อมูลให้ครบ";
+      setAccountError(message);
+      toast.error(message);
+      return;
+    }
+
+    const validationError = getBankAccountError(formData.bankName, formData.accountNumber);
+    if (validationError) {
+      setAccountError(validationError);
+      toast.error(validationError);
       return;
     }
 
@@ -97,7 +108,7 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
         .from("debt_agreements")
         .update({
           bank_name: formData.bankName,
-          account_number: formData.accountNumber,
+          account_number: normalizeBankAccountForStorage(formData.bankName, formData.accountNumber),
           account_name: formData.accountName,
         })
         .eq("lender_id", user.id)
@@ -111,11 +122,12 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
 
       setBankData({
         bank_name: formData.bankName,
-        account_number: formData.accountNumber,
+        account_number: normalizeBankAccountForStorage(formData.bankName, formData.accountNumber),
         account_name: formData.accountName,
       });
 
       toast.success("อัปเดตบัญชีรับเงินแล้ว");
+      setAccountError(null);
       setIsEditing(false);
     } catch (error) {
       console.error("Error updating bank account:", error);
@@ -151,6 +163,7 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
       accountNumber: bankData?.account_number || "",
       accountName: bankData?.account_name || "",
     });
+    setAccountError(null);
     setIsEditing(true);
   };
 
@@ -234,9 +247,10 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
               <Label>ธนาคาร</Label>
               <Select
                 value={formData.bankName}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, bankName: value })
-                }
+                onValueChange={(value) => {
+                  setFormData({ ...formData, bankName: value });
+                  setAccountError(null);
+                }}
               >
                 <SelectTrigger className="rounded-xl">
                   <SelectValue placeholder="เลือกธนาคาร" />
@@ -259,24 +273,30 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
               </Label>
               <Input
                 value={formData.accountNumber}
-                onChange={(e) =>
-                  setFormData({ ...formData, accountNumber: e.target.value })
-                }
+                onChange={(e) => {
+                  setFormData({ ...formData, accountNumber: e.target.value });
+                  setAccountError(null);
+                }}
                 placeholder={
                   formData.bankName === "promptpay"
                     ? "0812345678"
                     : "123-4-56789-0"
                 }
+                inputMode="numeric"
               />
             </div>
+            {accountError ? (
+              <p className="text-xs text-destructive -mt-2">{accountError}</p>
+            ) : null}
 
             <div className="space-y-2">
               <Label>ชื่อบัญชี</Label>
               <Input
                 value={formData.accountName}
-                onChange={(e) =>
-                  setFormData({ ...formData, accountName: e.target.value })
-                }
+                onChange={(e) => {
+                  setFormData({ ...formData, accountName: e.target.value });
+                  setAccountError(null);
+                }}
                 placeholder="ชื่อ-นามสกุล ตามบัญชี"
               />
             </div>
@@ -285,7 +305,10 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => setIsEditing(false)}
+                onClick={() => {
+                  setAccountError(null);
+                  setIsEditing(false);
+                }}
                 disabled={isSubmitting}
               >
                 <X className="w-4 h-4 mr-1" />
