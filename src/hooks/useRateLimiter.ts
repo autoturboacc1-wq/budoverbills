@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface RateLimitConfig {
   maxAttempts: number;
@@ -18,27 +19,71 @@ const defaultConfig: RateLimitConfig = {
   blockDurationMs: 5 * 60 * 1000, // 5 minute block
 };
 
-// Global store for rate limiting across components
+// Global store for rate limiting across components.
+// Keys are scoped per authenticated user or anonymous browser session.
 const rateLimitStore: Map<string, RateLimitState> = new Map();
+const ANONYMOUS_SCOPE_STORAGE_KEY = 'rate_limiter_anonymous_scope';
+
+function createAnonymousScope(forceNew = false): string {
+  if (typeof window === 'undefined') {
+    return 'anonymous';
+  }
+
+  if (forceNew) {
+    window.sessionStorage.removeItem(ANONYMOUS_SCOPE_STORAGE_KEY);
+  }
+
+  const existingScope = window.sessionStorage.getItem(ANONYMOUS_SCOPE_STORAGE_KEY);
+  if (existingScope) {
+    return existingScope;
+  }
+
+  const nextScope =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  window.sessionStorage.setItem(ANONYMOUS_SCOPE_STORAGE_KEY, nextScope);
+  return nextScope;
+}
 
 export function useRateLimiter(key: string, config: Partial<RateLimitConfig> = {}) {
-  const finalConfig = { ...defaultConfig, ...config };
+  const { user } = useAuth();
+  const maxAttempts = config.maxAttempts ?? defaultConfig.maxAttempts;
+  const windowMs = config.windowMs ?? defaultConfig.windowMs;
+  const blockDurationMs = config.blockDurationMs ?? defaultConfig.blockDurationMs;
+  const [anonymousScope, setAnonymousScope] = useState(() => createAnonymousScope());
   const [isBlocked, setIsBlocked] = useState(false);
-  const [remainingAttempts, setRemainingAttempts] = useState(finalConfig.maxAttempts);
+  const [remainingAttempts, setRemainingAttempts] = useState(maxAttempts);
   const [blockTimeRemaining, setBlockTimeRemaining] = useState(0);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previousUserIdRef = useRef<string | null>(user?.id ?? null);
+
+  useEffect(() => {
+    const currentUserId = user?.id ?? null;
+    const previousUserId = previousUserIdRef.current;
+
+    if (previousUserId && !currentUserId) {
+      setAnonymousScope(createAnonymousScope(true));
+    }
+
+    previousUserIdRef.current = currentUserId;
+  }, [user?.id]);
+
+  const scope = user?.id ?? anonymousScope;
+  const scopedKey = `${scope}:${key}`;
 
   const getState = useCallback((): RateLimitState => {
-    return rateLimitStore.get(key) || {
+    return rateLimitStore.get(scopedKey) || {
       attempts: 0,
       firstAttemptTime: null,
       blockedUntil: null,
     };
-  }, [key]);
+  }, [scopedKey]);
 
   const setState = useCallback((state: RateLimitState) => {
-    rateLimitStore.set(key, state);
-  }, [key]);
+    rateLimitStore.set(scopedKey, state);
+  }, [scopedKey]);
 
   const clearBlockTimer = useCallback(() => {
     if (intervalRef.current) {
@@ -58,7 +103,7 @@ export function useRateLimiter(key: string, config: Partial<RateLimitConfig> = {
       if (remaining <= 0) {
         clearBlockTimer();
         setIsBlocked(false);
-        setRemainingAttempts(finalConfig.maxAttempts);
+        setRemainingAttempts(maxAttempts);
         setState({
           attempts: 0,
           firstAttemptTime: null,
@@ -69,7 +114,33 @@ export function useRateLimiter(key: string, config: Partial<RateLimitConfig> = {
 
     updateRemaining();
     intervalRef.current = setInterval(updateRemaining, 1000);
-  }, [clearBlockTimer, finalConfig.maxAttempts, setState]);
+  }, [clearBlockTimer, maxAttempts, setState]);
+
+  useEffect(() => {
+    const state = getState();
+    const now = Date.now();
+
+    if (state.blockedUntil && now < state.blockedUntil) {
+      setIsBlocked(true);
+      setRemainingAttempts(0);
+      startBlockTimer(state.blockedUntil);
+      return clearBlockTimer;
+    }
+
+    if (state.blockedUntil && now >= state.blockedUntil) {
+      setState({
+        attempts: 0,
+        firstAttemptTime: null,
+        blockedUntil: null,
+      });
+    }
+
+    setIsBlocked(false);
+    setBlockTimeRemaining(0);
+    setRemainingAttempts(Math.max(0, maxAttempts - state.attempts));
+
+    return clearBlockTimer;
+  }, [clearBlockTimer, getState, maxAttempts, setState, startBlockTimer, scopedKey]);
 
   const checkRateLimit = useCallback((): boolean => {
     const now = Date.now();
@@ -90,11 +161,11 @@ export function useRateLimiter(key: string, config: Partial<RateLimitConfig> = {
         blockedUntil: null,
       });
       setIsBlocked(false);
-      setRemainingAttempts(finalConfig.maxAttempts);
+      setRemainingAttempts(maxAttempts);
     }
 
     return true;
-  }, [getState, setState, startBlockTimer, finalConfig.maxAttempts]);
+  }, [getState, maxAttempts, setState, startBlockTimer]);
 
   const recordAttempt = useCallback((success: boolean = false): { allowed: boolean; message?: string } => {
     const now = Date.now();
@@ -110,7 +181,7 @@ export function useRateLimiter(key: string, config: Partial<RateLimitConfig> = {
     }
 
     // Reset if window has passed
-    if (state.firstAttemptTime && now - state.firstAttemptTime > finalConfig.windowMs) {
+    if (state.firstAttemptTime && now - state.firstAttemptTime > windowMs) {
       state = {
         attempts: 0,
         firstAttemptTime: null,
@@ -126,7 +197,7 @@ export function useRateLimiter(key: string, config: Partial<RateLimitConfig> = {
         blockedUntil: null,
       });
       setIsBlocked(false);
-      setRemainingAttempts(finalConfig.maxAttempts);
+      setRemainingAttempts(maxAttempts);
       return { allowed: true };
     }
 
@@ -134,9 +205,9 @@ export function useRateLimiter(key: string, config: Partial<RateLimitConfig> = {
     const newAttempts = state.attempts + 1;
     const firstAttemptTime = state.firstAttemptTime || now;
 
-    if (newAttempts >= finalConfig.maxAttempts) {
+    if (newAttempts >= maxAttempts) {
       // Block the user
-      const blockedUntil = now + finalConfig.blockDurationMs;
+      const blockedUntil = now + blockDurationMs;
       setState({
         attempts: newAttempts,
         firstAttemptTime,
@@ -148,7 +219,7 @@ export function useRateLimiter(key: string, config: Partial<RateLimitConfig> = {
       
       return {
         allowed: false,
-        message: `ลองผิดเกิน ${finalConfig.maxAttempts} ครั้ง กรุณารอ ${Math.ceil(finalConfig.blockDurationMs / 1000 / 60)} นาที`,
+        message: `ลองผิดเกิน ${maxAttempts} ครั้ง กรุณารอ ${Math.ceil(blockDurationMs / 1000 / 60)} นาที`,
       };
     }
 
@@ -158,13 +229,13 @@ export function useRateLimiter(key: string, config: Partial<RateLimitConfig> = {
       firstAttemptTime,
       blockedUntil: null,
     });
-    setRemainingAttempts(finalConfig.maxAttempts - newAttempts);
+    setRemainingAttempts(maxAttempts - newAttempts);
 
     return {
       allowed: true,
-      message: `เหลือโอกาสอีก ${finalConfig.maxAttempts - newAttempts} ครั้ง`,
+      message: `เหลือโอกาสอีก ${maxAttempts - newAttempts} ครั้ง`,
     };
-  }, [getState, setState, startBlockTimer, finalConfig]);
+  }, [blockDurationMs, getState, maxAttempts, setState, startBlockTimer, windowMs]);
 
   const reset = useCallback(() => {
     clearBlockTimer();
@@ -174,9 +245,9 @@ export function useRateLimiter(key: string, config: Partial<RateLimitConfig> = {
       blockedUntil: null,
     });
     setIsBlocked(false);
-    setRemainingAttempts(finalConfig.maxAttempts);
+    setRemainingAttempts(maxAttempts);
     setBlockTimeRemaining(0);
-  }, [clearBlockTimer, setState, finalConfig.maxAttempts]);
+  }, [clearBlockTimer, maxAttempts, setState]);
 
   return {
     isBlocked,

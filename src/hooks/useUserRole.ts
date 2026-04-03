@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -8,9 +8,13 @@ export function useUserRole() {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const requestIdRef = useRef(0);
 
   const fetchRoles = useCallback(async () => {
-    if (!user) {
+    const requestId = ++requestIdRef.current;
+
+    if (!userId) {
       setRoles([]);
       setLoading(false);
       return;
@@ -22,18 +26,28 @@ export function useUserRole() {
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
       if (error) throw error;
 
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       setRoles((data || []).map(r => r.role as AppRole));
     } catch (error) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       console.error("Error fetching user roles:", error);
       setRoles([]);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     fetchRoles();

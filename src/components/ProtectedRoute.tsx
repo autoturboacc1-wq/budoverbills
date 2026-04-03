@@ -11,6 +11,7 @@ export function ProtectedRoute({ requireAdminSession = false }: ProtectedRoutePr
   const { user, isLoading } = useAuth();
   const { isAdmin, isModerator, loading: roleLoading } = useUserRole();
   const location = useLocation();
+  const hasAdminAccess = isAdmin || isModerator;
 
   if (isLoading || (requireAdminSession && roleLoading)) {
     return (
@@ -28,11 +29,11 @@ export function ProtectedRoute({ requireAdminSession = false }: ProtectedRoutePr
     const isCodeVerified = sessionStorage.getItem('admin_code_verified') === 'true';
     const isVerified = sessionStorage.getItem('admin_verified') === user.id;
 
-    if (!isAdmin && !isModerator) {
-      return <Navigate to="/admin/login" replace />;
+    if (!hasAdminAccess) {
+      return <Navigate to="/profile" replace />;
     }
 
-    if (!isCodeVerified && !isVerified) {
+    if (!isCodeVerified || !isVerified) {
       return <Navigate to="/admin/login" replace />;
     }
   }

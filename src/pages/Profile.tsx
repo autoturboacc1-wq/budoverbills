@@ -51,6 +51,7 @@ export default function Profile() {
   const isDarkMode = theme === "dark";
   const { isPremium } = useSubscription();
   const { isAdmin, isModerator } = useUserRole();
+  const hasAdminAccess = isAdmin || isModerator;
 
   // Fetch real stats from database with realtime updates
   const { data: userStats, refetch: refetchStats } = useQuery({
@@ -410,9 +411,8 @@ export default function Profile() {
           {(isAdmin || isModerator) && (
             <button
               onClick={() => {
-                // Check if already verified in session
-                const verified = sessionStorage.getItem("admin_verified");
-                if (verified) {
+                const verified = sessionStorage.getItem("admin_verified") === user?.id;
+                if (hasAdminAccess && verified) {
                   navigate("/admin");
                 } else {
                   navigate("/admin/login");

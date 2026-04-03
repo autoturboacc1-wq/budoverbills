@@ -10,6 +10,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { BobLogo } from "@/components/BobLogo";
 
 type LoginStep = "credentials" | "otp" | "success" | "locked";
@@ -24,8 +25,10 @@ interface OtpResult {
 }
 
 export default function AdminLogin() {
+  const OTP_RESEND_COOLDOWN_SECONDS = 60;
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isAdmin, isModerator, loading: roleLoading } = useUserRole();
   const [step, setStep] = useState<LoginStep>("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,28 +38,27 @@ export default function AdminLogin() {
   // OTP is now sent via email only - never stored or displayed client-side
   const [lockCountdown, setLockCountdown] = useState(0);
   const [remainingAttempts, setRemainingAttempts] = useState(3);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   // Check if already logged in as admin
   useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (user) {
-        const { data: roles } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id);
+    if (!user || roleLoading) {
+      return;
+    }
 
-        const isAdmin = roles?.some(r => r.role === "admin" || r.role === "moderator");
-        if (isAdmin) {
-          // Check if already verified in this session
-          const verified = sessionStorage.getItem("admin_verified");
-          if (verified === user.id) {
-            navigate("/admin");
-          }
-        }
+    if (!isAdmin && !isModerator) {
+      navigate("/profile", { replace: true });
+      return;
+    }
+
+    const checkAdminStatus = () => {
+      const verified = sessionStorage.getItem("admin_verified");
+      if (verified === user.id) {
+        navigate("/admin", { replace: true });
       }
     };
     checkAdminStatus();
-  }, [user, navigate]);
+  }, [user, roleLoading, isAdmin, isModerator, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +136,18 @@ export default function AdminLogin() {
       return () => clearInterval(timer);
     }
   }, [lockCountdown]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setResendCooldown((previous) => Math.max(0, previous - 1));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -222,6 +236,11 @@ export default function AdminLogin() {
   };
 
   const handleResendOtp = async () => {
+    if (resendCooldown > 0) {
+      toast.error(`กรุณารอ ${resendCooldown} วินาทีก่อนขอรหัสใหม่`);
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -241,6 +260,7 @@ export default function AdminLogin() {
         description: "กรุณาตรวจสอบอีเมลของคุณ"
       });
       setOtp("");
+      setResendCooldown(OTP_RESEND_COOLDOWN_SECONDS);
     } catch (err) {
       toast.error("ไม่สามารถส่งรหัส OTP ใหม่ได้");
     } finally {
@@ -387,9 +407,9 @@ export default function AdminLogin() {
                     variant="ghost"
                     className="w-full"
                     onClick={handleResendOtp}
-                    disabled={loading}
+                    disabled={loading || resendCooldown > 0}
                   >
-                    ส่งรหัส OTP อีกครั้ง
+                    {resendCooldown > 0 ? `ส่งรหัส OTP ใหม่ใน ${resendCooldown}s` : "ส่งรหัส OTP อีกครั้ง"}
                   </Button>
 
                   <Button

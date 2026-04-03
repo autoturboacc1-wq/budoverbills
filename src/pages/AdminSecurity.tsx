@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -58,8 +58,19 @@ export default function AdminSecurity() {
     }
   }, [isAdmin, roleLoading, navigate]);
 
-  const fetchLogs = async () => {
-    if (!isAdmin) return;
+  useEffect(() => {
+    if (roleLoading || !user || !isAdmin) {
+      return;
+    }
+
+    const verified = sessionStorage.getItem('admin_verified');
+    if (verified !== user.id) {
+      navigate('/admin/login', { replace: true });
+    }
+  }, [isAdmin, roleLoading, navigate, user]);
+
+  const fetchLogs = useCallback(async () => {
+    if (!isAdmin || sessionStorage.getItem('admin_verified') !== user?.id) return;
     
     setLoading(true);
     try {
@@ -98,13 +109,13 @@ export default function AdminSecurity() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin, user?.id]);
 
   useEffect(() => {
     if (isAdmin) {
-      fetchLogs();
+      void fetchLogs();
     }
-  }, [isAdmin]);
+  }, [fetchLogs, isAdmin]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

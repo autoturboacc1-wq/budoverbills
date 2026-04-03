@@ -7,13 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 
 const AdminCodeLogin = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
+  const { isAdmin, isModerator, loading: roleLoading } = useUserRole();
   const [code, setCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const hasAdminAccess = isAdmin || isModerator;
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -21,7 +24,11 @@ const AdminCodeLogin = () => {
       toast.error("กรุณาเข้าสู่ระบบก่อน");
       navigate("/auth", { state: { returnTo: "/admin/code" } });
     }
-  }, [user, authLoading, navigate]);
+    if (!authLoading && !roleLoading && user && !hasAdminAccess) {
+      toast.error("ไม่มีสิทธิ์เข้าถึง");
+      navigate("/profile", { replace: true });
+    }
+  }, [user, authLoading, roleLoading, hasAdminAccess, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +40,12 @@ const AdminCodeLogin = () => {
 
     if (!user) {
       toast.error("กรุณาเข้าสู่ระบบก่อน");
+      return;
+    }
+
+    if (!hasAdminAccess) {
+      toast.error("ไม่มีสิทธิ์เข้าถึง");
+      navigate("/profile", { replace: true });
       return;
     }
 
@@ -48,7 +61,15 @@ const AdminCodeLogin = () => {
       const result = data as { success: boolean; error?: string; code_name?: string; role?: string };
 
       if (result.success) {
+        if (result.role !== "admin" && result.role !== "moderator") {
+          throw new Error("รหัสนี้ไม่มีสิทธิ์เข้าถึงแอดมิน");
+        }
+
         // Store verification in session
+        sessionStorage.removeItem("admin_verified");
+        sessionStorage.removeItem("admin_code_verified");
+        sessionStorage.removeItem("admin_code_name");
+        sessionStorage.removeItem("admin_code_role");
         sessionStorage.setItem("admin_verified", user.id);
         sessionStorage.setItem("admin_code_verified", "true");
         sessionStorage.setItem("admin_code_name", result.code_name || "");
@@ -77,8 +98,20 @@ const AdminCodeLogin = () => {
     );
   }
 
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   // Don't render if not logged in (will redirect)
   if (!user) {
+    return null;
+  }
+
+  if (!hasAdminAccess) {
     return null;
   }
 
