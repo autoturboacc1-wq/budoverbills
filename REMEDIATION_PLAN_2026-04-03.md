@@ -1,7 +1,7 @@
 # BudOverBills — Remediation Plan
 > Based on Full Bug Audit of 2026-04-03 (20 parallel Sonnet agents)
 > Priority: P0 = block deploy, P1 = fix this sprint, P2 = next sprint, P3 = backlog
-> Last updated: 2026-04-03 after local remediation pass and feature commits
+> Last updated: 2026-04-04 after follow-up UI polish commit
 
 ---
 
@@ -445,6 +445,7 @@ Lift `useNotifications` into a single React Context provider. Remove all duplica
 ## Progress Snapshot
 
 Completed local feature commits:
+- `5ed7e67` `Add animated page transitions and bug audit report`
 - `f4c9479` `feat(payments): move agreement and payment writes to atomic RPCs`
 - `844b24d` `feat(edge): harden internal functions and cron guards`
 - `71300c9` `feat(realtime): scope subscriptions to user data`

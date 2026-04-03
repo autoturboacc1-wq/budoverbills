@@ -13,27 +13,33 @@ const sizeClasses = {
 };
 
 const textSizes = {
-  sm: { main: "text-sm", sub: "text-[4px]" },
-  md: { main: "text-lg", sub: "text-[6px]" },
-  lg: { main: "text-2xl", sub: "text-[8px]" },
-  xl: { main: "text-3xl", sub: "text-[10px]" },
+  sm: { main: "text-sm", sub: null },
+  md: { main: "text-xl", sub: "text-[7px]" },
+  lg: { main: "text-2xl", sub: "text-[9px]" },
+  xl: { main: "text-3xl", sub: "text-[11px]" },
 };
 
 export function BobLogo({ size = "md", className }: BobLogoProps) {
+  const sub = textSizes[size].sub;
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-full bg-primary",
+        "flex flex-col items-center justify-center rounded-full",
+        "bg-gradient-to-br from-primary via-primary to-primary/75",
+        "shadow-lg shadow-primary/35",
+        "ring-1 ring-inset ring-white/20",
         sizeClasses[size],
         className
       )}
     >
-      <span className={cn("font-cherry text-white leading-none", textSizes[size].main)}>
+      <span className={cn("font-cherry text-white leading-none tracking-wide", textSizes[size].main)}>
         BOB
       </span>
-      <span className={cn("font-cherry text-white leading-tight", textSizes[size].sub)}>
-        Bud Over Bills
-      </span>
+      {sub && (
+        <span className={cn("font-cherry text-white/75 leading-tight tracking-widest", sub)}>
+          Bud Over Bills
+        </span>
+      )}
     </div>
   );
 }

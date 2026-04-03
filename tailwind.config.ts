@@ -20,8 +20,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Sarabun', 'Outfit', 'system-ui', 'sans-serif'],
-        heading: ['Outfit', 'Sarabun', 'system-ui', 'sans-serif'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"', 'system-ui', 'sans-serif'],
+        heading: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'system-ui', 'sans-serif'],
         cherry: ['"Cherry Bomb One"', 'cursive'],
       },
       colors: {
