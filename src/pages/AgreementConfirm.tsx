@@ -160,9 +160,23 @@ export default function AgreementConfirm() {
 
   const handleConfirmedApproval = async () => {
     if (!agreement || !user) return;
+    if (!isLender && !isBorrower) {
+      toast.error("คุณไม่มีสิทธิ์ยืนยันข้อตกลงนี้");
+      return;
+    }
 
     setIsConfirming(true);
     try {
+      const { data: latestAgreement, error: latestAgreementError } = await supabase
+        .from('debt_agreements')
+        .select('id, lender_confirmed, borrower_confirmed')
+        .eq('id', agreement.id)
+        .maybeSingle();
+
+      if (latestAgreementError || !latestAgreement) {
+        throw latestAgreementError ?? new Error('ไม่พบข้อตกลงล่าสุด');
+      }
+
       // Get IP and Device info for legal evidence
       const [clientIP, deviceId] = await Promise.all([
         getClientIP(),
@@ -206,17 +220,23 @@ export default function AgreementConfirm() {
 
       // Check if both parties will have confirmed after this
       const willBeFullyConfirmed = 
-        (isLender && agreement.borrower_confirmed) ||
-        (isBorrower && agreement.lender_confirmed);
+        (isLender && latestAgreement.borrower_confirmed) ||
+        (isBorrower && latestAgreement.lender_confirmed);
 
       if (willBeFullyConfirmed) {
         updates.status = 'active';
       }
 
-      const { error } = await supabase
+      let updateQuery = supabase
         .from('debt_agreements')
         .update(updates)
         .eq('id', agreement.id);
+
+      updateQuery = isLender
+        ? updateQuery.eq('lender_id', user.id)
+        : updateQuery.eq('borrower_id', user.id);
+
+      const { error } = await updateQuery;
 
       if (error) throw error;
 
@@ -242,13 +262,23 @@ export default function AgreementConfirm() {
   };
 
   const handleReject = async () => {
-    if (!agreement) return;
+    if (!agreement || !user) return;
+    if (!isLender && !isBorrower) {
+      toast.error("คุณไม่มีสิทธิ์ปฏิเสธข้อตกลงนี้");
+      return;
+    }
 
     try {
-      const { error } = await supabase
+      let rejectQuery = supabase
         .from('debt_agreements')
         .update({ status: 'cancelled' })
         .eq('id', agreement.id);
+
+      rejectQuery = isLender
+        ? rejectQuery.eq('lender_id', user.id)
+        : rejectQuery.eq('borrower_id', user.id);
+
+      const { error } = await rejectQuery;
 
       if (error) throw error;
 

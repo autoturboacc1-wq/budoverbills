@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   getPaymentSlipSignedUrl,
   uploadPaymentSlip,
@@ -51,6 +52,7 @@ export function TransferProofSection({
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loadingUrl, setLoadingUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
 
   // Get signed URL when opening preview
   useEffect(() => {
@@ -68,6 +70,11 @@ export function TransferProofSection({
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (!user?.id || !isLender) {
+      toast.error("คุณไม่มีสิทธิ์อัปโหลดสลิปนี้");
+      return;
+    }
 
     const validationError = validatePaymentSlipFile(file);
     if (validationError) {
@@ -88,15 +95,21 @@ export function TransferProofSection({
       if ('error' in result) throw result.error;
 
       // Update agreement with transfer slip URL
-      const { error: updateError } = await supabase
+      const { data: updateData, error: updateError } = await supabase
         .from('debt_agreements')
         .update({
           transfer_slip_url: result.path,
           transferred_at: new Date().toISOString(),
         })
-        .eq('id', agreementId);
+        .eq('id', agreementId)
+        .eq('lender_id', user.id)
+        .select('id')
+        .maybeSingle();
 
       if (updateError) throw updateError;
+      if (!updateData) {
+        throw new Error("ไม่พบรายการที่คุณมีสิทธิ์อัปโหลด");
+      }
 
       toast.success("อัปโหลดสลิปโอนเงินให้ยืมสำเร็จ");
       onUpdate();
@@ -112,17 +125,28 @@ export function TransferProofSection({
   };
 
   const handleBorrowerConfirm = async () => {
+    if (!user?.id || !isBorrower) {
+      toast.error("คุณไม่มีสิทธิ์ยืนยันรับเงินนี้");
+      return;
+    }
+
     setIsConfirming(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('debt_agreements')
         .update({
           borrower_confirmed_transfer: true,
           borrower_confirmed_transfer_at: new Date().toISOString(),
         })
-        .eq('id', agreementId);
+        .eq('id', agreementId)
+        .eq('borrower_id', user.id)
+        .select('id')
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) {
+        throw new Error("ไม่พบรายการที่คุณมีสิทธิ์ยืนยัน");
+      }
 
       toast.success("ยืนยันรับเงินสำเร็จ", {
         description: "ขอบคุณที่ยืนยันการรับเงิน",

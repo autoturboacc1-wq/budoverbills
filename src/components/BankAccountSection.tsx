@@ -19,9 +19,11 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { THAI_BANKS } from "@/constants/thaibanks";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface BankAccountSectionProps {
   agreementId: string;
+  lenderId: string;
   bankName?: string | null;
   accountNumber?: string | null;
   accountName?: string | null;
@@ -31,12 +33,14 @@ interface BankAccountSectionProps {
 
 export function BankAccountSection({
   agreementId,
+  lenderId,
   bankName,
   accountNumber,
   accountName,
   isLender,
   onUpdate,
 }: BankAccountSectionProps) {
+  const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -44,8 +48,14 @@ export function BankAccountSection({
     accountNumber: accountNumber || "",
     accountName: accountName || "",
   });
+  const canEditBankAccount = isLender && user?.id === lenderId;
 
   const handleSave = async () => {
+    if (!canEditBankAccount) {
+      toast.error("คุณไม่มีสิทธิ์แก้ไขบัญชีรับเงินนี้");
+      return;
+    }
+
     if (!formData.bankName || !formData.accountNumber || !formData.accountName) {
       toast.error("กรุณากรอกข้อมูลให้ครบ");
       return;
@@ -53,16 +63,22 @@ export function BankAccountSection({
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("debt_agreements")
         .update({
           bank_name: formData.bankName,
           account_number: formData.accountNumber,
           account_name: formData.accountName,
         })
-        .eq("id", agreementId);
+        .eq("id", agreementId)
+        .eq("lender_id", lenderId)
+        .select("id")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) {
+        throw new Error("ไม่พบรายการที่คุณมีสิทธิ์แก้ไข");
+      }
 
       toast.success("อัปเดตบัญชีรับเงินแล้ว");
       setIsEditing(false);
@@ -89,7 +105,7 @@ export function BankAccountSection({
             <Building className="w-4 h-4" />
             <span>บัญชีรับเงิน</span>
           </div>
-          {isLender && (
+          {canEditBankAccount && (
             <Button
               variant="ghost"
               size="sm"
@@ -214,7 +230,7 @@ export function BankAccountSection({
               <Button
                 className="flex-1"
                 onClick={handleSave}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !canEditBankAccount}
               >
                 {isSubmitting ? (
                   "กำลังบันทึก..."

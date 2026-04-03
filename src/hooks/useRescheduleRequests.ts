@@ -208,6 +208,20 @@ export function useRescheduleRequests() {
         throw new Error('ไม่พบคำขอเลื่อนงวด');
       }
 
+      const { data: agreement, error: agreementError } = await supabase
+        .from('debt_agreements')
+        .select('lender_id')
+        .eq('id', request.agreement_id)
+        .maybeSingle();
+
+      if (agreementError || !agreement) {
+        throw new Error('ไม่พบข้อตกลงที่เกี่ยวข้อง');
+      }
+
+      if (agreement.lender_id !== user.id) {
+        throw new Error('เฉพาะเจ้าหนี้เท่านั้นที่อนุมัติคำขอเลื่อนงวดได้');
+      }
+
       // Get the original installment to know its number
       const { data: targetInstallment, error: targetError } = await supabase
         .from('installments')
@@ -288,6 +302,30 @@ export function useRescheduleRequests() {
     if (!user) return false;
     
     try {
+      const { data: request, error: requestError } = await supabase
+        .from('reschedule_requests')
+        .select('agreement_id')
+        .eq('id', requestId)
+        .maybeSingle();
+
+      if (requestError || !request) {
+        throw new Error('ไม่พบคำขอเลื่อนงวด');
+      }
+
+      const { data: agreement, error: agreementError } = await supabase
+        .from('debt_agreements')
+        .select('lender_id')
+        .eq('id', request.agreement_id)
+        .maybeSingle();
+
+      if (agreementError || !agreement) {
+        throw new Error('ไม่พบข้อตกลงที่เกี่ยวข้อง');
+      }
+
+      if (agreement.lender_id !== user.id) {
+        throw new Error('เฉพาะเจ้าหนี้เท่านั้นที่ปฏิเสธคำขอเลื่อนงวดได้');
+      }
+
       const { error } = await supabase
         .from('reschedule_requests')
         .update({

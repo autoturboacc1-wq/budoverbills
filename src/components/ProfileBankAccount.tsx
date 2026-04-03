@@ -27,6 +27,8 @@ interface BankAccountData {
   account_name: string | null;
 }
 
+const OPEN_AGREEMENT_STATUSES = ["pending_confirmation", "active"] as const;
+
 export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function ProfileBankAccount(props, ref) {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -48,6 +50,7 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
         .from("debt_agreements")
         .select("bank_name, account_number, account_name")
         .eq("lender_id", user.id)
+        .in("status", OPEN_AGREEMENT_STATUSES)
         .not("bank_name", "is", null)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -90,16 +93,21 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
     setIsSubmitting(true);
     try {
       // Update all active agreements where user is lender
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("debt_agreements")
         .update({
           bank_name: formData.bankName,
           account_number: formData.accountNumber,
           account_name: formData.accountName,
         })
-        .eq("lender_id", user.id);
+        .eq("lender_id", user.id)
+        .in("status", OPEN_AGREEMENT_STATUSES)
+        .select("id");
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("ไม่พบรายการที่คุณมีสิทธิ์อัปเดต");
+      }
 
       setBankData({
         bank_name: formData.bankName,

@@ -272,11 +272,33 @@ export function useDebtAgreements() {
     }
   };
 
+  const getAgreementByInstallmentId = useCallback((installmentId: string) => {
+    return agreements.find((agreement) =>
+      agreement.installments?.some((installment) => installment.id === installmentId)
+    );
+  }, [agreements]);
+
   const updateInstallmentStatus = async (
     installmentId: string,
     status: InstallmentStatus,
     paymentProofUrl?: string
   ) => {
+    if (!user) {
+      toast.error('กรุณาเข้าสู่ระบบก่อน');
+      return false;
+    }
+
+    const agreement = getAgreementByInstallmentId(installmentId);
+    if (!agreement) {
+      toast.error('ไม่พบข้อมูลงวดที่ต้องการอัปเดต');
+      return false;
+    }
+
+    if (getUserRoleInAgreement(agreement, user.id) !== 'lender') {
+      toast.error('เฉพาะเจ้าหนี้เท่านั้นที่อัปเดตสถานะการชำระได้');
+      return false;
+    }
+
     try {
       const updates: TablesUpdate<'installments'> = { status };
 
@@ -302,6 +324,28 @@ export function useDebtAgreements() {
   };
 
   const uploadSlip = async (installmentId: string, slipUrl: string) => {
+    if (!user) {
+      toast.error('กรุณาเข้าสู่ระบบก่อน');
+      return false;
+    }
+
+    const agreement = getAgreementByInstallmentId(installmentId);
+    if (!agreement) {
+      toast.error('ไม่พบข้อมูลงวดที่ต้องการอัปโหลดสลิป');
+      return false;
+    }
+
+    if (getUserRoleInAgreement(agreement, user.id) !== 'borrower') {
+      toast.error('เฉพาะผู้ยืมเท่านั้นที่อัปโหลดสลิปได้');
+      return false;
+    }
+
+    const installment = agreement.installments?.find((item) => item.id === installmentId);
+    if (!installment || installment.status === 'paid' || installment.confirmed_by_lender) {
+      toast.error('งวดนี้ถูกยืนยันแล้ว ไม่สามารถอัปโหลดสลิปใหม่ได้');
+      return false;
+    }
+
     try {
       const updates: TablesUpdate<'installments'> = {
         payment_proof_url: slipUrl,
@@ -323,6 +367,22 @@ export function useDebtAgreements() {
   };
 
   const confirmPayment = async (installmentId: string) => {
+    if (!user) {
+      toast.error('กรุณาเข้าสู่ระบบก่อน');
+      return false;
+    }
+
+    const agreement = getAgreementByInstallmentId(installmentId);
+    if (!agreement) {
+      toast.error('ไม่พบข้อมูลงวดที่ต้องการยืนยัน');
+      return false;
+    }
+
+    if (getUserRoleInAgreement(agreement, user.id) !== 'lender') {
+      toast.error('เฉพาะเจ้าหนี้เท่านั้นที่ยืนยันการชำระได้');
+      return false;
+    }
+
     try {
       const { data: installmentData, error: fetchError } = await supabase
         .from('installments')

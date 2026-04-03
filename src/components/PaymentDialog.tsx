@@ -87,13 +87,13 @@ export function PaymentDialog({
   // Fetch verification history when dialog opens
   useEffect(() => {
     if (open && installment) {
-      fetchVerificationHistory();
+      void fetchVerificationHistory();
       setPaymentAmount(installment.amount.toString());
       setVerifiedAmount("");
       setSlipUrl(null);
       setSignedSlipUrl(null);
     }
-  }, [open, installment]);
+  }, [open, installment, fetchVerificationHistory]);
 
   // Fetch signed URL when displaySlipUrl changes
   useEffect(() => {
@@ -170,6 +170,18 @@ export function PaymentDialog({
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !installment) return;
+    if (!user || isLender || user.id !== agreement.borrower_id) {
+      toast.error("คุณไม่มีสิทธิ์อัปโหลดสลิปงวดนี้");
+      return;
+    }
+    if (pendingVerification) {
+      toast.error("มีสลิปที่รอตรวจสอบอยู่แล้ว");
+      return;
+    }
+    if (installment.confirmed_by_lender || installment.status === 'paid') {
+      toast.error("งวดนี้ถูกยืนยันแล้ว ไม่สามารถอัปโหลดสลิปใหม่ได้");
+      return;
+    }
 
     const validationError = validatePaymentSlipFile(file);
     if (validationError) {
@@ -274,6 +286,10 @@ export function PaymentDialog({
   // Lender confirms amount matches
   const handleConfirmPayment = async () => {
     if (!installment || !pendingVerification || !user) return;
+    if (!isLender || user.id !== agreement.lender_id) {
+      toast.error("เฉพาะเจ้าหนี้เท่านั้นที่ยืนยันการชำระได้");
+      return;
+    }
     if (numericVerifiedAmount <= 0) {
       toast.error("กรุณากรอกยอดเงินที่เห็นในสลิป");
       return;
@@ -356,7 +372,11 @@ export function PaymentDialog({
 
   // Lender rejects - amount doesn't match
   const handleRejectPayment = async () => {
-    if (!installment || !pendingVerification) return;
+    if (!installment || !pendingVerification || !user) return;
+    if (!isLender || user.id !== agreement.lender_id) {
+      toast.error("เฉพาะเจ้าหนี้เท่านั้นที่ปฏิเสธสลิปได้");
+      return;
+    }
 
     setIsSubmitting(true);
 
