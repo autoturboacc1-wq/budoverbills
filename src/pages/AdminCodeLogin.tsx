@@ -5,10 +5,10 @@ import { Shield, KeyRound, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
+import { clearAdminSession, issueAdminCodeSession, setAdminSession } from "@/utils/adminSession";
 
 const AdminCodeLogin = () => {
   const navigate = useNavigate();
@@ -52,28 +52,25 @@ const AdminCodeLogin = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.rpc("verify_admin_code", {
-        p_code: code.trim()
-      });
-
-      if (error) throw error;
-
-      const result = data as { success: boolean; error?: string; code_name?: string; role?: string };
+      const result = await issueAdminCodeSession(code.trim());
 
       if (result.success) {
-        if (result.role !== "admin" && result.role !== "moderator") {
+        if (result.code_role !== "admin" && result.code_role !== "moderator") {
           throw new Error("รหัสนี้ไม่มีสิทธิ์เข้าถึงแอดมิน");
+        }
+        if (!result.session_token) {
+          throw new Error("ไม่สามารถสร้าง admin session ได้");
         }
 
         // Store verification in session
-        sessionStorage.removeItem("admin_verified");
-        sessionStorage.removeItem("admin_code_verified");
-        sessionStorage.removeItem("admin_code_name");
-        sessionStorage.removeItem("admin_code_role");
-        sessionStorage.setItem("admin_verified", user.id);
-        sessionStorage.setItem("admin_code_verified", "true");
-        sessionStorage.setItem("admin_code_name", result.code_name || "");
-        sessionStorage.setItem("admin_code_role", result.role || "moderator");
+        clearAdminSession();
+        setAdminSession({
+          userId: user.id,
+          sessionToken: result.session_token,
+          codeVerified: true,
+          codeName: result.code_name || "",
+          codeRole: result.code_role || "moderator",
+        });
         
         toast.success(`ยินดีต้อนรับ ${result.code_name}`);
         

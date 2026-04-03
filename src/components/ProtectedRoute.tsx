@@ -1,8 +1,9 @@
 import { Loader2 } from 'lucide-react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { hasAdminSession } from '@/utils/adminSession';
+import { clearAdminSession, hasAdminSession, validateAdminSession } from '@/utils/adminSession';
 
 interface ProtectedRouteProps {
   requireAdminSession?: boolean;
@@ -15,8 +16,41 @@ export function ProtectedRoute({ requireAdminSession = false }: ProtectedRoutePr
   const hasAdminAccess = isAdmin || isModerator;
   const isOnPersonalInfoPage = location.pathname === '/personal-info';
   const isOnPdpaPage = location.pathname === '/pdpa-consent';
+  const [adminSessionValid, setAdminSessionValid] = useState<boolean | null>(requireAdminSession ? null : true);
 
-  if (isLoading || (requireAdminSession && roleLoading)) {
+  useEffect(() => {
+    if (!requireAdminSession) {
+      setAdminSessionValid(true);
+      return;
+    }
+
+    if (!user || !hasAdminAccess || !hasAdminSession(user.id)) {
+      setAdminSessionValid(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const valid = await validateAdminSession(user.id);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (!valid) {
+        clearAdminSession();
+      }
+
+      setAdminSessionValid(valid);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [requireAdminSession, user, hasAdminAccess]);
+
+  if (isLoading || (requireAdminSession && (roleLoading || adminSessionValid === null))) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -45,7 +79,7 @@ export function ProtectedRoute({ requireAdminSession = false }: ProtectedRoutePr
       return <Navigate to="/profile" replace />;
     }
 
-    if (!hasAdminSession(user.id)) {
+    if (!adminSessionValid) {
       return <Navigate to="/admin/login" replace />;
     }
   }

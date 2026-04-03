@@ -105,6 +105,7 @@ const Notifications = () => {
           </div>
           {unreadCount > 0 && (
             <Button
+              type="button"
               variant="outline"
               size="sm"
               onClick={handleMarkAllAsRead}
@@ -117,7 +118,7 @@ const Notifications = () => {
         </div>
       </motion.header>
 
-      <main className="px-4 py-4 max-w-lg mx-auto">
+      <main className="px-4 py-4 max-w-lg mx-auto" aria-busy={loading}>
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -137,20 +138,32 @@ const Notifications = () => {
             </p>
           </motion.div>
         ) : (
-          <div className="space-y-2" aria-live="polite" aria-relevant="additions text">
+          <div className="space-y-2" role="list" aria-live="polite" aria-relevant="additions text">
             {notifications.map((notification, index) => (
               <motion.div
                 key={notification.id}
+                role="listitem"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.03 }}
-                onClick={() => handleNotificationClick(notification)}
-                className={`relative p-4 bg-card rounded-xl border border-border cursor-pointer transition-all hover:shadow-md ${
+                className={`relative p-4 bg-card rounded-xl border border-border transition-all hover:shadow-md ${
                   !notification.is_read ? "bg-primary/5 border-primary/20" : "opacity-75"
                 }`}
               >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">{getNotificationIcon(notification.type)}</span>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`เปิดการแจ้งเตือน: ${notification.title}`}
+                  onClick={() => handleNotificationClick(notification)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleNotificationClick(notification);
+                    }
+                  }}
+                  className="flex items-start gap-3 outline-none rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  <span className="text-2xl" aria-hidden="true">{getNotificationIcon(notification.type)}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className={`font-medium text-foreground ${!notification.is_read ? "" : "text-muted-foreground"}`}>
@@ -168,9 +181,11 @@ const Notifications = () => {
                     </p>
                   </div>
                   <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                    aria-label={`ลบการแจ้งเตือน: ${notification.title}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDelete(notification.id);

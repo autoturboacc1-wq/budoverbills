@@ -12,18 +12,9 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { BobLogo } from "@/components/BobLogo";
-import { clearAdminSession, hasAdminSession } from "@/utils/adminSession";
+import { clearAdminSession, hasAdminSession, issueAdminOtpSession, setAdminSession } from "@/utils/adminSession";
 
 type LoginStep = "credentials" | "otp" | "success" | "locked";
-
-interface OtpResult {
-  success: boolean;
-  error?: string;
-  message: string;
-  attempts?: number;
-  remaining?: number;
-  locked_until?: string;
-}
 
 export default function AdminLogin() {
   const OTP_RESEND_COOLDOWN_SECONDS = 60;
@@ -92,7 +83,7 @@ export default function AdminLogin() {
 
       // Generate and send OTP via email (secure - never display OTP client-side)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: sendResult, error: otpError } = await (supabase.rpc as any)("generate_and_send_admin_otp", {
+      const { error: otpError } = await (supabase.rpc as any)("generate_and_send_admin_otp", {
         p_user_id: authData.user.id
       }) as { data: { success: boolean; message: string; email: string } | null; error: Error | null };
 
@@ -168,18 +159,18 @@ export default function AdminLogin() {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (!currentUser) throw new Error("Session หมดอายุ");
 
-      const { data: result, error: verifyError } = await supabase.rpc("verify_admin_otp", {
-        p_user_id: currentUser.id,
-        p_otp: otp
-      }) as { data: OtpResult | null; error: Error | null };
-
-      if (verifyError) throw verifyError;
-      if (!result) throw new Error("เกิดข้อผิดพลาดในการยืนยัน");
+      const result = await issueAdminOtpSession(otp);
 
       if (result.success) {
         // Store verification in session
         clearAdminSession();
-        sessionStorage.setItem("admin_verified", currentUser.id);
+        if (!result.session_token) {
+          throw new Error("ไม่สามารถสร้าง admin session ได้");
+        }
+        setAdminSession({
+          userId: currentUser.id,
+          sessionToken: result.session_token,
+        });
 
         // Log successful verification
         await supabase.rpc("log_activity", {
@@ -214,7 +205,7 @@ export default function AdminLogin() {
             p_is_suspicious: true
           });
         } else {
-          setError(result.message);
+          setError(result.message || "เกิดข้อผิดพลาด");
           if (result.remaining !== undefined) {
             setRemainingAttempts(result.remaining);
           }

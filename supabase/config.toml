@@ -20,3 +20,7 @@ verify_jwt = true
 # Internal cron/invocation only.
 # Caller must send `x-internal-secret: $INTERNAL_FUNCTION_SECRET`.
 verify_jwt = false
+
+[functions.admin-session]
+# Authenticated admin session mint/validate endpoint.
+verify_jwt = true

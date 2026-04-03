@@ -16,8 +16,8 @@
 ### Phase 0 (P0)
 - [x] 0.1 ย้าย mutation หลักไปเป็น atomic RPCs
 - [-] 0.2 Fix Admin Authentication
-  route/admin guard และ role mutation guard เสร็จแล้ว
-  ยังไม่เสร็จ: server-signed admin JWT แทน `sessionStorage`
+  route/admin guard, role mutation guard และ JWT-backed admin session path เสร็จแล้วในโค้ด
+  ยังไม่เสร็จ: ต้อง deploy edge function และตั้ง `ADMIN_SESSION_JWT_SECRET` จริง
 - [x] 0.3 Fix Onboarding Bypass
 - [-] 0.4 Fix Payment Gateway / Subscription RPCs
   ownership guards และ fail-closed path เสร็จแล้ว
@@ -28,6 +28,7 @@
 - [x] 0.8 Fix Bidirectional Friend Request Constraint
 - [x] 0.9 Fix `is_trial` Flag
 - [ ] Apply migrations ทั้งหมดขึ้น Supabase จริง
+- [ ] Deploy edge functions/secrets ใหม่ (`admin-session`, `request-client-context`, `ADMIN_SESSION_JWT_SECRET`)
 - [ ] Cleanup ข้อมูลซ้ำเดิมใน DB ถ้ามี ก่อนสร้าง unique indexes บางตัว
 
 ### Phase 1 (P1)
@@ -68,8 +69,8 @@
   debt/money tests เพิ่มแล้วบางส่วน
   ยังไม่เสร็จ: checklist ที่เหลือใน phase นี้
 - [-] 3.3 Accessibility
-  LanguageSelector และ AppErrorBoundary ดีขึ้นแล้ว
-  ยังไม่เสร็จ: `aria-live` notification list บางจุด
+  LanguageSelector, AppErrorBoundary และ `aria-live` notification list ดีขึ้นแล้ว
+  ยังไม่เสร็จ: polish เพิ่มเติมในจุดย่อยอื่น
 - [x] 3.4 PWA Fixes
 - [x] 3.5 Build & Config
 
@@ -454,8 +455,8 @@ Completed local feature commits:
 
 Still required before calling the whole remediation complete:
 - apply new migrations on real Supabase environments
+- deploy new edge functions and set required secrets
 - clean up legacy duplicate data where unique indexes may fail
-- replace admin `sessionStorage` session with server-signed admin JWT
 - finish remaining P2/P3 items
 
 Remaining code tasks worth doing next:

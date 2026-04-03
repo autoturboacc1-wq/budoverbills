@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Shield, Check, ChevronDown, ChevronUp } from "lucide-react";
@@ -65,14 +65,17 @@ export default function PDPAConsent() {
               การคุ้มครองข้อมูลส่วนบุคคล
             </h1>
             <p className="text-muted-foreground mt-2">
-              กรุณาอ่านและยอมรับก่อนใช้งาน Bud Over Bills
+              กรุณาอ่านและยอมรับก่อนใช้งาน BudOverBills
             </p>
           </div>
 
           {/* Terms Section */}
           <div className="bg-card rounded-2xl shadow-card mb-4 overflow-hidden">
             <button
+              type="button"
               onClick={() => setTermsExpanded(!termsExpanded)}
+              aria-expanded={termsExpanded}
+              aria-controls="terms-content"
               className="w-full px-5 py-4 flex items-center justify-between text-left"
             >
               <div>
@@ -89,11 +92,12 @@ export default function PDPAConsent() {
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
+                id="terms-content"
                 className="px-5 pb-4"
               >
                 <div className="text-sm text-muted-foreground space-y-3 max-h-48 overflow-y-auto">
-                  <p><strong>Bud Over Bills</strong> เป็นแพลตฟอร์มดิจิทัลที่ช่วยบันทึกและจัดการคำมั่นและข้อตกลงส่วนบุคคลระหว่างผู้ใช้งาน</p>
-                  <p>Bud Over Bills ไม่ใช่สถาบันการเงิน, ไม่ให้กู้เงิน, และไม่เป็นคนกลางในการถือหรือโอนเงิน</p>
+                  <p><strong>BudOverBills</strong> เป็นแพลตฟอร์มดิจิทัลที่ช่วยบันทึกและจัดการคำมั่นและข้อตกลงส่วนบุคคลระหว่างผู้ใช้งาน</p>
+                  <p>BudOverBills ไม่ใช่สถาบันการเงิน, ไม่ให้กู้เงิน, และไม่เป็นคนกลางในการถือหรือโอนเงิน</p>
                   <p>• ❌ ไม่รับฝากเงิน</p>
                   <p>• ❌ ไม่โอนเงินแทนผู้ใช้</p>
                   <p>• ❌ ไม่รับประกันการชำระ</p>
@@ -101,6 +105,7 @@ export default function PDPAConsent() {
                   <p>ผู้ใช้รับผิดชอบการตกลงและการชำระกันเองทั้งหมด</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => navigate("/terms")}
                   className="text-primary text-sm mt-3 hover:underline"
                 >
@@ -113,7 +118,10 @@ export default function PDPAConsent() {
           {/* Privacy Section */}
           <div className="bg-card rounded-2xl shadow-card mb-6 overflow-hidden">
             <button
+              type="button"
               onClick={() => setPrivacyExpanded(!privacyExpanded)}
+              aria-expanded={privacyExpanded}
+              aria-controls="privacy-content"
               className="w-full px-5 py-4 flex items-center justify-between text-left"
             >
               <div>
@@ -130,6 +138,7 @@ export default function PDPAConsent() {
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
+                id="privacy-content"
                 className="px-5 pb-4"
               >
                 <div className="text-sm text-muted-foreground space-y-3 max-h-48 overflow-y-auto">
@@ -144,6 +153,7 @@ export default function PDPAConsent() {
                   <p>• ❌ ไม่ขายข้อมูลผู้ใช้</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => navigate("/privacy")}
                   className="text-primary text-sm mt-3 hover:underline"
                 >
@@ -172,17 +182,20 @@ export default function PDPAConsent() {
               onCheckedChange={(checked) => setAccepted(checked === true)}
               className="mt-1"
             />
-            <label htmlFor="pdpa-consent" className="text-sm text-foreground cursor-pointer">
-              ข้าพเจ้าได้อ่านและยอมรับ{" "}
-              <button onClick={() => navigate("/terms")} className="text-primary hover:underline">
-                ข้อกำหนดการใช้งาน
-              </button>{" "}
-              และ{" "}
-              <button onClick={() => navigate("/privacy")} className="text-primary hover:underline">
-                นโยบายความเป็นส่วนตัว
-              </button>{" "}
-              ของ Bud Over Bills รวมถึงยินยอมให้เก็บและประมวลผลข้อมูลส่วนบุคคลตาม PDPA
-            </label>
+            <div className="space-y-1">
+              <label htmlFor="pdpa-consent" className="text-sm text-foreground cursor-pointer">
+                ข้าพเจ้าได้อ่านและยอมรับข้อกำหนดการใช้งาน นโยบายความเป็นส่วนตัว และยินยอมให้เก็บและประมวลผลข้อมูลส่วนบุคคลตาม PDPA
+              </label>
+              <div className="flex flex-wrap gap-2 text-sm">
+                <button type="button" onClick={() => navigate("/terms")} className="text-primary hover:underline">
+                  อ่านข้อกำหนดการใช้งาน
+                </button>
+                <span className="text-muted-foreground" aria-hidden="true">|</span>
+                <button type="button" onClick={() => navigate("/privacy")} className="text-primary hover:underline">
+                  อ่านนโยบายความเป็นส่วนตัว
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Accept Button or Status */}
@@ -227,7 +240,7 @@ export default function PDPAConsent() {
               </Button>
 
               <p className="text-center text-xs text-muted-foreground mt-4">
-                การกดยอมรับถือว่าคุณยินยอมตามข้อกำหนดและนโยบายของ Bud Over Bills
+                การกดยอมรับถือว่าคุณยินยอมตามข้อกำหนดและนโยบายของ BudOverBills
               </p>
             </>
           )}

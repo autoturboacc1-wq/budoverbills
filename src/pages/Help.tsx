@@ -211,7 +211,7 @@ const financeArticles: HelpArticle[] = [
     title: "การคำนวณงวดชำระ",
     content: (
       <div className="space-y-4 text-sm text-muted-foreground">
-        <p>Bud Over Bills ช่วยคำนวณงวดให้อัตโนมัติตามประเภทดอกเบี้ยที่เลือก</p>
+        <p>BudOverBills ช่วยคำนวณงวดให้อัตโนมัติตามประเภทดอกเบี้ยที่เลือก</p>
         
         <div>
           <h4 className="font-medium text-foreground mb-2">📐 สูตรคำนวณดอกเบี้ยคงที่</h4>
@@ -542,12 +542,13 @@ const faqArticles: HelpArticle[] = [
     title: "ข้อมูลปลอดภัยไหม?",
     content: (
       <div className="space-y-3 text-sm text-muted-foreground">
-        <p>Bud Over Bills ใช้มาตรฐานความปลอดภัยระดับธนาคาร:</p>
+        <p>BudOverBills ใช้มาตรการความปลอดภัยหลายชั้น:</p>
         <ul className="space-y-2">
           <li>• การเข้ารหัสข้อมูลแบบ End-to-end</li>
           <li>• ไม่เก็บรหัสผ่านเป็น plain text</li>
           <li>• มีระบบยืนยันตัวตนสองชั้น</li>
           <li>• ปฏิบัติตาม PDPA</li>
+          <li>• จำกัดสิทธิ์เข้าถึงข้อมูลเฉพาะส่วนที่จำเป็น</li>
         </ul>
       </div>
     ),

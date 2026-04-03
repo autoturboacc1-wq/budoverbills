@@ -38,6 +38,8 @@ supabase db dump --linked --schema public,storage --file "backups/predeploy-$(da
 - rollback ของ edge functions: เก็บ commit SHA ล่าสุดที่ deploy สำเร็จ
 - rollback ของ frontend: เก็บ artifact หรือ deploy target ของ release ก่อนหน้า
 
+ก่อน apply unique-index migrations ให้เช็กข้อมูลซ้ำด้วย `node scripts/predeploy-duplicate-cleanup.mjs` ตามแนวทางใน `deploy/duplicate-cleanup-readiness.md`
+
 ## 4. Migration Rollout Order
 
 apply ตามลำดับนี้โดยไม่ข้าม:

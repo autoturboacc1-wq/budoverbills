@@ -2,6 +2,7 @@ import {
   Sheet,
   SheetContent,
   SheetHeader,
+  SheetDescription,
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Bell, Check, Clock, AlertCircle, FileText, CheckCircle2, Loader2, AlertTriangle, ChevronRight } from "lucide-react";
@@ -165,6 +166,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
             </SheetTitle>
             {unreadCount > 0 && (
               <Button 
+                type="button"
                 variant="ghost" 
                 size="sm" 
                 onClick={markAllAsRead}
@@ -174,15 +176,16 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
               </Button>
             )}
           </div>
+          <SheetDescription>ดูการแจ้งเตือนล่าสุดและเปิดรายการที่เกี่ยวข้องได้ทันที</SheetDescription>
         </SheetHeader>
         
-        <div className="mt-6 space-y-3" aria-live="polite" aria-relevant="additions text">
+        <div className="mt-6 space-y-3" role="list" aria-live="polite" aria-relevant="additions text" aria-busy={loading}>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-12" role="status" aria-label="กำลังโหลดการแจ้งเตือน">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           ) : sortedNotifications.length === 0 ? (
-            <div className="text-center py-12">
+            <div className="text-center py-12" role="status">
               <Bell className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
               <p className="text-muted-foreground">ไม่มีการแจ้งเตือน</p>
             </div>
@@ -195,10 +198,12 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
               return (
                 <motion.button
                   key={notif.id}
+                  type="button"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
                   onClick={() => handleClick(notif)}
+                  aria-label={`เปิดการแจ้งเตือน: ${notif.title}`}
                   className={`w-full p-4 rounded-xl border text-left transition-all ${
                     notif.is_read 
                       ? "bg-background border-border hover:bg-secondary/50 opacity-75" 
