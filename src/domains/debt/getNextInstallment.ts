@@ -19,6 +19,10 @@ function compareDueDates(a: string, b: string): number {
   return getThaiMidnightTimestamp(a) - getThaiMidnightTimestamp(b);
 }
 
+function isOutstandingInstallment(installment: Installment): boolean {
+  return installment.status !== 'paid' && installment.status !== 'rescheduled';
+}
+
 /**
  * SINGLE SOURCE OF TRUTH for getting the next unpaid installment.
  * 
@@ -30,7 +34,7 @@ export function getNextInstallment(installments: Installment[] | undefined): Ins
     return null;
   }
   
-  const unpaidInstallments = installments.filter(i => i.status !== 'paid');
+  const unpaidInstallments = installments.filter(isOutstandingInstallment);
   
   if (unpaidInstallments.length === 0) {
     return null;
@@ -64,11 +68,15 @@ export function calculateDaysUntilDue(dueDate: string): number {
  * Check if an installment is overdue
  */
 export function isInstallmentOverdue(installment: Installment): boolean {
-  if (installment.status === 'paid') {
+  if (!isOutstandingInstallment(installment)) {
     return false;
   }
-  
-  return installment.due_date < getThaiDateKey(new Date());
+
+  if (installment.status === 'overdue') {
+    return true;
+  }
+
+  return compareDueDates(installment.due_date, getThaiDateKey(new Date())) < 0;
 }
 
 /**

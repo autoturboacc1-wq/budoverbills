@@ -26,6 +26,7 @@ describe('getNextInstallment', () => {
     const next = getNextInstallment([
       createInstallment({ id: '2', due_date: '2026-06-01', status: 'pending' }),
       createInstallment({ id: '1', due_date: '2026-04-20', status: 'overdue' }),
+      createInstallment({ id: '4', due_date: '2026-04-05', status: 'rescheduled' }),
       createInstallment({ id: '3', due_date: '2026-04-01', status: 'paid' }),
     ]);
 
@@ -43,6 +44,7 @@ describe('getNextInstallment', () => {
     const installments = [
       createInstallment({ id: '1', due_date: '2026-04-10', status: 'pending' }),
       createInstallment({ id: '2', due_date: '2026-04-20', status: 'pending' }),
+      createInstallment({ id: '3', due_date: '2026-04-01', status: 'rescheduled' }),
     ];
 
     expect(getOverdueInstallments(installments)).toHaveLength(1);

@@ -37,14 +37,14 @@ describe('getAgreementDisplayStatus', () => {
     ).toBe('overdue');
   });
 
-  it('returns paid when all installments are paid', () => {
+  it('returns completed when all installments are paid', () => {
     expect(
       getAgreementDisplayStatus(
         createAgreement({
           installments: createAgreement().installments?.map((installment) => ({ ...installment, status: 'paid' })),
         })
       )
-    ).toBe('paid');
+    ).toBe('completed');
   });
 });
 

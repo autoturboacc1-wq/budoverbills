@@ -15,9 +15,11 @@ export function getPeriodsPerYear(frequency: AgreementFrequency): number {
     case 'weekly':
       return 52;
     case 'monthly':
-    default:
       return 12;
   }
+
+  const exhaustiveCheck: never = frequency;
+  throw new Error(`Unsupported frequency: ${exhaustiveCheck}`);
 }
 
 export function buildEffectiveRateSchedule(params: {

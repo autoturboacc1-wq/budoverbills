@@ -23,6 +23,7 @@ describe('calculateRemainingAmount', () => {
       createInstallment({ amount: 1000, status: 'paid' }),
       createInstallment({ id: '2', amount: 250.25, status: 'pending' }),
       createInstallment({ id: '3', amount: 749.75, status: 'overdue' }),
+      createInstallment({ id: '4', amount: 500, status: 'rescheduled' }),
     ];
     expect(calculateRemainingAmount(installments)).toBe(1000);
   });
@@ -77,6 +78,9 @@ describe('other installment totals', () => {
     expect(isAgreementEffectivelyCompleted(installments)).toBe(false);
     expect(
       isAgreementEffectivelyCompleted(installments.map((installment) => ({ ...installment, status: 'paid' })))
+    ).toBe(true);
+    expect(
+      isAgreementEffectivelyCompleted(installments.map((installment) => ({ ...installment, status: 'rescheduled' })))
     ).toBe(true);
   });
 });

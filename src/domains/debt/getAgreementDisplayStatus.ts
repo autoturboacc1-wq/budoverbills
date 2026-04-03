@@ -38,9 +38,9 @@ export function getAgreementDisplayStatus(agreement: DebtAgreement): DebtDisplay
   if (agreement.status === 'active') {
     const nextInstallment = getNextInstallment(agreement.installments);
     
-    // All installments paid
+    // All payable installments are cleared
     if (!nextInstallment) {
-      return 'paid';
+      return 'completed';
     }
     
     // Check if next installment is overdue

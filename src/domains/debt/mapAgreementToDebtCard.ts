@@ -108,12 +108,12 @@ export function mapToUpcomingInstallments(
     const partnerName = getPartnerName(agreement, userId);
     
     (agreement.installments || []).forEach((installment) => {
-      if (installment.status === 'paid') return;
+      if (installment.status === 'paid' || installment.status === 'rescheduled') return;
       
       const daysUntilDue = calculateDaysUntilDue(installment.due_date);
       
-      // Include overdue and upcoming within maxDaysAhead
-      if (daysUntilDue >= -maxDaysAhead && daysUntilDue <= maxDaysAhead) {
+      // Include every overdue installment, but only upcoming items within the lookahead window.
+      if (daysUntilDue < 0 || daysUntilDue <= maxDaysAhead) {
         upcoming.push({
           agreementId: agreement.id,
           partnerName,

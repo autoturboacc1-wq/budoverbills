@@ -47,13 +47,14 @@ describe('mapAgreementToDebtCard', () => {
   it('maps upcoming installments sorted by urgency', () => {
     const agreement = createAgreement({
       installments: [
+        createInstallment({ id: 'stale', due_date: '2026-03-01', amount: 100, status: 'pending' }),
         createInstallment({ id: 'late', due_date: '2026-04-16', amount: 500 }),
         createInstallment({ id: 'later', due_date: '2026-04-20', amount: 700 }),
       ],
     });
 
-    const upcoming = mapToUpcomingInstallments([agreement], 'lender-id', 10, 10);
-    expect(upcoming[0]?.amount).toBe(500);
+    const upcoming = mapToUpcomingInstallments([agreement], 'lender-id', 1, 10);
+    expect(upcoming.map((item) => item.amount)).toEqual([100, 500]);
     expect(upcoming).toHaveLength(2);
   });
 });

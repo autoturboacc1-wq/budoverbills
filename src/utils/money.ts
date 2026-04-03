@@ -9,7 +9,17 @@ export function roundMoney(value: number): number {
     throw new Error(`Invalid monetary value: ${value}`);
   }
 
-  return Math.round((value + Number.EPSILON) * MONEY_MULTIPLIER) / MONEY_MULTIPLIER;
+  const normalized = Math.abs(value).toFixed(12);
+  const [wholePart, fractionPart = ''] = normalized.split('.');
+  const digits = `${fractionPart}000000000000`;
+  const cents = Number(digits.slice(0, 2));
+  const roundingDigit = Number(digits[2] ?? '0');
+  const roundedCents = cents + (roundingDigit >= 5 ? 1 : 0);
+  const roundedWhole = Number(wholePart) + Math.floor(roundedCents / MONEY_MULTIPLIER);
+  const finalCents = roundedCents % MONEY_MULTIPLIER;
+  const result = Number(`${roundedWhole}.${finalCents.toString().padStart(2, '0')}`);
+  const signed = value < 0 ? -result : result;
+  return Object.is(signed, -0) ? 0 : signed;
 }
 
 export function toMoney(value: unknown, options: MoneyOptions = {}): number {
@@ -40,7 +50,8 @@ export function subtractMoney(a: number, b: number): number {
 }
 
 export function moneyEquals(a: number, b: number, tolerance: number = 0.01): boolean {
-  return Math.abs(toMoney(a, { allowNegative: true }) - toMoney(b, { allowNegative: true })) <= tolerance;
+  const toleranceCents = Math.max(0, Math.round(Math.abs(tolerance) * MONEY_MULTIPLIER));
+  return Math.abs(toMoneyCents(a) - toMoneyCents(b)) <= toleranceCents;
 }
 
 export function isWithinMoneyTolerance(

@@ -1,6 +1,10 @@
 import { Installment } from '@/domains/debt/types';
 import { sumMoney } from '@/utils/money';
 
+function isOutstandingInstallment(installment: Installment): boolean {
+  return installment.status !== 'paid' && installment.status !== 'rescheduled';
+}
+
 /**
  * SINGLE SOURCE OF TRUTH for calculating remaining amount to be paid.
  * 
@@ -13,7 +17,9 @@ export function calculateRemainingAmount(installments: Installment[] | undefined
   }
 
   return sumMoney(
-    ...installments.filter((installment) => installment.status !== 'paid').map((installment) => installment.amount)
+    ...installments
+      .filter(isOutstandingInstallment)
+      .map((installment) => installment.amount || 0)
   );
 }
 
@@ -75,5 +81,5 @@ export function isAgreementEffectivelyCompleted(installments: Installment[] | un
     return false;
   }
 
-  return installments.every((installment) => installment.status === 'paid');
+  return installments.every((installment) => !isOutstandingInstallment(installment));
 }
