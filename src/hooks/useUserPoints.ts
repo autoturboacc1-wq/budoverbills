@@ -14,6 +14,16 @@ const POINT_VALUES = {
 const DAILY_LIMIT = 50;
 const MIN_READ_TIME_SECONDS = 30;
 const MIN_COMMENT_LENGTH = 20;
+const BANGKOK_TIME_ZONE = "Asia/Bangkok";
+
+function getBangkokDateKey(date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: BANGKOK_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
 
 export interface UserPoints {
   total_points: number;
@@ -119,6 +129,8 @@ export function useUserPoints() {
     }
 
     try {
+      const todayKey = getBangkokDateKey();
+
       // Fetch or create user points
       let data: UserPointsRow | null = null;
       const { data: existingData, error } = await supabase
@@ -133,7 +145,13 @@ export function useUserPoints() {
         // No record found, create one
         const { data: newData, error: insertError } = await supabase
           .from("user_points")
-          .insert({ user_id: user.id })
+          .insert({
+            user_id: user.id,
+            last_daily_reset: todayKey,
+            total_points: 0,
+            lifetime_points: 0,
+            daily_earned_today: 0,
+          })
           .select()
           .single();
 
@@ -144,18 +162,19 @@ export function useUserPoints() {
       }
 
       // Reset daily points if new day
-      if (data && data.last_daily_reset !== new Date().toISOString().split("T")[0]) {
+      if (data && data.last_daily_reset !== todayKey) {
         const { data: updatedData } = await supabase
           .from("user_points")
           .update({ 
             daily_earned_today: 0, 
-            last_daily_reset: new Date().toISOString().split("T")[0] 
+            last_daily_reset: todayKey
           })
           .eq("user_id", user.id)
           .select()
           .single();
-        
+
         if (updatedData) data = updatedData;
+        else data = { ...data, daily_earned_today: 0, last_daily_reset: todayKey };
       }
 
       setPoints(data);
@@ -206,16 +225,29 @@ export function useUserPoints() {
     referenceId?: string,
     description?: string
   ) => {
-    if (!user || !points) return false;
+    if (!user) return false;
 
-    // Check daily limit
-    if (!canEarnToday()) {
+    const { data: latestPoints, error: pointsError } = await supabase
+      .from("user_points")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
+
+    if (pointsError) {
+      console.error("Error refreshing points before earning:", pointsError);
+      return false;
+    }
+
+    const currentPoints = latestPoints as UserPointsRow;
+
+    // Check daily limit against the latest server snapshot
+    if (currentPoints.daily_earned_today >= DAILY_LIMIT) {
       return false;
     }
 
     const pointsToEarn = Math.min(
       POINT_VALUES[actionType],
-      DAILY_LIMIT - points.daily_earned_today
+      DAILY_LIMIT - currentPoints.daily_earned_today
     );
 
     if (pointsToEarn <= 0) return false;
@@ -229,13 +261,29 @@ export function useUserPoints() {
           .eq("user_id", user.id)
           .eq("action_type", actionType)
           .eq("reference_id", referenceId)
-          .single();
+          .maybeSingle();
 
         if (existing) return false; // Already earned
       }
 
+      const nextPoints = {
+        total_points: currentPoints.total_points + pointsToEarn,
+        lifetime_points: currentPoints.lifetime_points + pointsToEarn,
+        daily_earned_today: currentPoints.daily_earned_today + pointsToEarn,
+      };
+
+      // Update points first so the counter remains consistent with any later transaction write.
+      const { data: updatedPoints, error: updateError } = await supabase
+        .from("user_points")
+        .update(nextPoints)
+        .eq("user_id", user.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
       // Insert transaction
-      await supabase
+      const { error: transactionError } = await supabase
         .from("point_transactions")
         .insert({
           user_id: user.id,
@@ -245,24 +293,25 @@ export function useUserPoints() {
           description: description || null,
         });
 
-      // Update points
-      const { data: updatedPoints } = await supabase
-        .from("user_points")
-        .update({
-          total_points: points.total_points + pointsToEarn,
-          lifetime_points: points.lifetime_points + pointsToEarn,
-          daily_earned_today: points.daily_earned_today + pointsToEarn,
-        })
-        .eq("user_id", user.id)
-        .select()
-        .single();
+      if (transactionError) {
+        await supabase
+          .from("user_points")
+          .update(currentPoints)
+          .eq("user_id", user.id);
+        setPoints(currentPoints);
+        throw transactionError;
+      }
 
       if (updatedPoints) {
         setPoints(updatedPoints);
-        toast.success(`+${pointsToEarn} คะแนน!`, {
-          description: description || `จากการ${getActionLabel(actionType)}`,
-        });
       }
+
+      await fetchTransactions();
+      await fetchPoints();
+
+      toast.success(`+${pointsToEarn} คะแนน!`, {
+        description: description || `จากการ${getActionLabel(actionType)}`,
+      });
 
       // Check for badge upgrades
       await checkBadgeProgress(actionType);
@@ -272,21 +321,52 @@ export function useUserPoints() {
       console.error("Error earning points:", error);
       return false;
     }
-  }, [user, points, canEarnToday, checkBadgeProgress]);
+  }, [user, checkBadgeProgress, fetchPoints, fetchTransactions]);
 
   const redeemPoints = useCallback(async (
     pointsToSpend: number,
     rewardType: string,
     rewardValue: string
   ) => {
-    if (!user || !points || points.total_points < pointsToSpend) {
+    if (!user) return false;
+
+    const { data: latestPoints, error: pointsError } = await supabase
+      .from("user_points")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
+
+    if (pointsError) {
+      console.error("Error refreshing points before redeeming:", pointsError);
+      toast.error("เกิดข้อผิดพลาด");
+      return false;
+    }
+
+    const currentPoints = latestPoints as UserPointsRow;
+
+    if (currentPoints.total_points < pointsToSpend) {
       toast.error("คะแนนไม่เพียงพอ");
       return false;
     }
 
     try {
+      const nextPoints = {
+        total_points: currentPoints.total_points - pointsToSpend,
+        lifetime_points: currentPoints.lifetime_points,
+        daily_earned_today: currentPoints.daily_earned_today,
+      };
+
+      const { data: updatedPoints, error: updateError } = await supabase
+        .from("user_points")
+        .update(nextPoints)
+        .eq("user_id", user.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
       // Create redemption
-      await supabase
+      const { data: redemption, error: redemptionError } = await supabase
         .from("point_redemptions")
         .insert({
           user_id: user.id,
@@ -294,25 +374,21 @@ export function useUserPoints() {
           reward_type: rewardType,
           reward_value: rewardValue,
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-        });
-
-      // Deduct points
-      const { data: updatedPoints } = await supabase
-        .from("user_points")
-        .update({
-          total_points: points.total_points - pointsToSpend,
         })
-        .eq("user_id", user.id)
         .select()
         .single();
 
-      if (updatedPoints) {
-        setPoints(updatedPoints);
-        toast.success("แลกรางวัลสำเร็จ! 🎁");
+      if (redemptionError) {
+        await supabase
+          .from("user_points")
+          .update(currentPoints)
+          .eq("user_id", user.id);
+        setPoints(currentPoints);
+        throw redemptionError;
       }
 
       // Log redemption transaction
-      await supabase
+      const { error: transactionError } = await supabase
         .from("point_transactions")
         .insert({
           user_id: user.id,
@@ -321,14 +397,33 @@ export function useUserPoints() {
           description: `แลก ${rewardType}: ${rewardValue}`,
         });
 
-      fetchTransactions();
+      if (transactionError) {
+        if (redemption?.id) {
+          await supabase.from("point_redemptions").delete().eq("id", redemption.id);
+        }
+
+        await supabase
+          .from("user_points")
+          .update(currentPoints)
+          .eq("user_id", user.id);
+        setPoints(currentPoints);
+        throw transactionError;
+      }
+
+      if (updatedPoints) {
+        setPoints(updatedPoints);
+      }
+
+      await fetchTransactions();
+      await fetchPoints();
+      toast.success("แลกรางวัลสำเร็จ! 🎁");
       return true;
     } catch (error) {
       console.error("Error redeeming points:", error);
       toast.error("เกิดข้อผิดพลาด");
       return false;
     }
-  }, [user, points, fetchTransactions]);
+  }, [user, fetchPoints, fetchTransactions]);
 
   return {
     points,

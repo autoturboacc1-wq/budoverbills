@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -28,11 +28,19 @@ export function useFriendRequests() {
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const requestIdRef = useRef(0);
+
+  const clearRequests = useCallback(() => {
+    setIncomingRequests([]);
+    setOutgoingRequests([]);
+  }, []);
 
   const fetchRequests = useCallback(async () => {
-    if (!user) {
-      setIncomingRequests([]);
-      setOutgoingRequests([]);
+    const requestId = ++requestIdRef.current;
+
+    if (!userId) {
+      clearRequests();
       setIsLoading(false);
       return;
     }
@@ -43,7 +51,7 @@ export function useFriendRequests() {
       const { data: incoming, error: incomingError } = await supabase
         .from('friend_requests')
         .select('*')
-        .eq('to_user_id', user.id)
+        .eq('to_user_id', userId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
@@ -53,44 +61,64 @@ export function useFriendRequests() {
       const { data: outgoing, error: outgoingError } = await supabase
         .from('friend_requests')
         .select('*')
-        .eq('from_user_id', user.id)
+        .eq('from_user_id', userId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       if (outgoingError) throw outgoingError;
 
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       // Fetch profile data for incoming requests
       const incomingWithProfiles = await Promise.all(
         (incoming || []).map(async (req) => {
-          const { data: profile } = await supabase
+          const { data: profile, error } = await supabase
             .from('profiles')
             .select('display_name, user_code, avatar_url')
             .eq('user_id', req.from_user_id)
-            .single();
-          return { ...req, from_profile: profile } as FriendRequest;
+            .maybeSingle();
+
+          if (error) {
+            console.error('Error fetching incoming request profile:', error);
+          }
+
+          return { ...req, from_profile: profile ?? undefined } as FriendRequest;
         })
       );
 
       // Fetch profile data for outgoing requests
       const outgoingWithProfiles = await Promise.all(
         (outgoing || []).map(async (req) => {
-          const { data: profile } = await supabase
+          const { data: profile, error } = await supabase
             .from('profiles')
             .select('display_name, user_code, avatar_url')
             .eq('user_id', req.to_user_id)
-            .single();
-          return { ...req, to_profile: profile } as FriendRequest;
+            .maybeSingle();
+
+          if (error) {
+            console.error('Error fetching outgoing request profile:', error);
+          }
+
+          return { ...req, to_profile: profile ?? undefined } as FriendRequest;
         })
       );
+
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
 
       setIncomingRequests(incomingWithProfiles);
       setOutgoingRequests(outgoingWithProfiles);
     } catch (error: unknown) {
       console.error('Error fetching friend requests:', error);
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [user]);
+  }, [clearRequests, userId]);
 
   useEffect(() => {
     fetchRequests();
@@ -98,7 +126,7 @@ export function useFriendRequests() {
 
   // Realtime subscription for friend requests
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
 
     const channel = supabase
       .channel('friend-requests-changes')
@@ -108,7 +136,7 @@ export function useFriendRequests() {
           event: '*',
           schema: 'public',
           table: 'friend_requests',
-          filter: `to_user_id=eq.${user.id}`,
+          filter: `to_user_id=eq.${userId}`,
         },
         () => {
           fetchRequests();
@@ -120,7 +148,7 @@ export function useFriendRequests() {
           event: '*',
           schema: 'public',
           table: 'friend_requests',
-          filter: `from_user_id=eq.${user.id}`,
+          filter: `from_user_id=eq.${userId}`,
         },
         () => {
           fetchRequests();
@@ -131,15 +159,15 @@ export function useFriendRequests() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchRequests]);
+  }, [fetchRequests, userId]);
 
   const sendRequest = async (toUserId: string) => {
-    if (!user) {
+    if (!userId) {
       toast.error('กรุณาเข้าสู่ระบบก่อน');
       return false;
     }
 
-    if (toUserId === user.id) {
+    if (toUserId === userId) {
       toast.error('ไม่สามารถเพิ่มตัวเองเป็นเพื่อนได้');
       return false;
     }
@@ -149,7 +177,7 @@ export function useFriendRequests() {
       const { data: existing } = await supabase
         .from('friend_requests')
         .select('id, status')
-        .or(`and(from_user_id.eq.${user.id},to_user_id.eq.${toUserId}),and(from_user_id.eq.${toUserId},to_user_id.eq.${user.id})`)
+        .or(`and(from_user_id.eq.${userId},to_user_id.eq.${toUserId}),and(from_user_id.eq.${toUserId},to_user_id.eq.${userId})`)
         .maybeSingle();
 
       if (existing) {
@@ -165,7 +193,7 @@ export function useFriendRequests() {
       const { data: existingFriend } = await supabase
         .from('friends')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('friend_user_id', toUserId)
         .maybeSingle();
 
@@ -177,7 +205,7 @@ export function useFriendRequests() {
       const { error } = await supabase
         .from('friend_requests')
         .insert({
-          from_user_id: user.id,
+          from_user_id: userId,
           to_user_id: toUserId,
         });
 
@@ -198,63 +226,91 @@ export function useFriendRequests() {
   };
 
   const acceptRequest = async (requestId: string) => {
-    if (!user) return false;
+    if (!userId) return false;
+    const createdFriendIds: string[] = [];
 
     try {
-      // Find the request
-      const request = incomingRequests.find(r => r.id === requestId);
+      const { data: request, error: requestError } = await supabase
+        .from('friend_requests')
+        .select('*')
+        .eq('id', requestId)
+        .eq('to_user_id', userId)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      if (requestError) throw requestError;
+
       if (!request) {
         toast.error('ไม่พบคำขอ');
         return false;
       }
 
-      // Update request status
-      const { error: updateError } = await supabase
-        .from('friend_requests')
-        .update({ status: 'accepted' })
-        .eq('id', requestId);
+      const [fromProfileResult, toProfileResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('display_name, user_code')
+          .eq('user_id', request.from_user_id)
+          .maybeSingle(),
+        supabase
+          .from('profiles')
+          .select('display_name, user_code')
+          .eq('user_id', userId)
+          .maybeSingle(),
+      ]);
 
-      if (updateError) throw updateError;
+      if (fromProfileResult.error) throw fromProfileResult.error;
+      if (toProfileResult.error) throw toProfileResult.error;
 
-      // Get both profiles for names
-      const { data: fromProfile } = await supabase
-        .from('profiles')
-        .select('display_name, user_code')
-        .eq('user_id', request.from_user_id)
-        .single();
-
-      const { data: toProfile } = await supabase
-        .from('profiles')
-        .select('display_name, user_code')
-        .eq('user_id', user.id)
-        .single();
-
-      // Create friendship for both parties
-      const { error: friend1Error } = await supabase
+      const { data: friend1, error: friend1Error } = await supabase
         .from('friends')
         .insert({
-          user_id: user.id,
+          user_id: userId,
           friend_user_id: request.from_user_id,
-          friend_name: fromProfile?.display_name || `User ${fromProfile?.user_code || 'Unknown'}`,
-        });
+          friend_name: fromProfileResult.data?.display_name || `User ${fromProfileResult.data?.user_code || 'Unknown'}`,
+        })
+        .select('id')
+        .single();
 
       if (friend1Error) throw friend1Error;
+      if (friend1?.id) {
+        createdFriendIds.push(friend1.id);
+      }
 
-      const { error: friend2Error } = await supabase
+      const { data: friend2, error: friend2Error } = await supabase
         .from('friends')
         .insert({
           user_id: request.from_user_id,
-          friend_user_id: user.id,
-          friend_name: toProfile?.display_name || `User ${toProfile?.user_code || 'Unknown'}`,
-        });
+          friend_user_id: userId,
+          friend_name: toProfileResult.data?.display_name || `User ${toProfileResult.data?.user_code || 'Unknown'}`,
+        })
+        .select('id')
+        .single();
 
       if (friend2Error) throw friend2Error;
+      if (friend2?.id) {
+        createdFriendIds.push(friend2.id);
+      }
+
+      const { error: updateError } = await supabase
+        .from('friend_requests')
+        .update({ status: 'accepted' })
+        .eq('id', requestId)
+        .eq('to_user_id', userId)
+        .eq('status', 'pending');
+
+      if (updateError) throw updateError;
 
       await fetchRequests();
       toast.success('ยอมรับคำขอเป็นเพื่อนแล้ว');
       return true;
     } catch (error: unknown) {
       console.error('Error accepting friend request:', error);
+      if (createdFriendIds.length > 0) {
+        await supabase
+          .from('friends')
+          .delete()
+          .in('id', createdFriendIds);
+      }
       toast.error('ไม่สามารถยอมรับคำขอได้');
       return false;
     }
@@ -262,10 +318,14 @@ export function useFriendRequests() {
 
   const rejectRequest = async (requestId: string) => {
     try {
+      if (!userId) return false;
+
       const { error } = await supabase
         .from('friend_requests')
         .update({ status: 'rejected' })
-        .eq('id', requestId);
+        .eq('id', requestId)
+        .eq('to_user_id', userId)
+        .eq('status', 'pending');
 
       if (error) throw error;
 
@@ -281,10 +341,14 @@ export function useFriendRequests() {
 
   const cancelRequest = async (requestId: string) => {
     try {
+      if (!userId) return false;
+
       const { error } = await supabase
         .from('friend_requests')
         .delete()
-        .eq('id', requestId);
+        .eq('id', requestId)
+        .eq('from_user_id', userId)
+        .eq('status', 'pending');
 
       if (error) throw error;
 

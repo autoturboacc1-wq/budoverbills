@@ -10,32 +10,41 @@ export function FriendRequestsSection() {
 
   const handleAccept = async (requestId: string) => {
     setProcessingIds(prev => new Set(prev).add(requestId));
-    await acceptRequest(requestId);
-    setProcessingIds(prev => {
-      const next = new Set(prev);
-      next.delete(requestId);
-      return next;
-    });
+    try {
+      await acceptRequest(requestId);
+    } finally {
+      setProcessingIds(prev => {
+        const next = new Set(prev);
+        next.delete(requestId);
+        return next;
+      });
+    }
   };
 
   const handleReject = async (requestId: string) => {
     setProcessingIds(prev => new Set(prev).add(requestId));
-    await rejectRequest(requestId);
-    setProcessingIds(prev => {
-      const next = new Set(prev);
-      next.delete(requestId);
-      return next;
-    });
+    try {
+      await rejectRequest(requestId);
+    } finally {
+      setProcessingIds(prev => {
+        const next = new Set(prev);
+        next.delete(requestId);
+        return next;
+      });
+    }
   };
 
   const handleCancel = async (requestId: string) => {
     setProcessingIds(prev => new Set(prev).add(requestId));
-    await cancelRequest(requestId);
-    setProcessingIds(prev => {
-      const next = new Set(prev);
-      next.delete(requestId);
-      return next;
-    });
+    try {
+      await cancelRequest(requestId);
+    } finally {
+      setProcessingIds(prev => {
+        const next = new Set(prev);
+        next.delete(requestId);
+        return next;
+      });
+    }
   };
 
   if (isLoading) {

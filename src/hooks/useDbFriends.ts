@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -17,9 +17,13 @@ export function useDbFriends() {
   const [friends, setFriends] = useState<DbFriend[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const requestIdRef = useRef(0);
 
   const fetchFriends = useCallback(async () => {
-    if (!user) {
+    const requestId = ++requestIdRef.current;
+
+    if (!userId) {
       setFriends([]);
       setIsLoading(false);
       return;
@@ -30,17 +34,24 @@ export function useDbFriends() {
       const { data, error } = await supabase
         .from('friends')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       setFriends(data || []);
     } catch (error: unknown) {
       console.error('Error fetching friends:', error);
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     fetchFriends();
@@ -52,8 +63,13 @@ export function useDbFriends() {
     friend_user_id?: string;
     nickname?: string;
   }) => {
-    if (!user) {
+    if (!userId) {
       toast.error('กรุณาเข้าสู่ระบบก่อน');
+      return null;
+    }
+
+    if (input.friend_user_id && input.friend_user_id === userId) {
+      toast.error('ไม่สามารถเพิ่มตัวเองเป็นเพื่อนได้');
       return null;
     }
 
@@ -61,7 +77,7 @@ export function useDbFriends() {
       const { data, error } = await supabase
         .from('friends')
         .insert({
-          user_id: user.id,
+          user_id: userId,
           friend_name: input.name,
           friend_phone: input.phone || null,
           friend_user_id: input.friend_user_id || null,
@@ -82,11 +98,17 @@ export function useDbFriends() {
   };
 
   const removeFriend = async (friendId: string) => {
+    if (!userId) {
+      toast.error('กรุณาเข้าสู่ระบบก่อน');
+      return false;
+    }
+
     try {
       const { error } = await supabase
         .from('friends')
         .delete()
-        .eq('id', friendId);
+        .eq('id', friendId)
+        .eq('user_id', userId);
 
       if (error) throw error;
       await fetchFriends();
@@ -104,11 +126,17 @@ export function useDbFriends() {
     friend_phone?: string;
     nickname?: string;
   }) => {
+    if (!userId) {
+      toast.error('กรุณาเข้าสู่ระบบก่อน');
+      return false;
+    }
+
     try {
       const { error } = await supabase
         .from('friends')
         .update(updates)
-        .eq('id', friendId);
+        .eq('id', friendId)
+        .eq('user_id', userId);
 
       if (error) throw error;
       await fetchFriends();

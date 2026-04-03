@@ -20,6 +20,18 @@ interface SubscriptionInfo {
   expires_at: string | null;
 }
 
+function getDefaultFeeAmount(feeAmount?: number | null): number {
+  return typeof feeAmount === "number" && Number.isFinite(feeAmount) ? feeAmount : 29;
+}
+
+function getTotalAvailable(freeRemaining: number, credits: number, totalAvailable?: number | null): number {
+  if (typeof totalAvailable === "number" && Number.isFinite(totalAvailable)) {
+    return totalAvailable;
+  }
+
+  return Math.max(0, freeRemaining + credits);
+}
+
 export function useSubscription() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -56,8 +68,8 @@ export function useSubscription() {
           free_limit: result.free_limit,
           free_remaining: result.free_remaining,
           credits: result.credits ?? 0,
-          total_available: result.total_available ?? result.free_remaining,
-          fee_amount: result.fee_amount,
+          total_available: getTotalAvailable(result.free_remaining, result.credits ?? 0, result.total_available),
+          fee_amount: getDefaultFeeAmount(result.fee_amount),
           fee_currency: result.fee_currency,
         };
       }
@@ -70,7 +82,7 @@ export function useSubscription() {
         free_remaining: 2,
         credits: 0,
         total_available: 2,
-        fee_amount: 25,
+        fee_amount: 29,
         fee_currency: 'THB',
       };
     },
@@ -174,7 +186,7 @@ export function useSubscription() {
   // Check if can create free agreement
   const canCreateFree = quota?.can_create_free ?? true;
   const freeRemaining = quota?.free_remaining ?? 2;
-  const feeAmount = quota?.fee_amount ?? 29;
+  const feeAmount = getDefaultFeeAmount(quota?.fee_amount);
   const feeCurrency = quota?.fee_currency ?? 'THB';
 
   // Backwards compatibility
@@ -188,7 +200,9 @@ export function useSubscription() {
     ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
 
-  const hasUsedTrial = subscriptionInfo?.is_trial ?? false;
+  const hasUsedTrial = Boolean(
+    subscriptionInfo?.is_trial || subscriptionInfo?.trial_ends_at || subscriptionInfo?.expires_at,
+  );
 
   return {
     // New pay-per-agreement model
