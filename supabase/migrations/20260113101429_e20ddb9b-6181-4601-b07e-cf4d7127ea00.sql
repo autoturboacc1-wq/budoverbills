@@ -155,8 +155,4 @@ $$;
 -- Note: This will invalidate existing codes - admins need to create new ones
 DELETE FROM public.admin_codes WHERE code_hash NOT LIKE '$2a$%' AND code_hash NOT LIKE '$2b$%';
 
--- Create a default admin code for testing (secure bcrypt hash)
--- Default code is: Admin@Secure2024! (12+ chars with upper, lower, number, special)
-INSERT INTO public.admin_codes (code_name, code_hash, role)
-VALUES ('Default Admin', crypt('Admin@Secure2024!', gen_salt('bf', 10)), 'admin')
-ON CONFLICT DO NOTHING;
+-- SECURITY: do not seed default admin credentials in source-controlled migrations.
