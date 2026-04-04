@@ -63,7 +63,7 @@ export function mapAgreementToDebtCard(
     partnerName,
     partnerInitial: partnerName.charAt(0).toUpperCase(),
     partnerAvatarUrl,
-    amount: remainingAmount,
+    amount: agreement.total_amount,
     remainingAmount,
     nextPaymentDate: nextInstallment 
       ? formatDueDate(nextInstallment.due_date)

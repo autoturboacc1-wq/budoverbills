@@ -4,7 +4,6 @@ import { PageTransition } from "@/components/ux/PageTransition";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { BottomNav } from "@/components/BottomNav";
 import { useDebtAgreements, DebtAgreement } from "@/hooks/useDebtAgreements";
 import { useAuth } from "@/contexts/AuthContext";
 import { PasswordConfirmDialog } from "@/components/PasswordConfirmDialog";
@@ -87,6 +86,24 @@ export default function AgreementConfirm() {
 
   const isLender = userRole === 'lender';
   const isBorrower = userRole === 'borrower';
+
+  const fetchAgreementConfirmationState = async () => {
+    if (!id) {
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from("debt_agreements")
+      .select("id, status, lender_confirmed, borrower_confirmed")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  };
 
   // Get signed URL for preview
   useEffect(() => {
@@ -173,6 +190,17 @@ export default function AgreementConfirm() {
 
     setIsConfirming(true);
     try {
+      const latestAgreement = await fetchAgreementConfirmationState();
+      if (!latestAgreement) {
+        toast.error("ไม่พบข้อตกลงล่าสุด");
+        return;
+      }
+
+      if (latestAgreement.status !== "pending_confirmation") {
+        toast.error("ข้อตกลงนี้ไม่อยู่ในสถานะที่ยืนยันได้แล้ว");
+        return;
+      }
+
       // Get IP and Device info for legal evidence
       const [clientIP, deviceId] = await Promise.all([
         getClientIP(),
@@ -195,8 +223,8 @@ export default function AgreementConfirm() {
       await refresh();
       
       const willBeFullyConfirmed = isLender
-        ? Boolean(agreement.borrower_confirmed)
-        : Boolean(agreement.lender_confirmed);
+        ? Boolean(latestAgreement.borrower_confirmed)
+        : Boolean(latestAgreement.lender_confirmed);
 
       if (willBeFullyConfirmed) {
         toast.success("ข้อตกลงถูกยืนยันแล้ว!", {
@@ -225,6 +253,17 @@ export default function AgreementConfirm() {
     }
 
     try {
+      const latestAgreement = await fetchAgreementConfirmationState();
+      if (!latestAgreement) {
+        toast.error("ไม่พบข้อตกลงล่าสุด");
+        return;
+      }
+
+      if (latestAgreement.status !== "pending_confirmation") {
+        toast.error("ข้อตกลงนี้ไม่สามารถปฏิเสธได้แล้ว");
+        return;
+      }
+
       let rejectQuery = supabase
         .from('debt_agreements')
         .update({ status: 'cancelled' })
@@ -624,7 +663,6 @@ export default function AgreementConfirm() {
         </DialogContent>
       </Dialog>
 
-      <BottomNav />
     </div>
     </PageTransition>
   );

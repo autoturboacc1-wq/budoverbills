@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import { ArrowLeft, FileText, Check, Calendar, Loader2, Download, Sparkles } from "lucide-react";
 import { PageTransition } from "@/components/ux/PageTransition";
 import { useNavigate } from "react-router-dom";
-import { BottomNav } from "@/components/BottomNav";
 import { useDebtAgreements } from "@/hooks/useDebtAgreements";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMemo } from "react";
@@ -342,7 +341,6 @@ export default function History() {
         )}
       </div>
 
-      <BottomNav />
     </div>
     </PageTransition>
   );

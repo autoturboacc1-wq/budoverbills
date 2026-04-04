@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+const MIN_REFRESH_WINDOW_MS = 30_000;
+
+function getRefreshDelayMs(expiresIn: number): number {
+  const requestedMs = expiresIn * 1000;
+  if (requestedMs <= MIN_REFRESH_WINDOW_MS * 2) {
+    return Math.max(Math.floor(requestedMs / 2), 5_000);
+  }
+
+  return requestedMs - MIN_REFRESH_WINDOW_MS;
+}
+
 export function normalizeStoragePath(path: string): string {
   if (!path.includes("/storage/v1/object/public/")) {
     return path;
@@ -30,11 +41,18 @@ export function useSignedUrl(
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const requestIdRef = useRef(0);
+  const refreshTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const requestId = ++requestIdRef.current;
     let cancelled = false;
+
+    if (refreshTimerRef.current !== null) {
+      window.clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
 
     if (!path) {
       setSignedUrl(null);
@@ -57,6 +75,9 @@ export function useSignedUrl(
         if (signError) throw signError;
         if (!cancelled && requestIdRef.current === requestId) {
           setSignedUrl(data.signedUrl);
+          refreshTimerRef.current = window.setTimeout(() => {
+            setRefreshKey((current) => current + 1);
+          }, getRefreshDelayMs(expiresIn));
         }
       } catch (err) {
         if (cancelled || requestIdRef.current !== requestId) {
@@ -76,9 +97,13 @@ export function useSignedUrl(
 
     return () => {
       cancelled = true;
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
       requestIdRef.current += 1;
     };
-  }, [bucket, path, expiresIn]);
+  }, [bucket, path, expiresIn, refreshKey]);
 
   return { signedUrl, isLoading, error };
 }

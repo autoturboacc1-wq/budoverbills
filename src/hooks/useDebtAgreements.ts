@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
@@ -201,11 +201,72 @@ export function useDebtAgreements() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     void fetchAgreements();
   }, [fetchAgreements]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    const channels: Array<ReturnType<typeof supabase.channel>> = [];
+    const refresh = () => {
+      void fetchAgreements();
+    };
+
+    const agreementsChannel = supabase
+      .channel(`debt-agreements-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'debt_agreements',
+          filter: `lender_id=eq.${user.id}`,
+        },
+        refresh
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'debt_agreements',
+          filter: `borrower_id=eq.${user.id}`,
+        },
+        refresh
+      )
+      .subscribe();
+
+    channels.push(agreementsChannel);
+
+    agreements.forEach((agreement) => {
+      const installmentsChannel = supabase
+        .channel(`debt-installments-${user.id}-${agreement.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'installments',
+            filter: `agreement_id=eq.${agreement.id}`,
+          },
+          refresh
+        )
+        .subscribe();
+
+      channels.push(installmentsChannel);
+    });
+
+    return () => {
+      channels.forEach((channel) => {
+        void supabase.removeChannel(channel);
+      });
+    };
+  }, [agreements, fetchAgreements, user?.id]);
 
   const createAgreement = async (input: CreateAgreementInput) => {
     if (!user) {
@@ -549,27 +610,39 @@ export function useDebtAgreements() {
     [agreements]
   );
 
-  const getActiveAgreements = useCallback(() => agreements.filter((agreement) => agreement.status === 'active'), [agreements]);
+  const getActiveAgreements = useCallback(
+    () => agreements.filter((agreement) => agreement.status === 'active' || agreement.status === 'rescheduling'),
+    [agreements]
+  );
 
   const getPendingAgreements = useCallback(
     () => agreements.filter((agreement) => agreement.status === 'pending_confirmation'),
     [agreements]
   );
 
-  const stats = {
+  const stats = useMemo(() => ({
     totalToReceive: sumMoney(
       ...agreements
-        .filter((agreement) => getUserRoleInAgreement(agreement, user?.id) === 'lender' && agreement.status === 'active')
+        .filter((agreement) =>
+          getUserRoleInAgreement(agreement, user?.id) === 'lender' &&
+          (agreement.status === 'active' || agreement.status === 'rescheduling')
+        )
         .map((agreement) => calculateRemainingAmount(agreement.installments))
     ),
     totalToPay: sumMoney(
       ...agreements
-        .filter((agreement) => getUserRoleInAgreement(agreement, user?.id) === 'borrower' && agreement.status === 'active')
+        .filter((agreement) =>
+          getUserRoleInAgreement(agreement, user?.id) === 'borrower' &&
+          (agreement.status === 'active' || agreement.status === 'rescheduling')
+        )
         .map((agreement) => calculateRemainingAmount(agreement.installments))
     ),
-    activeCount: agreements.filter((agreement) => agreement.status === 'active').length,
+    activeCount: agreements.filter((agreement) =>
+      (agreement.status === 'active' || agreement.status === 'rescheduling') &&
+      calculateRemainingAmount(agreement.installments) > 0
+    ).length,
     pendingCount: agreements.filter((agreement) => agreement.status === 'pending_confirmation').length,
-  };
+  }), [agreements, user?.id]);
 
   return {
     agreements,

@@ -13,7 +13,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/contexts/AuthContext";
-import { BottomNav } from "@/components/BottomNav";
 import type { AppRole } from "@/hooks/useUserRole";
 
 interface UserWithRoles {
@@ -375,7 +374,6 @@ export default function AdminUserRoles() {
         </motion.div>
       </div>
 
-      <BottomNav />
     </div>
     </PageTransition>
   );

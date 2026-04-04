@@ -31,6 +31,17 @@ const PAYMENTS_PER_MONTH: Record<AgreementFrequency, number> = {
   monthly: 1,
 };
 
+function getMonthlyRate(interestRate: number, frequency: AgreementFrequency): number {
+  const periodicRate = Math.max(interestRate, 0) / 100;
+  const periodsPerMonth = PAYMENTS_PER_MONTH[frequency];
+
+  if (periodicRate <= 0 || periodsPerMonth <= 0) {
+    return 0;
+  }
+
+  return Math.pow(1 + periodicRate, periodsPerMonth) - 1;
+}
+
 function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -93,7 +104,7 @@ function simulate(orderedDebts: DebtItem[], extraPayment: number): PaymentPlan {
         continue;
       }
 
-      const monthlyRate = debt.interestRate / 100 / 12;
+      const monthlyRate = getMonthlyRate(debt.interestRate, debt.frequency);
       const monthlyInterest = roundCurrency(debt.balance * monthlyRate);
 
       debt.balance = roundCurrency(debt.balance + monthlyInterest);

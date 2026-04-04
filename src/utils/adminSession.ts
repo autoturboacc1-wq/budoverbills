@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const ADMIN_SESSION_TOKEN_KEY = "admin_session_token";
 const ADMIN_SESSION_FUNCTION = "admin-session";
+const validatedAdminSessions = new Map<string, AdminSessionDetails>();
 
 type AdminSessionIssueResponse = {
   success: boolean;
@@ -33,7 +34,21 @@ export type AdminSessionDetails = {
 };
 
 function getStoredSessionToken(): string | null {
-  return sessionStorage.getItem(ADMIN_SESSION_TOKEN_KEY);
+  const token = sessionStorage.getItem(ADMIN_SESSION_TOKEN_KEY);
+  return token && token.trim() ? token : null;
+}
+
+function rememberValidatedAdminSession(userId: string, details: AdminSessionDetails): void {
+  validatedAdminSessions.set(userId, details);
+}
+
+function forgetValidatedAdminSession(userId?: string | null): void {
+  if (userId) {
+    validatedAdminSessions.delete(userId);
+    return;
+  }
+
+  validatedAdminSessions.clear();
 }
 
 async function invokeAdminSession<TResponse>(body: Record<string, unknown>): Promise<TResponse> {
@@ -51,11 +66,19 @@ export function getAdminSessionToken(): string | null {
 }
 
 export function hasAdminSession(userId?: string | null): boolean {
-  return Boolean(userId) && Boolean(getStoredSessionToken());
+  if (!userId || !getStoredSessionToken()) {
+    return false;
+  }
+
+  return validatedAdminSessions.has(userId);
 }
 
 export function hasAdminCodeSession(userId?: string | null): boolean {
-  return Boolean(userId) && Boolean(getStoredSessionToken()) && sessionStorage.getItem("admin_code_verified") === "true";
+  if (!userId || !getStoredSessionToken()) {
+    return false;
+  }
+
+  return validatedAdminSessions.get(userId)?.verifiedVia === "code";
 }
 
 export async function issueAdminOtpSession(otp: string): Promise<AdminSessionIssueResponse> {
@@ -77,6 +100,7 @@ export async function issueAdminCodeSession(code: string): Promise<AdminSessionI
 export function setAdminSession(params: {
   sessionToken: string;
 }) {
+  forgetValidatedAdminSession();
   sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, params.sessionToken);
 }
 
@@ -93,16 +117,11 @@ async function validateAdminSessionDetails(userId?: string | null): Promise<Admi
     });
 
     if (!result?.valid) {
+      forgetValidatedAdminSession(userId);
       return null;
     }
 
-    if (result.verified_via === "code") {
-      sessionStorage.setItem("admin_code_verified", "true");
-    } else {
-      sessionStorage.removeItem("admin_code_verified");
-    }
-
-    return {
+    const details: AdminSessionDetails = {
       verifiedVia: result.verified_via ?? "otp",
       codeName: result.code_name ?? null,
       codeRole: result.code_role === "admin" || result.code_role === "moderator"
@@ -110,6 +129,10 @@ async function validateAdminSessionDetails(userId?: string | null): Promise<Admi
         : null,
       expiresAt: result.expires_at ?? null,
     };
+
+    rememberValidatedAdminSession(userId, details);
+
+    return details;
   } catch (error) {
     console.error("Failed to validate admin session:", error);
     return null;
@@ -136,13 +159,14 @@ async function revokeAdminSession(sessionToken: string): Promise<void> {
 }
 
 export function clearAdminSession(): void {
+  forgetValidatedAdminSession();
+
   const token = getStoredSessionToken();
   if (token) {
     void revokeAdminSession(token);
   }
 
   sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
-  sessionStorage.removeItem("admin_code_verified");
   sessionStorage.removeItem("admin_code_name");
   sessionStorage.removeItem("admin_code_role");
 }

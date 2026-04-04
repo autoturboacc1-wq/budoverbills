@@ -11,7 +11,7 @@ import { toast } from "sonner";
 
 export default function PDPAConsent() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const [accepted, setAccepted] = useState(false);
   const [termsExpanded, setTermsExpanded] = useState(false);
   const [privacyExpanded, setPrivacyExpanded] = useState(false);
@@ -40,6 +40,7 @@ export default function PDPAConsent() {
 
       if (error) throw error;
 
+      await refreshProfile();
       toast.success("ยอมรับข้อกำหนดเรียบร้อยแล้ว");
       navigate("/", { replace: true });
     } catch (error) {

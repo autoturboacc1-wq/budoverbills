@@ -3,7 +3,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { MessageCircle, Users, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { BottomNav } from "@/components/BottomNav";
 import { ChatThreadList, ChatRoom, ChatThread, RoomType, PendingActionType } from "@/components/chat";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +36,15 @@ type ChatThreadSummaryRpcResult = {
   error: { message: string } | null;
 };
 
+interface ChatTargets {
+  agreementIds: string[];
+  directChatIds: string[];
+}
+
+function uniqueStrings(values?: Array<string | null | undefined>): string[] {
+  return Array.from(new Set((values ?? []).filter((value): value is string => Boolean(value))));
+}
+
 const fetchChatThreadSummaries = () =>
   supabase.rpc("get_chat_thread_summaries" as never) as unknown as Promise<ChatThreadSummaryRpcResult>;
 
@@ -48,6 +56,10 @@ const Chat = () => {
   const [loading, setLoading] = useState(true);
   const [selectedThread, setSelectedThread] = useState<ChatThread | null>(null);
   const [activeTab, setActiveTab] = useState<"chats" | "friends">("chats");
+  const [chatTargets, setChatTargets] = useState<ChatTargets>({
+    agreementIds: [],
+    directChatIds: [],
+  });
   const totalUnreadCount = useMemo(() => threads.reduce((acc, t) => acc + t.unread_count, 0), [threads]);
 
   // Fetch all chat threads (both agreement-based and direct chats)
@@ -80,6 +92,11 @@ const Chat = () => {
         agreement_status: row.agreement_status || undefined,
         principal_amount: row.principal_amount ?? undefined,
       }));
+
+      setChatTargets({
+        agreementIds: uniqueStrings((data || []).filter((row) => row.chat_type === "agreement").map((row) => row.agreement_id)),
+        directChatIds: uniqueStrings((data || []).filter((row) => row.chat_type === "direct").map((row) => row.direct_chat_id)),
+      });
 
       // Sort: pending actions first (debt with pending action), then by last message time
       allThreads.sort((a, b) => {
@@ -120,41 +137,55 @@ const Chat = () => {
     fetchThreads();
   }, [fetchThreads]);
 
-  // Realtime subscription for new messages and chat_rooms updates
+  // Realtime subscription for thread list updates only.
   useEffect(() => {
-    if (!user) return;
+    if (!user || selectedThread) return;
 
     const channel = supabase
       .channel("chat-threads-updates")
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
-          table: "messages",
+          table: "debt_agreements",
+          filter: `lender_id=eq.${user.id}`,
         },
         () => {
           fetchThreads();
         }
       )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "direct_chats",
-        },
-        () => {
-          fetchThreads();
-        }
-      )
-      // Listen for chat_rooms updates (action status changes)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "chat_rooms",
+          table: "debt_agreements",
+          filter: `borrower_id=eq.${user.id}`,
+        },
+        () => {
+          fetchThreads();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "direct_chats",
+          filter: `user1_id=eq.${user.id}`,
+        },
+        () => {
+          fetchThreads();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "direct_chats",
+          filter: `user2_id=eq.${user.id}`,
         },
         () => {
           fetchThreads();
@@ -165,7 +196,60 @@ const Chat = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchThreads]);
+  }, [fetchThreads, selectedThread, user]);
+
+  useEffect(() => {
+    if (!user || selectedThread) return;
+    if (chatTargets.agreementIds.length === 0 && chatTargets.directChatIds.length === 0) return;
+
+    const channels: Array<ReturnType<typeof supabase.channel>> = [];
+
+    const refreshThreads = () => {
+      void fetchThreads();
+    };
+
+    chatTargets.agreementIds.forEach((agreementId) => {
+      const channel = supabase
+        .channel(`chat-thread-agreement-${user.id}-${agreementId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "messages",
+            filter: `agreement_id=eq.${agreementId}`,
+          },
+          refreshThreads
+        )
+        .subscribe();
+
+      channels.push(channel);
+    });
+
+    chatTargets.directChatIds.forEach((directChatId) => {
+      const channel = supabase
+        .channel(`chat-thread-direct-${user.id}-${directChatId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "messages",
+            filter: `direct_chat_id=eq.${directChatId}`,
+          },
+          refreshThreads
+        )
+        .subscribe();
+
+      channels.push(channel);
+    });
+
+    return () => {
+      channels.forEach((channel) => {
+        void supabase.removeChannel(channel);
+      });
+    };
+  }, [chatTargets.agreementIds, chatTargets.directChatIds, fetchThreads, selectedThread, user]);
 
   const handleSelectThread = (thread: ChatThread) => {
     setSelectedThread(thread);
@@ -240,7 +324,6 @@ const Chat = () => {
         )}
       </main>
 
-      <BottomNav />
     </div>
     </PageTransition>
   );

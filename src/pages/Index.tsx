@@ -7,7 +7,6 @@ import { PaymentCalendar } from "@/components/PaymentCalendar";
 import { DebtCard } from "@/components/DebtCard";
 import { PendingAgreements } from "@/components/PendingAgreements";
 import { PendingActionsCard } from "@/components/home/PendingActionsCard";
-import { BottomNav } from "@/components/BottomNav";
 import { useDebtAgreements } from "@/hooks/useDebtAgreements";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -35,7 +34,7 @@ const Index = () => {
   // Filter out agreements that are effectively completed (all installments paid)
   const debtCards = useMemo(() => {
     const activeAgreements = agreements.filter(a => 
-      a.status === 'active' && 
+      (a.status === 'active' || a.status === 'rescheduling') && 
       !isAgreementEffectivelyCompleted(a.installments)
     );
     return mapAgreementsToDebtCards(activeAgreements, user?.id);
@@ -190,7 +189,6 @@ const Index = () => {
         </PageSection>
       </div>
 
-      <BottomNav />
     </div>
     </PageTransition>
   );

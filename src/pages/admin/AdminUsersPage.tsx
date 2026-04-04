@@ -118,11 +118,15 @@ export default function AdminUsersPage() {
 
   const addRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
-      const { error } = await supabase
-        .from("user_roles")
-        .insert({ user_id: userId, role });
-      
+      const { data, error } = await supabase.rpc("grant_user_role", {
+        p_user_id: userId,
+        p_role: role,
+      }) as { data: { success?: boolean; error?: string; message?: string } | null; error: Error | null };
+
       if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.message || data?.error || "ไม่สามารถเพิ่มสิทธิ์ได้");
+      }
       
       await createNotification(userId, "granted", role);
       await logRoleActivity(userId, "role_granted", role);
@@ -134,7 +138,7 @@ export default function AdminUsersPage() {
       setSearchCode("");
     },
     onError: (error: Error) => {
-      if (error.message.includes("duplicate")) {
+      if (error.message.includes("duplicate") || error.message.includes("มีสิทธิ์นี้อยู่แล้ว")) {
         toast.error("ผู้ใช้มีสิทธิ์นี้อยู่แล้ว");
       } else {
         toast.error("เกิดข้อผิดพลาด");
@@ -144,13 +148,15 @@ export default function AdminUsersPage() {
 
   const removeRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
-      const { error } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", userId)
-        .eq("role", role);
-      
+      const { data, error } = await supabase.rpc("revoke_user_role", {
+        p_user_id: userId,
+        p_role: role,
+      }) as { data: { success?: boolean; error?: string; message?: string } | null; error: Error | null };
+
       if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.message || data?.error || "ไม่สามารถถอดสิทธิ์ได้");
+      }
       
       await createNotification(userId, "revoked", role);
       await logRoleActivity(userId, "role_revoked", role);
@@ -159,8 +165,16 @@ export default function AdminUsersPage() {
       toast.success("ถอดสิทธิ์สำเร็จ");
       queryClient.invalidateQueries({ queryKey: ["admin-user-roles"] });
     },
-    onError: () => {
-      toast.error("เกิดข้อผิดพลาด");
+    onError: (error: Error) => {
+      if (error.message.includes("Admin อย่างน้อย 1 คน")) {
+        toast.error("ต้องมี Admin อย่างน้อย 1 คน");
+      } else if (error.message.includes("ตัวเอง")) {
+        toast.error("ไม่สามารถถอดสิทธิ์ Admin ของตัวเองได้");
+      } else if (error.message.includes("มีสิทธิ์นี้อยู่แล้ว")) {
+        toast.error("ผู้ใช้มีสิทธิ์นี้อยู่แล้ว");
+      } else {
+        toast.error(error.message || "เกิดข้อผิดพลาด");
+      }
     }
   });
 

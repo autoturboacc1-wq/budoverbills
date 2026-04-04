@@ -92,6 +92,11 @@ vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     rpc: pageMocks.rpc,
     from: pageMocks.from,
+    storage: {
+      from: vi.fn(() => ({
+        remove: vi.fn().mockResolvedValue({ error: null }),
+      })),
+    },
   },
 }));
 
@@ -129,16 +134,38 @@ describe('AgreementConfirm', () => {
     pageMocks.refresh.mockResolvedValue(undefined);
     pageMocks.getClientIP.mockResolvedValue('203.0.113.10');
     pageMocks.getDeviceIdString.mockReturnValue('device-123');
-    pageMocks.from.mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: {
-          display_name: 'ผู้ให้ยืม',
-          first_name: 'Niran',
-          last_name: 'Somchai',
-        },
-      }),
+    pageMocks.from.mockImplementation((table: string) => {
+      if (table === "profiles") {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: {
+              display_name: 'ผู้ให้ยืม',
+              first_name: 'Niran',
+              last_name: 'Somchai',
+            },
+          }),
+        };
+      }
+
+      if (table === "debt_agreements") {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: {
+              id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+              status: 'pending_confirmation',
+              lender_confirmed: false,
+              borrower_confirmed: false,
+            },
+            error: null,
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
     });
     pageMocks.rpc.mockResolvedValue({ data: { success: true }, error: null });
 

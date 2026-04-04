@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useSyncExternalStore } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,6 +11,44 @@ interface ChatTargets {
 
 function uniqueStrings(values?: Array<string | null | undefined>): string[] {
   return Array.from(new Set((values ?? []).filter((value): value is string => Boolean(value))));
+}
+
+let unreadChatMessageCount = 0;
+const unreadChatMessageListeners = new Set<() => void>();
+
+function emitUnreadChatMessageChange() {
+  unreadChatMessageListeners.forEach((listener) => listener());
+}
+
+function setUnreadChatMessageCount(nextCount: number) {
+  const normalizedCount = Number.isFinite(nextCount) ? Math.max(0, Math.trunc(nextCount)) : 0;
+
+  if (normalizedCount === unreadChatMessageCount) {
+    return;
+  }
+
+  unreadChatMessageCount = normalizedCount;
+  emitUnreadChatMessageChange();
+}
+
+function subscribeUnreadChatMessageCount(listener: () => void) {
+  unreadChatMessageListeners.add(listener);
+
+  return () => {
+    unreadChatMessageListeners.delete(listener);
+  };
+}
+
+function getUnreadChatMessageSnapshot() {
+  return unreadChatMessageCount;
+}
+
+export function useUnreadChatMessageCount(): number {
+  return useSyncExternalStore(
+    subscribeUnreadChatMessageCount,
+    getUnreadChatMessageSnapshot,
+    () => 0
+  );
 }
 
 /**
@@ -37,6 +75,7 @@ export const useGlobalChatNotification = () => {
   const refreshChatTargets = useCallback(async () => {
     if (!userId) {
       setChatTargets({ agreementIds: [], directChatIds: [] });
+      setUnreadChatMessageCount(0);
       return;
     }
 
@@ -52,10 +91,34 @@ export const useGlobalChatNotification = () => {
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
     ]);
 
+    const agreementIds = uniqueStrings(agreementsResult.data?.map((agreement) => agreement.id));
+    const directChatIds = uniqueStrings(directChatsResult.data?.map((chat) => chat.id));
+
     setChatTargets({
-      agreementIds: uniqueStrings(agreementsResult.data?.map((agreement) => agreement.id)),
-      directChatIds: uniqueStrings(directChatsResult.data?.map((chat) => chat.id)),
+      agreementIds,
+      directChatIds,
     });
+
+    const [agreementCountResult, directCountResult] = await Promise.all([
+      agreementIds.length > 0
+        ? supabase
+            .from("messages")
+            .select("id", { count: "exact" })
+            .in("agreement_id", agreementIds)
+            .neq("sender_id", userId)
+            .is("read_at", null)
+        : Promise.resolve({ count: 0 }),
+      directChatIds.length > 0
+        ? supabase
+            .from("messages")
+            .select("id", { count: "exact" })
+            .in("direct_chat_id", directChatIds)
+            .neq("sender_id", userId)
+            .is("read_at", null)
+        : Promise.resolve({ count: 0 }),
+    ]);
+
+    setUnreadChatMessageCount((agreementCountResult.count || 0) + (directCountResult.count || 0));
   }, [userId]);
 
   useEffect(() => {
@@ -124,6 +187,7 @@ export const useGlobalChatNotification = () => {
 
   useEffect(() => {
     if (!userId || (chatTargets.agreementIds.length === 0 && chatTargets.directChatIds.length === 0)) {
+      setUnreadChatMessageCount(0);
       return;
     }
 
@@ -133,6 +197,7 @@ export const useGlobalChatNotification = () => {
       const message = payload.new;
 
       if (message.sender_id === userId) return;
+      void refreshChatTargets();
       if (!isInChatPageRef.current) {
         playNotificationSound();
       }

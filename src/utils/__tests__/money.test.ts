@@ -7,6 +7,7 @@ import {
   subtractMoney,
   sumMoney,
   toMoney,
+  toMoneyCents,
 } from '@/utils/money';
 
 describe('money utils', () => {
@@ -17,6 +18,7 @@ describe('money utils', () => {
 
   it('throws on invalid value', () => {
     expect(() => toMoney('abc')).toThrow();
+    expect(() => toMoney(null)).toThrow();
   });
 
   it('throws on negative value by default', () => {
@@ -35,14 +37,21 @@ describe('money utils', () => {
     expect(subtractMoney(10, 9.7)).toBe(0.3);
   });
 
-  it('compares with cent tolerance', () => {
+  it('compares exactly by default and only allows explicit tolerance', () => {
     expect(moneyEquals(100, 100.001)).toBe(true);
-    expect(moneyEquals(100, 100.009)).toBe(true);
-    expect(isWithinMoneyTolerance(100, 100.02)).toBe(false);
+    expect(moneyEquals(100, 100.009)).toBe(false);
+    expect(moneyEquals(100, 100.009, 0.01)).toBe(true);
+    expect(isWithinMoneyTolerance(100, 100.009)).toBe(false);
+    expect(isWithinMoneyTolerance(100, 100.009, 0.01)).toBe(true);
   });
 
   it('divides with 2-decimal normalization', () => {
     expect(divideMoney(100, 3)).toBe(33.33);
+  });
+
+  it('converts to integer cents without floating drift', () => {
+    expect(toMoneyCents(10.235)).toBe(1024);
+    expect(toMoneyCents(1.005)).toBe(101);
   });
 
   it('throws on invalid divisors', () => {

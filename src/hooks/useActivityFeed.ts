@@ -72,6 +72,8 @@ export function useActivityFeed() {
       return;
     }
 
+    let cancelled = false;
+
     const fetchActivities = async () => {
       try {
         // Fetch recent debt agreements - use secure view that hides borrower info until confirmed
@@ -241,15 +243,25 @@ export function useActivityFeed() {
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
 
-        setActivities(activityList.slice(0, 20));
+        if (!cancelled) {
+          setActivities(activityList.slice(0, 20));
+        }
       } catch (error) {
-        console.error("Error fetching activity feed:", error);
+        if (!cancelled) {
+          console.error("Error fetching activity feed:", error);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchActivities();
+    void fetchActivities();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   return { activities, loading };

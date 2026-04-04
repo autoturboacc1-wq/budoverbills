@@ -1,8 +1,62 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback, useMemo } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { logActivityDirect } from '@/hooks/useActivityLogger';
 import { clearAdminSession } from '@/utils/adminSession';
+
+const AUTH_RECOVERY_FLAG_KEY = 'auth_password_recovery';
+
+function readRecoveryFlag(): boolean {
+  return typeof window !== 'undefined' && window.sessionStorage.getItem(AUTH_RECOVERY_FLAG_KEY) === 'true';
+}
+
+function setRecoveryFlag(enabled: boolean): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (enabled) {
+    window.sessionStorage.setItem(AUTH_RECOVERY_FLAG_KEY, 'true');
+    return;
+  }
+
+  window.sessionStorage.removeItem(AUTH_RECOVERY_FLAG_KEY);
+}
+
+function normalizeInternalPath(destinationPath?: string | null): string {
+  if (!destinationPath) {
+    return '/';
+  }
+
+  let decoded = destinationPath;
+  try {
+    decoded = decodeURIComponent(destinationPath);
+  } catch {
+    decoded = destinationPath;
+  }
+
+  const candidate = decoded.trim();
+  if (!candidate.startsWith('/') || candidate.startsWith('//')) {
+    return '/';
+  }
+
+  if (/[\s\\]/.test(candidate)) {
+    return '/';
+  }
+
+  if (/^[a-z][a-z0-9+.-]*:/i.test(candidate)) {
+    return '/';
+  }
+
+  try {
+    const url = new URL(candidate, window.location.origin);
+    return url.origin === window.location.origin && url.pathname.startsWith('/')
+      ? `${url.pathname}${url.search}${url.hash}`
+      : '/';
+  } catch {
+    return '/';
+  }
+}
 interface Profile {
   id: string;
   user_id: string;
@@ -28,6 +82,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   requireAuth: (action: string) => boolean;
   refreshProfile: () => Promise<void>;
+  isPasswordRecovery: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,14 +93,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(readRecoveryFlag);
   const currentUserIdRef = useRef<string | null>(null);
+  const authStateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearAuthStateTimeout = useCallback(() => {
+    if (authStateTimeoutRef.current !== null) {
+      clearTimeout(authStateTimeoutRef.current);
+      authStateTimeoutRef.current = null;
+    }
+  }, []);
 
   const getSafeAuthDestination = useCallback((destinationPath?: string | null) => {
-    if (!destinationPath || !destinationPath.startsWith('/') || destinationPath.startsWith('//')) {
-      return '/';
-    }
-
-    return destinationPath;
+    return normalizeInternalPath(destinationPath);
   }, []);
 
   const fetchProfile = useCallback(async (userId: string) => {
@@ -82,24 +142,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         const nextUser = session?.user ?? null;
+        const isRecoveryEvent = event === 'PASSWORD_RECOVERY';
         currentUserIdRef.current = nextUser?.id ?? null;
+        clearAuthStateTimeout();
         setAuthLoading(true);
         setSession(session);
         setUser(nextUser);
+
+        if (isRecoveryEvent) {
+          setIsPasswordRecovery(true);
+          setRecoveryFlag(true);
+        } else if (!nextUser) {
+          setIsPasswordRecovery(false);
+        }
         
         if (nextUser) {
-          if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/auth') {
+          if (isRecoveryEvent && window.location.pathname !== '/auth') {
             window.location.assign('/auth?type=recovery');
             return;
           }
 
-          setTimeout(() => {
+          authStateTimeoutRef.current = setTimeout(() => {
             void (async () => {
               await fetchProfile(nextUser.id);
-              setAuthLoading(false);
+              if (currentUserIdRef.current === nextUser.id) {
+                setAuthLoading(false);
+              }
             })();
           }, 0);
         } else {
+          clearAuthStateTimeout();
+          setRecoveryFlag(false);
           clearAdminSession();
           setProfile(null);
           setProfileLoading(false);
@@ -108,10 +181,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    return () => subscription.unsubscribe();
-  }, [fetchProfile]);
+    return () => {
+      clearAuthStateTimeout();
+      subscription.unsubscribe();
+    };
+  }, [clearAuthStateTimeout, fetchProfile]);
 
-  const signUp = async (email: string, password: string, displayName?: string) => {
+  const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
     const { data, error } = await supabase.auth.signUp({
@@ -136,9 +212,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     return { error: error as Error | null };
-  };
+  }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -161,9 +237,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     return { error: error as Error | null };
-  };
+  }, []);
 
-  const signInWithGoogle = async (destinationPath?: string) => {
+  const signInWithGoogle = useCallback(async (destinationPath?: string) => {
     const safeDestination = getSafeAuthDestination(destinationPath);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -173,9 +249,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     
     return { error: error as Error | null };
-  };
+  }, [getSafeAuthDestination]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     // Log logout before signing out
     if (user) {
       logActivityDirect({
@@ -185,11 +261,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     }
     
+    setRecoveryFlag(false);
+    setIsPasswordRecovery(false);
     clearAdminSession();
     await supabase.auth.signOut();
-  };
+  }, [user]);
 
-  const requireAuth = (action: string): boolean => {
+  const requireAuth = useCallback((action: string): boolean => {
     if (!user) {
       console.warn(`Authentication required for action: ${action}`);
       const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -197,11 +275,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     }
     return true;
-  };
+  }, [user]);
 
   const isLoading = authLoading || profileLoading;
 
-  const value: AuthContextType = {
+  const value: AuthContextType = useMemo(() => ({
     user,
     session,
     profile,
@@ -213,7 +291,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     requireAuth,
     refreshProfile,
-  };
+    isPasswordRecovery,
+  }), [
+    user,
+    session,
+    profile,
+    isLoading,
+    signUp,
+    signIn,
+    signInWithGoogle,
+    signOut,
+    requireAuth,
+    refreshProfile,
+    isPasswordRecovery,
+  ]);
 
   return (
     <AuthContext.Provider value={value}>

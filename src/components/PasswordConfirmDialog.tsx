@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { useRateLimiter } from "@/hooks/useRateLimiter";
 
 interface PasswordConfirmDialogProps {
   open: boolean;
@@ -36,12 +36,17 @@ export function PasswordConfirmDialog({
 }: PasswordConfirmDialogProps) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState<'reauth-request' | 'reauth-code' | 'confirm' | 'text-confirm'>('reauth-request');
+  const [step, setStep] = useState<'password' | 'confirm' | 'text-confirm'>('password');
+  const [password, setPassword] = useState("");
   const [confirmText, setConfirmText] = useState("");
-  const [reauthCode, setReauthCode] = useState("");
   const [isOAuthUser, setIsOAuthUser] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [userEmail, setUserEmail] = useState("");
+  const passwordVerifyLimiter = useRateLimiter("password_confirm_password_verify", {
+    maxAttempts: 5,
+    windowMs: 10 * 60 * 1000,
+    blockDurationMs: 15 * 60 * 1000,
+  });
 
   // Check if user is OAuth (Google) user - they don't have a password
   useEffect(() => {
@@ -71,13 +76,13 @@ export function PasswordConfirmDialog({
           if (hasOAuthIdentity) {
             setStep('text-confirm');
           } else {
-            setStep('reauth-request');
+            setStep('password');
           }
         }
       } catch (err) {
         if (cancelled) return;
         console.error("Error checking auth method:", err);
-        setStep('reauth-request');
+        setStep('password');
       } finally {
         if (!cancelled) {
           setIsCheckingAuth(false);
@@ -92,30 +97,14 @@ export function PasswordConfirmDialog({
     };
   }, [open]);
 
-  const handleSendReauthCode = async () => {
-    setIsVerifying(true);
-    setError("");
-
-    try {
-      const { error: reauthError } = await supabase.auth.reauthenticate();
-
-      if (reauthError) {
-        setError(reauthError.message || "ไม่สามารถส่งรหัสยืนยันได้");
-        return;
-      }
-
-      toast.success("ส่งรหัสยืนยันไปยังอีเมลของคุณแล้ว");
-      setStep("reauth-code");
-    } catch (err) {
-      setError("เกิดข้อผิดพลาด กรุณาลองใหม่");
-    } finally {
-      setIsVerifying(false);
+  const handleVerifyPassword = async () => {
+    if (!password.trim()) {
+      setError("กรุณากรอกรหัสผ่านปัจจุบัน");
+      return;
     }
-  };
 
-  const handleVerifyReauthCode = async () => {
-    if (reauthCode.length < 6) {
-      setError("กรุณากรอกรหัสยืนยัน");
+    if (!passwordVerifyLimiter.checkRateLimit()) {
+      setError(`กรุณารออีก ${passwordVerifyLimiter.blockTimeRemaining} วินาที ก่อนลองใหม่`);
       return;
     }
 
@@ -128,19 +117,21 @@ export function PasswordConfirmDialog({
     setError("");
 
     try {
-      const { error: verifyError } = await supabase.auth.verifyOtp({
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
         email: userEmail,
-        token: reauthCode.trim(),
-        type: "email",
+        password: password,
       });
 
       if (verifyError) {
-        setError("รหัสยืนยันไม่ถูกต้อง");
+        passwordVerifyLimiter.recordAttempt(false);
+        setError("รหัสผ่านไม่ถูกต้อง");
         return;
       }
 
+      passwordVerifyLimiter.reset();
       setStep("confirm");
     } catch (err) {
+      passwordVerifyLimiter.recordAttempt(false);
       setError("เกิดข้อผิดพลาด กรุณาลองใหม่");
     } finally {
       setIsVerifying(false);
@@ -162,10 +153,10 @@ export function PasswordConfirmDialog({
   };
 
   const handleClose = () => {
+    setPassword("");
     setConfirmText("");
-    setReauthCode("");
     setError("");
-    setStep('reauth-request');
+    setStep('password');
     setUserEmail("");
     setIsOAuthUser(false);
     onOpenChange(false);
@@ -191,15 +182,27 @@ export function PasswordConfirmDialog({
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
-        ) : step === 'reauth-request' ? (
+        ) : step === 'password' ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-4 mt-4"
           >
             <div className="space-y-2">
+              <Label htmlFor="confirm-password">รหัสผ่านปัจจุบัน</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError("");
+                }}
+                autoComplete="current-password"
+                placeholder="กรอกรหัสผ่านปัจจุบัน"
+              />
               <p className="text-sm text-muted-foreground">
-                เพื่อความปลอดภัย เราจะส่งรหัสยืนยันไปยังอีเมลของคุณก่อนดำเนินการต่อ
+                เพื่อความปลอดภัย กรุณายืนยันด้วยรหัสผ่านปัจจุบันก่อนดำเนินการต่อ
               </p>
               {error && (
                 <p className="text-destructive text-sm flex items-center gap-1">
@@ -219,60 +222,10 @@ export function PasswordConfirmDialog({
               </Button>
               <Button
                 className="flex-1"
-                onClick={handleSendReauthCode}
+                onClick={handleVerifyPassword}
                 disabled={isVerifying}
               >
-                {isVerifying ? "กำลังส่ง..." : "ส่งรหัสยืนยัน"}
-              </Button>
-            </div>
-          </motion.div>
-        ) : step === 'reauth-code' ? (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-4 mt-4"
-          >
-            <div className="space-y-2">
-              <Label>กรอกรหัสยืนยัน 6 หลัก</Label>
-              <InputOTP
-                maxLength={6}
-                value={reauthCode}
-                onChange={(value) => {
-                  setReauthCode(value);
-                  setError("");
-                }}
-              >
-                <InputOTPGroup>
-                  <InputOTPSlot index={0} />
-                  <InputOTPSlot index={1} />
-                  <InputOTPSlot index={2} />
-                  <InputOTPSlot index={3} />
-                  <InputOTPSlot index={4} />
-                  <InputOTPSlot index={5} />
-                </InputOTPGroup>
-              </InputOTP>
-              {error && (
-                <p className="text-destructive text-sm flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  {error}
-                </p>
-              )}
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setStep("reauth-request")}
-              >
-                กลับ
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={handleVerifyReauthCode}
-                disabled={isVerifying || reauthCode.length < 6}
-              >
-                {isVerifying ? "กำลังตรวจสอบ..." : "ยืนยันรหัส"}
+                {isVerifying ? "กำลังตรวจสอบ..." : "ยืนยันรหัสผ่าน"}
               </Button>
             </div>
           </motion.div>
@@ -346,7 +299,7 @@ export function PasswordConfirmDialog({
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => setStep(isOAuthUser ? 'text-confirm' : 'reauth-code')}
+                onClick={() => setStep(isOAuthUser ? 'text-confirm' : 'password')}
               >
                 ย้อนกลับ
               </Button>

@@ -14,7 +14,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BottomNav } from "@/components/BottomNav";
 import { useDbFriends } from "@/hooks/useDbFriends";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { formatMaskedPhone } from "@/lib/utils";
@@ -345,7 +344,6 @@ export default function Friends() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <BottomNav />
     </div>
     </PageTransition>
   );

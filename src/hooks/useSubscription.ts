@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
-interface AgreementQuota {
+export interface AgreementQuota {
   can_create_free: boolean;
   free_used: number;
   free_limit: number;
@@ -14,11 +14,18 @@ interface AgreementQuota {
   fee_currency: string;
 }
 
-interface SubscriptionInfo {
+export interface SubscriptionInfo {
   is_trial: boolean;
   trial_ends_at: string | null;
   expires_at: string | null;
 }
+
+export interface SubscriptionStateCache {
+  quota: AgreementQuota | null;
+  subscriptionInfo: SubscriptionInfo | null;
+}
+
+const SUBSCRIPTION_STATE_CACHE_PREFIX = "subscription-state";
 
 function getDefaultFeeAmount(feeAmount?: number | null): number {
   return typeof feeAmount === "number" && Number.isFinite(feeAmount) ? feeAmount : 29;
@@ -30,6 +37,63 @@ function getTotalAvailable(freeRemaining: number, credits: number, totalAvailabl
   }
 
   return Math.max(0, freeRemaining + credits);
+}
+
+function getSubscriptionStateCacheKey(userId: string): string {
+  return `${SUBSCRIPTION_STATE_CACHE_PREFIX}:${userId}`;
+}
+
+export function readCachedSubscriptionState(userId: string): SubscriptionStateCache | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(getSubscriptionStateCacheKey(userId));
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<SubscriptionStateCache>;
+    return {
+      quota: parsed.quota ?? null,
+      subscriptionInfo: parsed.subscriptionInfo ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function writeCachedSubscriptionState(userId: string, state: SubscriptionStateCache): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(getSubscriptionStateCacheKey(userId), JSON.stringify(state));
+  } catch {
+    // Ignore cache persistence failures and continue with live data.
+  }
+}
+
+function updateCachedSubscriptionState(userId: string, patch: Partial<SubscriptionStateCache>): void {
+  const current = readCachedSubscriptionState(userId) ?? {
+    quota: null,
+    subscriptionInfo: null,
+  };
+
+  writeCachedSubscriptionState(userId, {
+    quota: patch.quota ?? current.quota,
+    subscriptionInfo: patch.subscriptionInfo ?? current.subscriptionInfo,
+  });
+}
+
+export function getTrialDaysRemaining(trialEndsAt: Date | null, now = Date.now()): number {
+  if (!trialEndsAt) {
+    return 0;
+  }
+
+  return Math.max(0, Math.ceil((trialEndsAt.getTime() - now) / (1000 * 60 * 60 * 24)));
 }
 
 function parseFutureDate(value: string | null | undefined): Date | null {
@@ -45,19 +109,22 @@ export function useSubscription() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const paymentGatewayEnabled = false;
+  const cachedSubscriptionState = user?.id ? readCachedSubscriptionState(user.id) : null;
 
   // Fetch agreement quota (2 free, then pay per agreement)
   const { data: quota, isLoading, refetch } = useQuery({
     queryKey: ["agreement-quota", user?.id],
+    placeholderData: cachedSubscriptionState?.quota ?? undefined,
     queryFn: async (): Promise<AgreementQuota | null> => {
       if (!user?.id) return null;
 
+      const cachedQuota = readCachedSubscriptionState(user.id)?.quota ?? null;
       const { data, error } = await supabase
         .rpc("can_create_agreement_free", { p_user_id: user.id });
 
       if (error) {
         console.error("Error fetching agreement quota:", error);
-        return null;
+        return cachedQuota;
       }
 
       // Parse the JSONB response - cast to unknown first then to our type
@@ -72,8 +139,8 @@ export function useSubscription() {
           fee_amount: number;
           fee_currency: string;
         };
-      return {
-        can_create_free: result.can_create_free,
+        const nextQuota: AgreementQuota = {
+          can_create_free: result.can_create_free,
           free_used: result.free_used,
           free_limit: result.free_limit,
           free_remaining: result.free_remaining,
@@ -82,19 +149,12 @@ export function useSubscription() {
           fee_amount: getDefaultFeeAmount(result.fee_amount),
           fee_currency: result.fee_currency,
         };
+
+        updateCachedSubscriptionState(user.id, { quota: nextQuota });
+        return nextQuota;
       }
 
-      // Default values
-      return {
-        can_create_free: false,
-        free_used: 0,
-        free_limit: 2,
-        free_remaining: 0,
-        credits: 0,
-        total_available: 0,
-        fee_amount: 29,
-        fee_currency: 'THB',
-      };
+      return cachedQuota;
     },
     enabled: !!user?.id,
     staleTime: 30000, // 30 seconds
@@ -103,21 +163,23 @@ export function useSubscription() {
   // Fetch subscription details for trial info (backwards compatibility)
   const { data: subscriptionInfo } = useQuery({
     queryKey: ["subscription-info", user?.id],
+    placeholderData: cachedSubscriptionState?.subscriptionInfo ?? undefined,
     queryFn: async (): Promise<SubscriptionInfo | null> => {
       if (!user?.id) return null;
 
+      const cachedInfo = readCachedSubscriptionState(user.id)?.subscriptionInfo ?? null;
       const { data, error } = await supabase
         .from("subscriptions")
         .select("is_trial, trial_ends_at, expires_at")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        // May not have subscription record in new model
-        console.log("No subscription record found (this is normal for pay-per-agreement model)");
-        return null;
+        console.error("Error fetching subscription info:", error);
+        return cachedInfo;
       }
 
+      updateCachedSubscriptionState(user.id, { subscriptionInfo: data });
       return data;
     },
     enabled: !!user?.id,
@@ -208,9 +270,7 @@ export function useSubscription() {
   const trialEndsAt = parseFutureDate(subscriptionInfo?.trial_ends_at);
   const isTrial = Boolean(subscriptionInfo?.is_trial && trialEndsAt && trialEndsAt.getTime() > Date.now());
   
-  const trialDaysRemaining = trialEndsAt 
-    ? Math.max(0, Math.floor((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : 0;
+  const trialDaysRemaining = getTrialDaysRemaining(trialEndsAt);
 
   const hasUsedTrial = Boolean(
     subscriptionInfo?.is_trial || subscriptionInfo?.trial_ends_at,

@@ -2,6 +2,18 @@
 
 ใช้ runbook นี้คู่กับ `npm run audit:predeploy` ก่อน production deploy ทุกครั้ง
 
+ถ้าต้องการ checklist แบบ step-by-step สำหรับ rollout จริง ให้ใช้ร่วมกับ:
+- [production-rollout-checklist.md](/Users/iphone/Desktop/budoverbills-main/deploy/production-rollout-checklist.md)
+
+ก่อนเริ่ม rollout จริง ต้องทำ CLI preflight ให้ผ่านก่อน:
+
+```bash
+supabase --version
+supabase login
+supabase link --project-ref taihdoldpcbovubzjjah
+supabase projects list
+```
+
 ## 1. Local Strict Gate
 
 รันจาก release commit ที่จะปล่อยจริง:

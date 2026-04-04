@@ -1,15 +1,77 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const JSON_HEADERS = {
+const BASE_JSON_HEADERS = {
   "Content-Type": "application/json",
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
 };
 
-function jsonResponse(body: unknown, status = 200): Response {
+const DEFAULT_ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+
+function getAllowedOrigins(): Set<string> {
+  const origins = new Set<string>(DEFAULT_ALLOWED_ORIGINS);
+  const rawOrigins = [
+    Deno.env.get("ADMIN_SESSION_ALLOWED_ORIGINS"),
+    Deno.env.get("SITE_URL"),
+    Deno.env.get("APP_URL"),
+    Deno.env.get("PUBLIC_SITE_URL"),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(",");
+
+  for (const candidate of rawOrigins.split(",")) {
+    const origin = normalizeOrigin(candidate);
+    if (origin) {
+      origins.add(origin);
+    }
+  }
+
+  return origins;
+}
+
+function normalizeOrigin(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return null;
+  }
+}
+
+function getRequestOrigin(req: Request): string | null {
+  return normalizeOrigin(req.headers.get("origin") ?? req.headers.get("Origin") ?? "");
+}
+
+function buildCorsHeaders(req: Request): Headers | null {
+  const requestOrigin = getRequestOrigin(req);
+  if (!requestOrigin) {
+    return null;
+  }
+
+  const allowedOrigins = getAllowedOrigins();
+  if (!allowedOrigins.has(requestOrigin)) {
+    return null;
+  }
+
+  const headers = new Headers(BASE_JSON_HEADERS);
+  headers.set("Access-Control-Allow-Origin", requestOrigin);
+  headers.set("Access-Control-Allow-Headers", "authorization, apikey, content-type, x-client-info, x-supabase-api-version");
+  headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  headers.set("Access-Control-Max-Age", "86400");
+  headers.set("Vary", "Origin");
+  return headers;
+}
+
+function corsResponse(req: Request, body: unknown, status = 200): Response {
+  const corsHeaders = buildCorsHeaders(req);
   return new Response(JSON.stringify(body), {
     status,
-    headers: JSON_HEADERS,
+    headers: corsHeaders ?? BASE_JSON_HEADERS,
   });
 }
 
@@ -60,7 +122,7 @@ async function issueSession(req: Request, verificationType: "otp" | "code", code
   if (verificationType === "otp") {
     const user = await getAuthenticatedUser(req);
     if (!user) {
-      return jsonResponse({ success: false, error: "unauthorized" }, 401);
+      return corsResponse(req, { success: false, error: "unauthorized" }, 401);
     }
 
     const { data, error } = await authClient.rpc(rpcName as never, {
@@ -72,7 +134,7 @@ async function issueSession(req: Request, verificationType: "otp" | "code", code
       throw error;
     }
 
-    return jsonResponse(data ?? { success: false, error: "invalid" }, data?.success ? 200 : 400);
+    return corsResponse(req, data ?? { success: false, error: "invalid" }, data?.success ? 200 : 400);
   }
 
   const { data, error } = await authClient.rpc(rpcName as never, {
@@ -83,7 +145,7 @@ async function issueSession(req: Request, verificationType: "otp" | "code", code
     throw error;
   }
 
-  return jsonResponse(data ?? { success: false, error: "invalid" }, data?.success ? 200 : 400);
+  return corsResponse(req, data ?? { success: false, error: "invalid" }, data?.success ? 200 : 400);
 }
 
 async function validateSession(req: Request) {
@@ -91,7 +153,7 @@ async function validateSession(req: Request) {
   const sessionToken = typeof body.session_token === "string" ? body.session_token.trim() : "";
 
   if (!sessionToken) {
-    return jsonResponse({ valid: false }, 400);
+    return corsResponse(req, { valid: false }, 400);
   }
 
   const { authClient } = getSupabaseClients(req);
@@ -103,7 +165,7 @@ async function validateSession(req: Request) {
     throw error;
   }
 
-  return jsonResponse(data ?? { valid: false }, data?.valid ? 200 : 400);
+  return corsResponse(req, data ?? { valid: false }, data?.valid ? 200 : 400);
 }
 
 async function revokeSession(req: Request) {
@@ -111,7 +173,7 @@ async function revokeSession(req: Request) {
   const sessionToken = typeof body.session_token === "string" ? body.session_token.trim() : "";
 
   if (!sessionToken) {
-    return jsonResponse({ success: false }, 400);
+    return corsResponse(req, { success: false }, 400);
   }
 
   const { authClient } = getSupabaseClients(req);
@@ -123,16 +185,21 @@ async function revokeSession(req: Request) {
     throw error;
   }
 
-  return jsonResponse({ success: Boolean(data) });
+  return corsResponse(req, { success: Boolean(data) });
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: JSON_HEADERS });
+    const corsHeaders = buildCorsHeaders(req);
+    if (!corsHeaders) {
+      return new Response(null, { status: 403, headers: BASE_JSON_HEADERS });
+    }
+
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   if (req.method !== "POST") {
-    return jsonResponse({ error: "Method not allowed" }, 405);
+    return corsResponse(req, { error: "Method not allowed" }, 405);
   }
 
   try {
@@ -153,9 +220,9 @@ Deno.serve(async (req) => {
       return await revokeSession(req);
     }
 
-    return jsonResponse({ error: "Unknown action" }, 400);
+    return corsResponse(req, { error: "Unknown action" }, 400);
   } catch (error) {
     console.error("[admin-session] Unexpected error", error);
-    return jsonResponse({ error: "Internal server error" }, 500);
+    return corsResponse(req, { error: "Internal server error" }, 500);
   }
 });

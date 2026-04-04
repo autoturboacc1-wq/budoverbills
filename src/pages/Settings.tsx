@@ -21,7 +21,6 @@ import {
   Gift
 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
-import { BottomNav } from "@/components/BottomNav";
 import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
@@ -503,7 +502,6 @@ export default function Settings() {
         </motion.div>
       </div>
 
-      <BottomNav />
     </div>
     </PageTransition>
   );

@@ -48,7 +48,11 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 function formatMoney(amount: number): string {
-  return `${Number(amount).toLocaleString("en-US", {
+  if (!Number.isFinite(amount)) {
+    return "-";
+  }
+
+  return `${Number(amount).toLocaleString("th-TH", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })} THB`;
@@ -390,6 +394,20 @@ export async function generateAgreementPDF(data: AgreementPDFData): Promise<Blob
 
 export function downloadPDF(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
+  const userAgent = window.navigator.userAgent;
+  const isIosDevice =
+    /iPad|iPhone|iPod/.test(userAgent) ||
+    (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
+  const isStandalonePwa =
+    window.matchMedia?.("(display-mode: standalone)").matches ||
+    ("standalone" in window.navigator && Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone));
+
+  if (isIosDevice || isStandalonePwa) {
+    window.open(url, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
+  }
+
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;

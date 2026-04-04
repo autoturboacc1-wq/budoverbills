@@ -235,16 +235,6 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
     }
   };
 
-  // ==============================
-  // DEBUG (บังคับ)
-  // ==============================
-  console.log("=== CHAT DEBUG ===");
-  console.log("currentUserId:", currentUserId);
-  messages.forEach((m) => {
-    console.log("MSG:", m.id, "sender_id:", m.sender_id, "isMe:", m.sender_id === currentUserId);
-  });
-  console.log("==================");
-
   // Guard: require authenticated user
   if (!user || !currentUserId) {
     return (

@@ -79,8 +79,6 @@ export function Header({ userName }: HeaderProps) {
                 {unreadCount > 9 ? "9+" : unreadCount}
               </motion.span>
             )}
-            {/* Pulse ring animation */}
-            {unreadCount > 0 && <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping" aria-hidden="true" />}
           </button>
         </div>
       </motion.header>

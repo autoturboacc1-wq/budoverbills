@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { Bell, Check, Trash2, Loader2 } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useNavigate } from "react-router-dom";
@@ -203,7 +202,6 @@ const Notifications = () => {
         )}
       </main>
 
-      <BottomNav />
     </div>
     </PageTransition>
   );

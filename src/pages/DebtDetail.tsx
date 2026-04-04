@@ -133,7 +133,7 @@ export default function DebtDetail() {
       .filter(i => i.status === 'paid')
       .reduce((sum, i) => sum + i.principal_portion, 0);
     const principalPending = regularInstallments
-      .filter(i => i.status !== 'paid')
+      .filter(i => i.status !== 'paid' && i.status !== 'rescheduled')
       .reduce((sum, i) => sum + i.principal_portion, 0);
     
     // Calculate interest (from regular installments)
@@ -141,7 +141,7 @@ export default function DebtDetail() {
       .filter(i => i.status === 'paid')
       .reduce((sum, i) => sum + (i.interest_portion || 0), 0);
     const interestPending = regularInstallments
-      .filter(i => i.status !== 'paid')
+      .filter(i => i.status !== 'paid' && i.status !== 'rescheduled')
       .reduce((sum, i) => sum + (i.interest_portion || 0), 0);
     
     // Calculate fee (from fee installments)
@@ -149,7 +149,7 @@ export default function DebtDetail() {
       .filter(i => i.status === 'paid')
       .reduce((sum, i) => sum + i.amount, 0);
     const feePending = feeInstallments
-      .filter(i => i.status !== 'paid')
+      .filter(i => i.status !== 'paid' && i.status !== 'rescheduled')
       .reduce((sum, i) => sum + i.amount, 0);
     
     // Overall totals

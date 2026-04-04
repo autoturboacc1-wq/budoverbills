@@ -19,7 +19,6 @@ import coffeePremium from "@/assets/coffee-premium.png";
 import coffeeLuxury from "@/assets/coffee-luxury.png";
 import { CostBreakdownCard } from "@/components/CostBreakdownCard";
 import { useNavigate } from "react-router-dom";
-import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
@@ -514,7 +513,6 @@ export default function Subscription() {
         </motion.section>
       </div>
 
-      <BottomNav />
     </div>
     </PageTransition>
   );

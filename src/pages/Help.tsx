@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { BottomNav } from "@/components/BottomNav";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Accordion,
@@ -993,7 +992,6 @@ export default function Help() {
         )}
       </div>
 
-      <BottomNav />
     </div>
     </PageTransition>
   );

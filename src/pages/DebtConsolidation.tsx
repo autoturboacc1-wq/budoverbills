@@ -3,7 +3,6 @@ import { PageTransition } from "@/components/ux/PageTransition";
 import { ArrowLeft, Calculator, Loader2, Sparkles } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { BottomNav } from "@/components/BottomNav";
 import { DebtStrategyComparison } from "@/components/DebtStrategyComparison";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -284,7 +283,6 @@ export default function DebtConsolidation() {
         )}
       </div>
 
-      <BottomNav />
     </div>
     </PageTransition>
   );

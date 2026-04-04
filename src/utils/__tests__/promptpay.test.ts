@@ -16,6 +16,13 @@ describe("generatePromptPayPayload", () => {
     expect(payload).toMatch(/[0-9A-F]{4}$/);
   });
 
+  it("builds a PromptPay payload from a 07x mobile number", () => {
+    const payload = generatePromptPayPayload("0712345678", 50);
+
+    expect(payload).toContain("01130066712345678");
+    expect(payload).toContain("540550.00");
+  });
+
   it("builds a PromptPay payload from a national id without an amount", () => {
     const payload = generatePromptPayPayload("1234567890123");
     const payloadBody = payload.split("5802TH6304")[0];
@@ -26,13 +33,13 @@ describe("generatePromptPayPayload", () => {
 
   it("throws for unsupported PromptPay targets", () => {
     expect(() => generatePromptPayPayload("55555")).toThrow(
-      "PromptPay รองรับเบอร์โทรศัพท์มือถือ 10 หลัก (ขึ้นต้นด้วย 06, 08 หรือ 09) หรือเลขบัตรประชาชน 13 หลัก",
+      "PromptPay รองรับเบอร์โทรศัพท์มือถือ 10 หลัก (ขึ้นต้นด้วย 06, 07, 08 หรือ 09) หรือเลขบัตรประชาชน 13 หลัก",
     );
   });
 
   it("rejects Thai landline numbers for phone-based PromptPay", () => {
     expect(() => generatePromptPayPayload("0212345678")).toThrow(
-      "PromptPay รองรับเบอร์โทรศัพท์มือถือ 10 หลัก (ขึ้นต้นด้วย 06, 08 หรือ 09) หรือเลขบัตรประชาชน 13 หลัก",
+      "PromptPay รองรับเบอร์โทรศัพท์มือถือ 10 หลัก (ขึ้นต้นด้วย 06, 07, 08 หรือ 09) หรือเลขบัตรประชาชน 13 หลัก",
     );
   });
 });

@@ -32,11 +32,29 @@ interface NotificationsContextValue {
 
 const NotificationsContext = createContext<NotificationsContextValue | undefined>(undefined);
 
+export function dedupeNotificationsById(items: Notification[]): Notification[] {
+  const seen = new Set<string>();
+  const deduped: Notification[] = [];
+
+  for (const item of items) {
+    if (seen.has(item.id)) {
+      continue;
+    }
+
+    seen.add(item.id);
+    deduped.push(item);
+  }
+
+  return deduped;
+}
+
 function useNotificationsState(): NotificationsContextValue {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const requestIdRef = useRef(0);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const notificationIdSetRef = useRef<Set<string>>(new Set());
 
   const userId = user?.id ?? null;
 
@@ -51,11 +69,25 @@ function useNotificationsState(): NotificationsContextValue {
     };
   }, []);
 
+  const syncNotificationIds = useCallback((items: Notification[]) => {
+    notificationIdSetRef.current = new Set(items.map((notification) => notification.id));
+  }, []);
+
+  const teardownChannel = useCallback((channel: ReturnType<typeof supabase.channel> | null) => {
+    if (!channel) {
+      return;
+    }
+
+    void channel.unsubscribe();
+    void supabase.removeChannel(channel);
+  }, []);
+
   const fetchNotifications = useCallback(async () => {
     const requestId = ++requestIdRef.current;
 
     if (!userId) {
       setNotifications([]);
+      syncNotificationIds([]);
       setLoading(false);
       return;
     }
@@ -76,7 +108,9 @@ function useNotificationsState(): NotificationsContextValue {
         return;
       }
 
-      setNotifications((data || []).map(normalizeNotification));
+      const nextNotifications = dedupeNotificationsById((data || []).map(normalizeNotification));
+      syncNotificationIds(nextNotifications);
+      setNotifications(nextNotifications);
     } catch (error) {
       if (requestId !== requestIdRef.current) {
         return;
@@ -88,7 +122,28 @@ function useNotificationsState(): NotificationsContextValue {
         setLoading(false);
       }
     }
-  }, [normalizeNotification, userId]);
+  }, [normalizeNotification, syncNotificationIds, userId]);
+
+  const upsertNotification = useCallback((notification: Notification) => {
+    setNotifications((prev) => {
+      const existingIndex = prev.findIndex((item) => item.id === notification.id);
+      const next = existingIndex >= 0
+        ? [...prev.slice(0, existingIndex), notification, ...prev.slice(existingIndex + 1)]
+        : [notification, ...prev];
+      const deduped = dedupeNotificationsById(next);
+
+      syncNotificationIds(deduped);
+      return deduped;
+    });
+  }, [syncNotificationIds]);
+
+  const removeNotificationById = useCallback((notificationId: string) => {
+    setNotifications((prev) => {
+      const next = prev.filter((item) => item.id !== notificationId);
+      syncNotificationIds(next);
+      return next;
+    });
+  }, [syncNotificationIds]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
     if (!userId) return;
@@ -153,8 +208,16 @@ function useNotificationsState(): NotificationsContextValue {
   useEffect(() => {
     if (!userId) {
       setNotifications([]);
+      syncNotificationIds([]);
+      teardownChannel(channelRef.current);
+      channelRef.current = null;
       setLoading(false);
       return;
+    }
+
+    if (channelRef.current) {
+      teardownChannel(channelRef.current);
+      channelRef.current = null;
     }
 
     void fetchNotifications();
@@ -173,9 +236,13 @@ function useNotificationsState(): NotificationsContextValue {
         (payload) => {
           if (cancelled) return;
           const newNotification = normalizeNotification(payload.new as Notification);
-          setNotifications(prev => [newNotification, ...prev]);
-          
-          // Show toast for new notification
+          if (notificationIdSetRef.current.has(newNotification.id)) {
+            return;
+          }
+
+          notificationIdSetRef.current.add(newNotification.id);
+          upsertNotification(newNotification);
+
           toast(newNotification.title, {
             description: newNotification.message,
           });
@@ -192,9 +259,8 @@ function useNotificationsState(): NotificationsContextValue {
         (payload) => {
           if (cancelled) return;
           const updated = normalizeNotification(payload.new as Notification);
-          setNotifications(prev =>
-            prev.map(n => (n.id === updated.id ? updated : n))
-          );
+          notificationIdSetRef.current.add(updated.id);
+          upsertNotification(updated);
         }
       )
       .on(
@@ -208,17 +274,22 @@ function useNotificationsState(): NotificationsContextValue {
         (payload) => {
           if (cancelled) return;
           const deleted = payload.old as Notification;
-          setNotifications(prev => prev.filter(n => n.id !== deleted.id));
+          removeNotificationById(deleted.id);
         }
       )
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
       cancelled = true;
       requestIdRef.current += 1;
-      supabase.removeChannel(channel);
+      if (channelRef.current === channel) {
+        channelRef.current = null;
+      }
+      teardownChannel(channel);
     };
-  }, [fetchNotifications, normalizeNotification, userId]);
+  }, [fetchNotifications, normalizeNotification, removeNotificationById, syncNotificationIds, teardownChannel, upsertNotification, userId]);
 
   return {
     notifications,

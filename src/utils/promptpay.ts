@@ -27,7 +27,7 @@ function normalizePromptPayTarget(target: string): { accountType: "01" | "02"; v
     };
   }
 
-  if (sanitized.length === 10 && /^0[689]\d{8}$/.test(sanitized)) {
+  if (sanitized.length === 10 && /^0[6789]\d{8}$/.test(sanitized)) {
     return {
       accountType: "01",
       value: `0066${sanitized.slice(1)}`,
@@ -35,7 +35,7 @@ function normalizePromptPayTarget(target: string): { accountType: "01" | "02"; v
   }
 
   throw new Error(
-    "PromptPay รองรับเบอร์โทรศัพท์มือถือ 10 หลัก (ขึ้นต้นด้วย 06, 08 หรือ 09) หรือเลขบัตรประชาชน 13 หลัก",
+    "PromptPay รองรับเบอร์โทรศัพท์มือถือ 10 หลัก (ขึ้นต้นด้วย 06, 07, 08 หรือ 09) หรือเลขบัตรประชาชน 13 หลัก",
   );
 }
 

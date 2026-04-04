@@ -33,6 +33,7 @@ import { format, parseISO } from "date-fns";
 import { th } from "date-fns/locale";
 import { THAI_BANKS } from "@/constants/thaibanks";
 import {
+  deletePaymentSlip,
   getPaymentSlipSignedUrl,
   uploadPaymentSlip,
   validatePaymentSlipFile,
@@ -97,6 +98,7 @@ export function PaymentDialog({
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [signedSlipUrl, setSignedSlipUrl] = useState<string | null>(null);
   const [loadingSignedUrl, setLoadingSignedUrl] = useState(false);
+  const [liveInstallmentAmount, setLiveInstallmentAmount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadLockRef = useRef(false);
   const borrowerSubmitLockRef = useRef(false);
@@ -127,6 +129,10 @@ export function PaymentDialog({
 
     const freshInstallment = installmentResult.data as InstallmentSnapshot | null;
     const freshPending = ((pendingResult.data ?? [])[0] ?? null) as SlipVerification | null;
+
+    if (freshInstallment) {
+      setLiveInstallmentAmount(freshInstallment.amount);
+    }
 
     setPendingVerification(freshPending);
 
@@ -176,11 +182,13 @@ export function PaymentDialog({
     if (open && installment) {
       void fetchVerificationHistory();
       setPaymentAmount(installment.amount.toString());
+      setLiveInstallmentAmount(installment.amount);
       setVerifiedAmount("");
       setSlipUrl(null);
       setSignedSlipUrl(null);
+      void refreshPaymentState();
     }
-  }, [open, installment, fetchVerificationHistory]);
+  }, [open, installment, fetchVerificationHistory, refreshPaymentState]);
 
   // Fetch signed URL when displaySlipUrl changes
   useEffect(() => {
@@ -211,12 +219,12 @@ export function PaymentDialog({
   // Calculate extra payment if verified amount exceeds installment
   const extraPaymentPreview = useMemo(() => {
     const amount = isLender ? numericVerifiedAmount : numericAmount;
-    if (!installment || amount <= installment.amount) return null;
-    const extraAmount = amount - installment.amount;
+    if (!installment || amount <= liveInstallmentAmount) return null;
+    const extraAmount = amount - liveInstallmentAmount;
     return calculateExtraPaymentPreview(agreement, extraAmount);
-  }, [numericAmount, numericVerifiedAmount, installment, agreement, calculateExtraPaymentPreview, isLender]);
+  }, [numericAmount, numericVerifiedAmount, installment, agreement, calculateExtraPaymentPreview, isLender, liveInstallmentAmount]);
 
-  const isExtraPayment = (isLender ? numericVerifiedAmount : numericAmount) > (installment?.amount || 0);
+  const isExtraPayment = (isLender ? numericVerifiedAmount : numericAmount) > liveInstallmentAmount;
 
   // Count rejected verifications
   const rejectionCount = useMemo(() => {
@@ -294,7 +302,7 @@ export function PaymentDialog({
   const handleSubmitPayment = async () => {
     if (!installment || !slipUrl || !user) return;
     if (borrowerSubmitLockRef.current) return;
-    if (numericAmount < installment.amount) {
+    if (numericAmount < liveInstallmentAmount) {
       toast.error("ยอดเงินต้องไม่น้อยกว่าค่างวด");
       return;
     }
@@ -393,6 +401,9 @@ export function PaymentDialog({
       onOpenChange(false);
 
     } catch (error) {
+      if (slipUrl && !insertedSlipVerificationId) {
+        await deletePaymentSlip(slipUrl).catch(() => null);
+      }
       console.error("Submit payment error:", error);
       toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่");
     } finally {
@@ -582,7 +593,7 @@ export function PaymentDialog({
             <ReviewPanel
               title="สรุปการชำระเงิน"
               rows={[
-                { label: isFeeInstallment ? "ค่าเลื่อนงวด" : "ค่างวด", value: `฿${installment.amount.toLocaleString()}` },
+                { label: isFeeInstallment ? "ค่าเลื่อนงวด" : "ค่างวด", value: `฿${liveInstallmentAmount.toLocaleString()}` },
                 {
                   label: "ประเภท",
                   value: isFeeInstallment ? "ค่าเลื่อนงวด" : "ชำระค่างวด",
@@ -689,8 +700,8 @@ export function PaymentDialog({
               <span className="text-sm text-muted-foreground">
                 {isFeeInstallment ? 'ค่าเลื่อนงวด' : 'ค่างวด'}
               </span>
-              <span className={`font-semibold ${isFeeInstallment ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}`}>
-                ฿{installment.amount.toLocaleString()}
+                <span className={`font-semibold ${isFeeInstallment ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}`}>
+                ฿{liveInstallmentAmount.toLocaleString()}
               </span>
             </div>
             {installment.principal_portion > 0 && (
@@ -713,9 +724,9 @@ export function PaymentDialog({
                     ฿{pendingVerification.submitted_amount.toLocaleString()}
                   </span>
                 </div>
-                {pendingVerification.submitted_amount > installment.amount && (
+                {pendingVerification.submitted_amount > liveInstallmentAmount && (
                   <p className="text-xs text-primary mt-1">
-                    (ชำระเกิน{isFeeInstallment ? 'ค่าเลื่อน' : 'ค่างวด'} ฿{(pendingVerification.submitted_amount - installment.amount).toLocaleString()})
+                    (ชำระเกิน{isFeeInstallment ? 'ค่าเลื่อน' : 'ค่างวด'} ฿{(pendingVerification.submitted_amount - liveInstallmentAmount).toLocaleString()})
                   </p>
                 )}
               </div>
@@ -732,9 +743,9 @@ export function PaymentDialog({
                 type="number"
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
-                placeholder={`อย่างน้อย ฿${installment.amount.toLocaleString()}`}
+                placeholder={`อย่างน้อย ฿${liveInstallmentAmount.toLocaleString()}`}
                 className="text-lg font-semibold"
-                min={installment.amount}
+                min={liveInstallmentAmount}
                 step="0.01"
               />
               <p className="text-xs text-muted-foreground mt-1">
@@ -832,11 +843,11 @@ export function PaymentDialog({
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">ค่างวดปกติ</span>
-                    <span>฿{installment.amount.toLocaleString()}</span>
+                    <span>฿{liveInstallmentAmount.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-primary font-medium">
                     <span>+ ตัดเงินต้นเพิ่ม</span>
-                    <span>฿{((isLender ? numericVerifiedAmount : numericAmount) - installment.amount).toLocaleString()}</span>
+                    <span>฿{((isLender ? numericVerifiedAmount : numericAmount) - liveInstallmentAmount).toLocaleString()}</span>
                   </div>
                   <div className="border-t border-border/50 pt-2 mt-2">
                     <div className="flex justify-between">
@@ -879,7 +890,7 @@ export function PaymentDialog({
 
               <TabsContent value="promptpay" className="mt-0">
                 <PromptPayQR
-                  amount={numericAmount > 0 ? numericAmount : installment.amount}
+                  amount={numericAmount > 0 ? numericAmount : liveInstallmentAmount}
                   promptPayId={agreement.account_number ?? ""}
                   recipientName={agreement.account_name}
                 />

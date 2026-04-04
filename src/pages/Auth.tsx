@@ -18,6 +18,32 @@ import { PageTransition } from "@/components/ux/PageTransition";
 const emailSchema = z.string().email("อีเมลไม่ถูกต้อง");
 const passwordSchema = z.string().min(6, "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
 
+function getSafeAuthErrorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof Error)) {
+    return fallback;
+  }
+
+  const message = error.message.toLowerCase();
+
+  if (message.includes("invalid login") || message.includes("invalid credentials") || message.includes("wrong password")) {
+    return "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+  }
+
+  if (message.includes("already registered") || message.includes("already been registered")) {
+    return "อีเมลนี้ถูกใช้งานแล้ว";
+  }
+
+  if (message.includes("email not confirmed")) {
+    return "กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ";
+  }
+
+  if (message.includes("weak password") || message.includes("password should be")) {
+    return "รหัสผ่านไม่ผ่านเงื่อนไขความปลอดภัย";
+  }
+
+  return fallback;
+}
+
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -26,12 +52,11 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  const [isNewSignup, setIsNewSignup] = useState(false);
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
 
-  const { signIn, signUp, signInWithGoogle, user, profile } = useAuth();
+  const { signIn, signUp, signInWithGoogle, user, profile, isPasswordRecovery } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -50,13 +75,12 @@ export default function Auth() {
   const locationState = location.state as { from?: { pathname?: string }; returnTo?: string } | null;
   const fromQuery = new URLSearchParams(location.search).get("from");
   const from = getSafeInternalPath(locationState?.from?.pathname || locationState?.returnTo || fromQuery || "/");
+  const isRecoveryCallback = new URLSearchParams(location.search).get("type") === "recovery";
 
   useEffect(() => {
     const checkRoleAndRedirect = async () => {
       if (user && profile !== undefined) {
-        // If new signup, go to personal info collection first
-        if (isNewSignup) {
-          navigate("/personal-info", { replace: true });
+        if (isPasswordRecovery || isRecoveryCallback) {
           return;
         }
         
@@ -93,7 +117,7 @@ export default function Auth() {
     };
     
     checkRoleAndRedirect();
-  }, [user, profile, navigate, from, isNewSignup]);
+  }, [user, profile, navigate, from, isPasswordRecovery, isRecoveryCallback]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -131,27 +155,17 @@ export default function Auth() {
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) {
-          // Record failed attempt
           const result = recordAttempt(false);
-          
-          if (error.message.includes("Invalid login")) {
-            toast.error(`อีเมลหรือรหัสผ่านไม่ถูกต้อง ${result.message ? `(${result.message})` : ''}`);
-          } else {
-            toast.error(error.message);
-          }
+          const message = getSafeAuthErrorMessage(error, "เข้าสู่ระบบไม่สำเร็จ");
+          toast.error(result.message ? `${message} (${result.message})` : message);
         } else {
-          // Record successful attempt (resets counter)
           recordAttempt(true);
           toast.success("เข้าสู่ระบบสำเร็จ");
         }
       } else {
         const { error } = await signUp(email, password, displayName);
         if (error) {
-          if (error.message.includes("already registered")) {
-            toast.error("อีเมลนี้ถูกใช้งานแล้ว");
-          } else {
-            toast.error(error.message);
-          }
+          toast.error(getSafeAuthErrorMessage(error, "สร้างบัญชีไม่สำเร็จ"));
         } else {
           // Show email confirmation screen
           setShowEmailConfirmation(true);
@@ -192,7 +206,7 @@ export default function Auth() {
       });
       
       if (error) {
-        toast.error("เกิดข้อผิดพลาด กรุณาลองอีกครั้ง");
+        toast.error("ไม่สามารถส่งลิงก์รีเซ็ตรหัสผ่านได้");
       } else {
         setResetEmailSent(true);
       }

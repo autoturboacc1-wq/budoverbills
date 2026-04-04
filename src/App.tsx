@@ -1,8 +1,9 @@
-import { Suspense, lazy, useState, type ReactNode } from "react";
+import { Suspense, lazy, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
+import { BottomNav } from "@/components/BottomNav";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -52,18 +53,18 @@ function RouteFallback() {
   );
 }
 
-function AppErrorBoundaryWithReset({ children }: { children: ReactNode }) {
-  const location = useLocation();
-
-  return <AppErrorBoundary key={location.key}>{children}</AppErrorBoundary>;
-}
+const ROUTES_WITH_BOTTOM_NAV = ["/", "/create", "/chat", "/notifications", "/profile", "/settings", "/badges", "/history", "/friends", "/debt", "/agreement", "/pdpa-consent", "/personal-info", "/subscription", "/admin"];
 
 function AnimatedRoutes() {
   const location = useLocation();
+  const showBottomNav = ROUTES_WITH_BOTTOM_NAV.some(r =>
+    r === "/" ? location.pathname === "/" : location.pathname.startsWith(r)
+  );
   return (
-    <AnimatePresence mode="wait">
+    <>
       <Suspense fallback={<RouteFallback />}>
-        <Routes location={location} key={location.pathname}>
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
           <Route path="/auth" element={<Auth />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/code" element={<AdminCodeLogin />} />
@@ -100,8 +101,10 @@ function AnimatedRoutes() {
 
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </AnimatePresence>
       </Suspense>
-    </AnimatePresence>
+      {showBottomNav && <BottomNav />}
+    </>
   );
 }
 
@@ -130,7 +133,7 @@ const App = () => {
               <Sonner />
               <BrowserRouter>
                 <PWAInstallPrompt />
-                <AppErrorBoundaryWithReset>
+                <AppErrorBoundary>
                   <NotificationsProvider>
                     <FriendRequestsProvider>
                       <GlobalChatNotificationProvider>
@@ -138,7 +141,7 @@ const App = () => {
                       </GlobalChatNotificationProvider>
                     </FriendRequestsProvider>
                   </NotificationsProvider>
-                </AppErrorBoundaryWithReset>
+                </AppErrorBoundary>
               </BrowserRouter>
             </TooltipProvider>
           </LanguageProvider>

@@ -62,6 +62,40 @@ export const ENGAGEMENT_BADGES = {
   on_time_payer: { label: "ชำระตรงเวลา", icon: "⏰", thresholds: [3, 10, 25] },
 };
 
+const ON_TIME_PAYMENT_BADGE_TYPE = "on_time_payer";
+const ON_TIME_PAYMENT_ACTION_TYPE = "on_time_payment";
+
+export function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+export function deriveEngagementBadges(transactions: PointTransaction[]): EngagementBadge[] {
+  const rule = ENGAGEMENT_BADGES[ON_TIME_PAYMENT_BADGE_TYPE];
+  const matchingTransactions = transactions
+    .filter((transaction) => transaction.action_type === ON_TIME_PAYMENT_ACTION_TYPE)
+    .slice()
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+  const tier = rule.thresholds.reduce((currentTier, threshold, index) => {
+    return matchingTransactions.length >= threshold ? index + 1 : currentTier;
+  }, 0);
+
+  if (tier === 0) {
+    return [];
+  }
+
+  const earnedAtIndex = rule.thresholds[tier - 1] - 1;
+  const earnedAt = matchingTransactions[earnedAtIndex]?.created_at ?? matchingTransactions[matchingTransactions.length - 1]?.created_at ?? new Date().toISOString();
+
+  return [
+    {
+      badge_type: ON_TIME_PAYMENT_BADGE_TYPE,
+      badge_tier: tier,
+      earned_at: earnedAt,
+    },
+  ];
+}
+
 export function useUserPoints() {
   const { user } = useAuth();
   const [points, setPoints] = useState<UserPoints | null>(null);
@@ -70,67 +104,6 @@ export function useUserPoints() {
   const [loading, setLoading] = useState(true);
   const earnLockRef = useRef(false);
   const redeemLockRef = useRef(false);
-
-  const checkBadgeProgress = useCallback(async (actionType: keyof typeof POINT_VALUES) => {
-    if (!user) return;
-
-    const badgeTypeMap: Record<string, string> = {
-      read_article: "avid_reader",
-      save_article: "collector",
-      on_time_payment: "on_time_payer",
-      quality_comment: "contributor",
-    };
-
-    const badgeType = badgeTypeMap[actionType];
-    if (!badgeType) return;
-
-    // Count actions of this type
-    const { count } = await supabase
-      .from("point_transactions")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("action_type", actionType);
-
-    if (!count) return;
-
-    const thresholds = ENGAGEMENT_BADGES[badgeType as keyof typeof ENGAGEMENT_BADGES]?.thresholds || [];
-    let newTier = 0;
-    for (let i = 0; i < thresholds.length; i++) {
-      if (count >= thresholds[i]) {
-        newTier = i + 1;
-      }
-    }
-
-    if (newTier === 0) return;
-
-    // Check current badge tier
-    const existingBadge = badges.find(b => b.badge_type === badgeType);
-    if (existingBadge && existingBadge.badge_tier >= newTier) return;
-
-    // Upsert badge
-    const { data: newBadge } = await supabase
-      .from("engagement_badges")
-      .upsert({
-        user_id: user.id,
-        badge_type: badgeType,
-        badge_tier: newTier,
-      }, { onConflict: "user_id,badge_type" })
-      .select()
-      .single();
-
-    if (newBadge) {
-      setBadges(prev => {
-        const filtered = prev.filter(b => b.badge_type !== badgeType);
-        return [...filtered, newBadge];
-      });
-
-      const badgeInfo = ENGAGEMENT_BADGES[badgeType as keyof typeof ENGAGEMENT_BADGES];
-      const tierName = ["", "🥉 Bronze", "🥈 Silver", "🥇 Gold"][newTier];
-      toast.success(`🎉 ได้รับ Badge ใหม่!`, {
-        description: `${badgeInfo.icon} ${badgeInfo.label} ${tierName}`,
-      });
-    }
-  }, [user, badges]);
 
   const fetchPoints = useCallback(async () => {
     if (!user) {
@@ -206,25 +179,15 @@ export function useUserPoints() {
       .order("created_at", { ascending: false })
       .limit(50);
 
-    if (data) setTransactions(data);
-  }, [user]);
-
-  const fetchBadges = useCallback(async () => {
-    if (!user) return;
-
-    const { data } = await supabase
-      .from("engagement_badges")
-      .select("*")
-      .eq("user_id", user.id);
-
-    if (data) setBadges(data);
+    const nextTransactions = data || [];
+    setTransactions(nextTransactions);
+    setBadges(deriveEngagementBadges(nextTransactions));
   }, [user]);
 
   useEffect(() => {
-    fetchPoints();
-    fetchTransactions();
-    fetchBadges();
-  }, [fetchPoints, fetchTransactions, fetchBadges]);
+    void fetchPoints();
+    void fetchTransactions();
+  }, [fetchPoints, fetchTransactions]);
 
   const canEarnToday = useCallback(() => {
     if (!points) return false;
@@ -242,7 +205,13 @@ export function useUserPoints() {
     earnLockRef.current = true;
 
     try {
-      const referenceIdToUse = referenceId ?? crypto.randomUUID();
+      const referenceIdToUse = referenceId?.trim();
+
+      if (!referenceIdToUse || !isUuidLike(referenceIdToUse)) {
+        console.warn("earnPoints requires a stable UUID referenceId");
+        return false;
+      }
+
       const { data, error } = await rpcClient.rpc<{
         success?: boolean;
         duplicate?: boolean;
@@ -274,9 +243,6 @@ export function useUserPoints() {
         description: description || `จากการ${getActionLabel(actionType)}`,
       });
 
-      // Check for badge upgrades
-      await checkBadgeProgress(actionType);
-
       return true;
     } catch (error) {
       console.error("Error earning points:", error);
@@ -284,7 +250,7 @@ export function useUserPoints() {
     } finally {
       earnLockRef.current = false;
     }
-  }, [user, checkBadgeProgress, fetchPoints, fetchTransactions]);
+  }, [user, fetchPoints, fetchTransactions]);
 
   const redeemPoints = useCallback(async (
     pointsToSpend: number,

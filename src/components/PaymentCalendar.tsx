@@ -110,6 +110,37 @@ interface PaymentCalendarProps {
   onRoleChange?: (role: RoleFilter) => void;
 }
 
+type FrequencyTone = "status-paid" | "status-pending";
+
+const FREQUENCY_TONE_CLASSES: Record<
+  FrequencyTone,
+  {
+    card: string;
+    iconSm: string;
+    iconLg: string;
+    label: string;
+    amount: string;
+    meta: string;
+  }
+> = {
+  "status-paid": {
+    card: "bg-status-paid/10 rounded-xl p-4 border border-status-paid/15",
+    iconSm: "w-4 h-4 text-status-paid",
+    iconLg: "w-5 h-5 text-status-paid",
+    label: "text-sm font-medium text-status-paid",
+    amount: "font-heading font-bold text-lg text-status-paid",
+    meta: "text-xs text-status-paid/80",
+  },
+  "status-pending": {
+    card: "bg-status-pending/10 rounded-xl p-4 border border-status-pending/15",
+    iconSm: "w-4 h-4 text-status-pending",
+    iconLg: "w-5 h-5 text-status-pending",
+    label: "text-sm font-medium text-status-pending",
+    amount: "font-heading font-bold text-lg text-status-pending",
+    meta: "text-xs text-status-pending/80",
+  },
+};
+
 export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -771,29 +802,30 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
                   // Check if all paid for this frequency
                   const allPaid = freqData.total > 0 && freqData.pendingCount === 0;
                   // If all paid: show green. Otherwise: lender=green, borrower=pending(orange)
-                  const colorClass = allPaid ? "status-paid" : (roleFilter === "lender" ? "status-paid" : "status-pending");
+                  const colorClass: FrequencyTone = allPaid ? "status-paid" : (roleFilter === "lender" ? "status-paid" : "status-pending");
+                  const toneClasses = FREQUENCY_TONE_CLASSES[colorClass];
                   const Icon = roleFilter === "lender" ? ArrowDownLeft : ArrowUpRight;
                   
                   return (
                     <div 
                       key={freq} 
-                      className={`bg-${colorClass}/10 rounded-xl p-4 border border-${colorClass}/15`}
+                      className={toneClasses.card}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <Icon className={`w-4 h-4 text-${colorClass}`} />
-                          <span className={`text-sm font-medium text-${colorClass}`}>
+                          <Icon className={toneClasses.iconSm} />
+                          <span className={toneClasses.label}>
                             {allPaid 
                               ? labels.paidComplete
                               : `${roleFilter === "lender" ? "ต้องได้รับ" : "ต้องชำระ"}${labels.period}`
                             }
                           </span>
                         </div>
-                        <p className={`font-heading font-bold text-lg text-${colorClass}`}>
+                        <p className={toneClasses.amount}>
                           ฿{freqData.total.toLocaleString()}
                         </p>
                       </div>
-                      <div className={`text-xs text-${colorClass}/80`}>
+                      <div className={toneClasses.meta}>
                         {freqData.pendingCount > 0 
                           ? `${freqData.pendingCount} งวด • ${roleFilter === "lender" ? "ค้างรับ" : "ค้างจ่าย"} ฿${freqData.pending.toLocaleString()}`
                           : labels.noPending
@@ -811,26 +843,27 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
                 const labels = freq ? (roleFilter === "lender" ? frequencyLabelsLender[freq] : frequencyLabels[freq]) : null;
                 
                 // If all paid: use green for both roles
-                const colorClass = allPaid ? "status-paid" : (roleFilter === "lender" ? "status-paid" : "status-pending");
+                const colorClass: FrequencyTone = allPaid ? "status-paid" : (roleFilter === "lender" ? "status-paid" : "status-pending");
+                const toneClasses = FREQUENCY_TONE_CLASSES[colorClass];
                 const Icon = roleFilter === "lender" ? ArrowDownLeft : ArrowUpRight;
                 
                 return (
-                  <div className={`bg-${colorClass}/10 rounded-xl p-4 border border-${colorClass}/15`}>
+                  <div className={toneClasses.card}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <Icon className={`w-5 h-5 text-${colorClass}`} />
-                        <span className={`text-sm font-medium text-${colorClass}`}>
+                        <Icon className={toneClasses.iconLg} />
+                        <span className={toneClasses.label}>
                           {allPaid 
                             ? (labels?.paidComplete || (roleFilter === "lender" ? "เดือนนี้รับครบแล้ว" : "เดือนนี้ชำระแล้ว"))
                             : `${roleFilter === "lender" ? "ต้องได้รับชำระ" : "ต้องชำระ"}${labels?.period || "เดือนนี้"}`
                           }
                         </span>
                       </div>
-                      <p className={`font-heading font-bold text-xl text-${colorClass}`}>
+                      <p className={toneClasses.amount}>
                         ฿{frequencySummary.totalAmount.toLocaleString()}
                       </p>
                     </div>
-                    <div className={`text-xs text-${colorClass}/80`}>
+                    <div className={toneClasses.meta}>
                       {frequencySummary.totalPendingCount > 0 
                         ? `${frequencySummary.totalPendingCount} งวด • ${roleFilter === "lender" ? "รอรับ" : "ค้างจ่าย"} ฿${frequencySummary.totalPending.toLocaleString()}`
                         : (labels?.noPending || (roleFilter === "lender" ? "เดือนนี้ไม่มีงวดต้องรับ" : "เดือนนี้ไม่มีงวดต้องจ่าย"))

@@ -1,5 +1,9 @@
 import type { Notification } from "@/hooks/useNotifications";
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function decodePathCandidate(value: string): string {
   try {
     return decodeURIComponent(value);
@@ -53,10 +57,19 @@ export function getSafeNotificationTarget(notification: NotificationTargetLike):
   switch (notification.related_type) {
     case "agreement":
     case "debt_agreement":
+    case "reschedule":
+      if (!isUuid(notification.related_id)) {
+        return null;
+      }
       return isSafeInternalPath(`/debt/${notification.related_id}`) ? `/debt/${notification.related_id}` : null;
+    case "feed_post":
+      return "/";
     case "friend_request":
       return "/friends";
     case "chat":
+      if (!isUuid(notification.related_id)) {
+        return null;
+      }
       return isSafeInternalPath(`/chat/${notification.related_id}`) ? `/chat/${notification.related_id}` : null;
     default:
       return null;

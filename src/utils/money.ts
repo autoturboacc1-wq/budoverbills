@@ -23,6 +23,10 @@ export function roundMoney(value: number): number {
 }
 
 export function toMoney(value: unknown, options: MoneyOptions = {}): number {
+  if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) {
+    throw new Error(`Invalid monetary value: ${String(value)}`);
+  }
+
   const num = typeof value === 'number' ? value : Number(value);
 
   if (!Number.isFinite(num)) {
@@ -37,7 +41,10 @@ export function toMoney(value: unknown, options: MoneyOptions = {}): number {
 }
 
 export function toMoneyCents(value: number): number {
-  return Math.round(roundMoney(value) * MONEY_MULTIPLIER);
+  const normalized = toMoney(value).toFixed(2);
+  const sign = normalized.startsWith('-') ? -1 : 1;
+  const digits = normalized.replace('-', '').replace('.', '');
+  return sign * Number(digits);
 }
 
 export function sumMoney(...values: number[]): number {
@@ -49,7 +56,7 @@ export function subtractMoney(a: number, b: number): number {
   return roundMoney((toMoneyCents(a) - toMoneyCents(b)) / MONEY_MULTIPLIER);
 }
 
-export function moneyEquals(a: number, b: number, tolerance: number = 0.01): boolean {
+export function moneyEquals(a: number, b: number, tolerance: number = 0): boolean {
   const toleranceCents = Math.max(0, Math.round(Math.abs(tolerance) * MONEY_MULTIPLIER));
   return Math.abs(toMoneyCents(a) - toMoneyCents(b)) <= toleranceCents;
 }
@@ -57,9 +64,10 @@ export function moneyEquals(a: number, b: number, tolerance: number = 0.01): boo
 export function isWithinMoneyTolerance(
   actual: number,
   expected: number,
-  tolerance: number = 0.01
+  tolerance: number = 0
 ): boolean {
-  return Math.abs(subtractMoney(actual, expected)) <= tolerance;
+  const toleranceCents = Math.max(0, Math.round(Math.abs(tolerance) * MONEY_MULTIPLIER));
+  return Math.abs(toMoneyCents(actual) - toMoneyCents(expected)) <= toleranceCents;
 }
 
 export function divideMoney(value: number, divisor: number): number {

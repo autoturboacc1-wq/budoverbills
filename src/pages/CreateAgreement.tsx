@@ -82,7 +82,7 @@ const parseBangkokDate = (value: string) => {
   if (!match) return null;
 
   const [, year, month, day] = match;
-  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12, 0, 0, 0));
+  return new Date(`${year}-${month}-${day}T00:00:00+07:00`);
 };
 
 const getBangkokTodayDate = () => parseBangkokDate(formatBangkokDate(new Date())) ?? new Date();
@@ -110,8 +110,6 @@ export default function CreateAgreement() {
     freeRemaining,
     feeAmount,
     feeCurrency,
-    useFreeSlot: consumeFreeSlot,
-    useAgreementCredit: consumeAgreementCredit,
     isLoading: subscriptionLoading,
     refetch: refetchLimits,
   } = useSubscription();
@@ -334,19 +332,10 @@ export default function CreateAgreement() {
       const result = await createAgreement(input);
       
       if (result) {
-        if ((currentQuota.free_remaining ?? 0) > 0) {
-          await consumeFreeSlot();
-        } else if ((currentQuota.credits ?? 0) > 0) {
-          await consumeAgreementCredit();
-        } else {
-          toast.error("สิทธิ์สร้างข้อตกลงไม่เพียงพอ");
-          return;
-        }
-        
-        refetchLimits(); // Refresh limits after creating
+        await refetchLimits(); // Refresh limits after the RPC atomically consumes quota
         toast.success("ส่งคำขอข้อตกลงสำเร็จ!", {
           description: (currentQuota.free_remaining ?? 0) > 0
-            ? `เหลือสิทธิ์ฟรีอีก ${freeRemaining - 1} ครั้ง` 
+            ? `เหลือสิทธิ์ฟรีอีก ${Math.max(0, (currentQuota.free_remaining ?? 0) - 1)} ครั้ง` 
             : `ใช้สิทธิ์ที่ซื้อไว้แล้ว เหลืออีก ${Math.max(0, (currentQuota.credits ?? 0) - 1)} ครั้ง`,
         });
         navigate("/");
@@ -498,9 +487,9 @@ export default function CreateAgreement() {
     // For weekly: calculate from selected day of week
     if (formData.frequency === "weekly") {
       const targetDay = Number(formData.weeklyDay);
-      const current = getBangkokTodayDate();
+      const current = parseBangkokDate(formData.startDate) ?? getBangkokTodayDate();
       
-      // Find the first occurrence of targetDay from today
+      // Find the first occurrence of targetDay from the selected Bangkok start date.
       while (current.getUTCDay() !== targetDay) {
         current.setUTCDate(current.getUTCDate() + 1);
       }

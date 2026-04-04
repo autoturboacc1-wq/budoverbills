@@ -5,7 +5,6 @@ import { ArrowLeft, Newspaper, Shield, UserCog, Activity, LayoutDashboard, Crown
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useUserRole } from "@/hooks/useUserRole";
-import { BottomNav } from "@/components/BottomNav";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { format, subDays, subMonths, startOfDay } from "date-fns";
@@ -360,7 +359,6 @@ export default function AdminHub() {
         )}
       </div>
 
-      <BottomNav />
     </div>
     </PageTransition>
   );

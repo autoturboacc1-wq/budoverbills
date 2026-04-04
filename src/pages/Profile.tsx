@@ -20,7 +20,6 @@ import {
   LayoutDashboard
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { BottomNav } from "@/components/BottomNav";
 import { NotificationSheet } from "@/components/NotificationSheet";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -229,9 +228,6 @@ export default function Profile() {
               >
                 {unreadCount > 9 ? "9+" : unreadCount}
               </motion.span>
-            )}
-            {unreadCount > 0 && (
-              <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
             )}
           </button>
         </motion.div>
@@ -514,7 +510,6 @@ export default function Profile() {
       </div>
       
       <NotificationSheet open={showNotifications} onOpenChange={setShowNotifications} />
-      <BottomNav />
     </div>
     </PageTransition>
   );

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageTransition } from "@/components/ux/PageTransition";
 import { Header } from '@/components/Header';
-import { BottomNav } from '@/components/BottomNav';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -147,7 +146,6 @@ export default function AdminSecurity() {
             <Skeleton className="h-64 w-full" />
           </div>
         </main>
-        <BottomNav />
       </div>
     );
   }
@@ -441,7 +439,6 @@ export default function AdminSecurity() {
           </Tabs>
         </div>
       </main>
-      <BottomNav />
     </div>
     </PageTransition>
   );

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
+import { getSafeNotificationTarget } from "@/utils/navigation";
 
 interface NotificationSheetProps {
   open: boolean;
@@ -60,40 +61,6 @@ const priorityConfig: Record<NotificationPriority, {
   },
 };
 
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
-function isSafeInternalPath(value: string): boolean {
-  return value.startsWith("/") && !value.startsWith("//") && !/[\s\\]/.test(value) && !/^[a-z][a-z0-9+.-]*:/i.test(value);
-}
-
-function getSafeNotificationTarget(notif: Notification): string | null {
-  if (notif.action_url && isSafeInternalPath(notif.action_url)) {
-    return notif.action_url;
-  }
-
-  if (!notif.related_id || !isUuid(notif.related_id)) {
-    return null;
-  }
-
-  switch (notif.related_type) {
-    case "agreement":
-    case "reschedule":
-      return `/debt/${notif.related_id}`;
-    case "installment":
-      return `/debt/${notif.related_id}`;
-    case "friend_request":
-      return "/friends";
-    case "feed_post":
-      return "/";
-    case "chat":
-      return `/chat/${notif.related_id}`;
-    default:
-      return null;
-  }
-}
-
 export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps) {
   const { notifications, loading, markAsRead, markAllAsRead, unreadCount } = useNotifications();
   const navigate = useNavigate();
@@ -115,7 +82,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
     // Close sheet first
     onOpenChange(false);
 
-    const safeTarget = getSafeNotificationTarget(notif);
+    const safeTarget = notif.related_type === "installment" ? null : getSafeNotificationTarget(notif);
     if (safeTarget) {
       if (notif.related_type === "installment") {
         await navigateToInstallment(notif.related_id as string);
