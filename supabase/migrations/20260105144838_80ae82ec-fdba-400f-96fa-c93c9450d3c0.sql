@@ -41,6 +41,10 @@ AS $function$
 DECLARE
   v_existing_trial boolean;
 BEGIN
+  IF auth.uid() IS NULL OR auth.uid() <> p_user_id THEN
+    RAISE EXCEPTION 'Forbidden';
+  END IF;
+
   -- Check if user already had a trial
   SELECT EXISTS(
     SELECT 1 FROM public.subscriptions 
