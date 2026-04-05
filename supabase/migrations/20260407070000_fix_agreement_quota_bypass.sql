@@ -1,0 +1,167 @@
+-- BUG-RLS-21: create_agreement_with_installments RPC bypasses quota check.
+-- Recreate the function with an explicit quota guard at the top so that calling
+-- the RPC directly never circumvents plan limits.
+
+CREATE OR REPLACE FUNCTION public.create_agreement_with_installments(
+  p_lender_id uuid,
+  p_borrower_id uuid DEFAULT NULL,
+  p_borrower_phone text DEFAULT NULL,
+  p_borrower_name text DEFAULT NULL,
+  p_principal_amount numeric,
+  p_interest_rate numeric DEFAULT 0,
+  p_interest_type text DEFAULT 'none',
+  p_total_amount numeric,
+  p_num_installments integer,
+  p_frequency text DEFAULT 'monthly',
+  p_start_date date,
+  p_description text DEFAULT NULL,
+  p_reschedule_fee_rate numeric DEFAULT 5,
+  p_reschedule_interest_multiplier numeric DEFAULT 1,
+  p_bank_name text DEFAULT NULL,
+  p_account_number text DEFAULT NULL,
+  p_account_name text DEFAULT NULL,
+  p_installments jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_agreement_id uuid;
+  v_installment_count integer;
+  v_expected_installment_count integer;
+  v_installment_sum numeric;
+  v_quota jsonb;
+  v_free_remaining integer := 0;
+  v_credits integer := 0;
+BEGIN
+  -- Identity check: caller must be the lender.
+  IF v_user_id IS NULL OR v_user_id <> p_lender_id THEN
+    RAISE EXCEPTION 'Forbidden';
+  END IF;
+
+  IF p_borrower_id IS NOT NULL AND p_borrower_id = p_lender_id THEN
+    RAISE EXCEPTION 'Borrower cannot be the same as lender';
+  END IF;
+
+  -- Quota check — must happen before any writes so that direct RPC calls
+  -- cannot bypass the plan limit (BUG-RLS-21).
+  v_quota := public.can_create_agreement_free(p_lender_id);
+  IF COALESCE((v_quota ->> 'can_create_free')::boolean, false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'Agreement quota exceeded';
+  END IF;
+
+  v_free_remaining := COALESCE((v_quota ->> 'free_remaining')::integer, 0);
+  v_credits        := COALESCE((v_quota ->> 'credits')::integer, 0);
+
+  -- Consume the quota slot atomically before inserting.
+  IF v_free_remaining > 0 THEN
+    IF public.use_free_agreement_slot(p_lender_id) IS NOT TRUE THEN
+      RAISE EXCEPTION 'Unable to consume free agreement slot';
+    END IF;
+  ELSIF v_credits > 0 THEN
+    IF public.use_agreement_credit(p_lender_id) IS NOT TRUE THEN
+      RAISE EXCEPTION 'Unable to consume agreement credit';
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'Agreement quota exceeded';
+  END IF;
+
+  -- Validate the installments payload.
+  IF p_installments IS NULL OR jsonb_typeof(p_installments) <> 'array' THEN
+    RAISE EXCEPTION 'Invalid installments payload';
+  END IF;
+
+  v_installment_count          := jsonb_array_length(p_installments);
+  v_expected_installment_count := COALESCE(p_num_installments, 0);
+
+  IF v_installment_count <> v_expected_installment_count THEN
+    RAISE EXCEPTION 'Installment count mismatch';
+  END IF;
+
+  SELECT COALESCE(SUM((item ->> 'amount')::numeric), 0)
+  INTO v_installment_sum
+  FROM jsonb_array_elements(p_installments) AS item;
+
+  IF ABS(v_installment_sum - p_total_amount) > 0.01 THEN
+    RAISE EXCEPTION 'Installment total does not match agreement total';
+  END IF;
+
+  -- Insert the agreement.
+  INSERT INTO public.debt_agreements (
+    lender_id,
+    borrower_id,
+    borrower_phone,
+    borrower_name,
+    principal_amount,
+    interest_rate,
+    interest_type,
+    total_amount,
+    num_installments,
+    frequency,
+    start_date,
+    description,
+    reschedule_fee_rate,
+    reschedule_interest_multiplier,
+    bank_name,
+    account_number,
+    account_name,
+    lender_confirmed,
+    lender_confirmed_at
+  )
+  VALUES (
+    p_lender_id,
+    p_borrower_id,
+    p_borrower_phone,
+    p_borrower_name,
+    p_principal_amount,
+    p_interest_rate,
+    p_interest_type,
+    p_total_amount,
+    p_num_installments,
+    p_frequency,
+    p_start_date,
+    p_description,
+    p_reschedule_fee_rate,
+    p_reschedule_interest_multiplier,
+    p_bank_name,
+    p_account_number,
+    p_account_name,
+    true,
+    now()
+  )
+  RETURNING id INTO v_agreement_id;
+
+  -- Insert the installment schedule.
+  INSERT INTO public.installments (
+    agreement_id,
+    installment_number,
+    due_date,
+    amount,
+    principal_portion,
+    interest_portion
+  )
+  SELECT
+    v_agreement_id,
+    item.installment_number,
+    item.due_date,
+    item.amount,
+    item.principal_portion,
+    item.interest_portion
+  FROM jsonb_to_recordset(p_installments) AS item(
+    installment_number integer,
+    due_date date,
+    amount numeric,
+    principal_portion numeric,
+    interest_portion numeric
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'agreement_id', v_agreement_id,
+    'installments_created', v_installment_count
+  );
+END;
+$$;
