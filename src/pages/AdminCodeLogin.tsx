@@ -92,6 +92,10 @@ const AdminCodeLogin = () => {
         clearAdminSession();
         setAdminSession({
           sessionToken: result.session_token,
+          verifiedVia: result.verified_via,
+          codeName: result.code_name ?? null,
+          codeRole: result.code_role === "admin" || result.code_role === "moderator" ? result.code_role : null,
+          expiresAt: result.expires_at ?? null,
         });
 
         const validatedSession = await getValidatedAdminSession(user.id);

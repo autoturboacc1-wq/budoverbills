@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Shield, UserCog, Search, Crown, User, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -57,13 +57,24 @@ export default function AdminUsersPage() {
     });
   };
 
+  const [displayNameSearch, setDisplayNameSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounce the display-name search so we don't fire a query on every keystroke
+  const handleDisplayNameSearch = (value: string) => {
+    setDisplayNameSearch(value);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setDebouncedSearch(value), 350);
+  };
+
   const { data: usersWithRoles = [], isLoading } = useQuery({
-    queryKey: ["admin-user-roles"],
+    queryKey: ["admin-user-roles", debouncedSearch],
     queryFn: async () => {
       const { data: roles, error } = await supabase
         .from("user_roles")
         .select("user_id, role");
-      
+
       if (error) throw error;
 
       const userRolesMap = new Map<string, AppRole[]>();
@@ -76,12 +87,25 @@ export default function AdminUsersPage() {
       const userIds = Array.from(userRolesMap.keys());
       if (userIds.length === 0) return [];
 
-      const { data: profiles } = await supabase
+      // Server-side filter by display_name so users beyond the first 100 are found
+      let profilesQuery = supabase
         .from("profiles")
         .select("user_id, display_name")
-        .in("user_id", userIds);
+        .in("user_id", userIds)
+        .limit(200);
 
-      const result: UserWithRoles[] = userIds.map(userId => ({
+      if (debouncedSearch.trim()) {
+        profilesQuery = profilesQuery.ilike("display_name", `%${debouncedSearch.trim()}%`);
+      }
+
+      const { data: profiles } = await profilesQuery;
+
+      // When filtering, only show users whose profile matched the server-side search
+      const filteredUserIds = debouncedSearch.trim()
+        ? (profiles?.map(p => p.user_id) ?? [])
+        : userIds;
+
+      const result: UserWithRoles[] = filteredUserIds.map(userId => ({
         user_id: userId,
         display_name: profiles?.find(p => p.user_id === userId)?.display_name || null,
         roles: userRolesMap.get(userId) || []
@@ -283,6 +307,14 @@ export default function AdminUsersPage() {
                 <Shield className="w-5 h-5" />
                 ผู้ใช้ที่มีสิทธิ์พิเศษ ({usersWithRoles.length})
               </CardTitle>
+              <div className="flex gap-2 pt-1">
+                <Input
+                  placeholder="ค้นหาตามชื่อผู้ใช้..."
+                  value={displayNameSearch}
+                  onChange={(e) => handleDisplayNameSearch(e.target.value)}
+                  className="max-w-xs"
+                />
+              </div>
             </CardHeader>
             <CardContent>
               {isLoading ? (

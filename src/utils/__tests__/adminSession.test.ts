@@ -19,6 +19,7 @@ import {
   hasAdminSession,
   issueAdminCodeSession,
   issueAdminOtpSession,
+  setAdminSession,
   validateAdminSession,
 } from '@/utils/adminSession';
 
@@ -128,5 +129,39 @@ describe('adminSession helpers', () => {
         session_token: 'stored-token',
       },
     });
+  });
+
+  it('treats expired stored admin sessions as invalid on the client', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-10T00:00:00.000Z'));
+    supabaseMocks.invoke.mockResolvedValue({ data: { success: true }, error: null });
+
+    setAdminSession({
+      sessionToken: 'session-token',
+      verifiedVia: 'code',
+      expiresAt: '2026-04-09T23:59:00.000Z',
+    });
+
+    expect(getAdminSessionToken()).toBeNull();
+    expect(hasAdminSession('user-123')).toBe(false);
+    expect(hasAdminCodeSession('user-123')).toBe(false);
+
+    vi.useRealTimers();
+  });
+
+  it('stores verification metadata when setting an admin session', () => {
+    setAdminSession({
+      sessionToken: 'session-token',
+      verifiedVia: 'code',
+      codeName: 'support-code',
+      codeRole: 'admin',
+      expiresAt: '2026-04-10T01:00:00.000Z',
+    });
+
+    expect(sessionStorage.getItem('admin_session_token')).toBe('session-token');
+    expect(sessionStorage.getItem('admin_session_verified_via')).toBe('code');
+    expect(sessionStorage.getItem('admin_code_name')).toBe('support-code');
+    expect(sessionStorage.getItem('admin_code_role')).toBe('admin');
+    expect(sessionStorage.getItem('admin_session_expires_at')).toBe('2026-04-10T01:00:00.000Z');
   });
 });

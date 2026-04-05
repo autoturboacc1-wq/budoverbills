@@ -1,6 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 
 const ADMIN_SESSION_TOKEN_KEY = "admin_session_token";
+const ADMIN_SESSION_EXPIRES_AT_KEY = "admin_session_expires_at";
+const ADMIN_SESSION_VERIFIED_VIA_KEY = "admin_session_verified_via";
+const ADMIN_SESSION_CODE_NAME_KEY = "admin_code_name";
+const ADMIN_SESSION_CODE_ROLE_KEY = "admin_code_role";
 const ADMIN_SESSION_FUNCTION = "admin-session";
 const validatedAdminSessions = new Map<string, AdminSessionDetails>();
 
@@ -38,6 +42,16 @@ function getStoredSessionToken(): string | null {
   return token && token.trim() ? token : null;
 }
 
+function isStoredSessionExpired(): boolean {
+  const expiresAt = sessionStorage.getItem(ADMIN_SESSION_EXPIRES_AT_KEY);
+  if (!expiresAt) {
+    return false;
+  }
+
+  const expiresAtMs = new Date(expiresAt).getTime();
+  return Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now();
+}
+
 function rememberValidatedAdminSession(userId: string, details: AdminSessionDetails): void {
   validatedAdminSessions.set(userId, details);
 }
@@ -62,6 +76,11 @@ async function invokeAdminSession<TResponse>(body: Record<string, unknown>): Pro
 }
 
 export function getAdminSessionToken(): string | null {
+  if (isStoredSessionExpired()) {
+    clearAdminSession();
+    return null;
+  }
+
   return getStoredSessionToken();
 }
 
@@ -99,9 +118,37 @@ export async function issueAdminCodeSession(code: string): Promise<AdminSessionI
 
 export function setAdminSession(params: {
   sessionToken: string;
+  verifiedVia?: "otp" | "code";
+  codeName?: string | null;
+  codeRole?: "admin" | "moderator" | null;
+  expiresAt?: string | null;
 }) {
   forgetValidatedAdminSession();
   sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, params.sessionToken);
+
+  if (params.expiresAt) {
+    sessionStorage.setItem(ADMIN_SESSION_EXPIRES_AT_KEY, params.expiresAt);
+  } else {
+    sessionStorage.removeItem(ADMIN_SESSION_EXPIRES_AT_KEY);
+  }
+
+  if (params.verifiedVia) {
+    sessionStorage.setItem(ADMIN_SESSION_VERIFIED_VIA_KEY, params.verifiedVia);
+  } else {
+    sessionStorage.removeItem(ADMIN_SESSION_VERIFIED_VIA_KEY);
+  }
+
+  if (params.codeName) {
+    sessionStorage.setItem(ADMIN_SESSION_CODE_NAME_KEY, params.codeName);
+  } else {
+    sessionStorage.removeItem(ADMIN_SESSION_CODE_NAME_KEY);
+  }
+
+  if (params.codeRole) {
+    sessionStorage.setItem(ADMIN_SESSION_CODE_ROLE_KEY, params.codeRole);
+  } else {
+    sessionStorage.removeItem(ADMIN_SESSION_CODE_ROLE_KEY);
+  }
 }
 
 async function validateAdminSessionDetails(userId?: string | null): Promise<AdminSessionDetails | null> {
@@ -167,6 +214,8 @@ export function clearAdminSession(): void {
   }
 
   sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
-  sessionStorage.removeItem("admin_code_name");
-  sessionStorage.removeItem("admin_code_role");
+  sessionStorage.removeItem(ADMIN_SESSION_EXPIRES_AT_KEY);
+  sessionStorage.removeItem(ADMIN_SESSION_VERIFIED_VIA_KEY);
+  sessionStorage.removeItem(ADMIN_SESSION_CODE_NAME_KEY);
+  sessionStorage.removeItem(ADMIN_SESSION_CODE_ROLE_KEY);
 }
