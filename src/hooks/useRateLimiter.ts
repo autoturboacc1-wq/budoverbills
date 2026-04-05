@@ -1,6 +1,22 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
+// NOTE — UX-ONLY RATE LIMITER
+// This hook provides a best-effort, client-side rate limiter intended to give
+// immediate feedback to the user and reduce accidental rapid-fire submissions.
+//
+// It is NOT a security control. A determined attacker can bypass it by:
+//   • Calling the API / RPC directly (fetch, curl, Postman, …)
+//   • Opening an incognito window or a different browser
+//
+// Real rate limiting MUST be enforced server-side inside each RPC or Edge
+// Function (e.g. via the admin_otp failed_attempts/locked_until columns, or a
+// dedicated rate-limit table keyed on user id + action).
+//
+// The attempt state is persisted to sessionStorage so that a page refresh
+// within the same browser session does not silently reset the counter.
+// This is still a UX measure only — clearing sessionStorage bypasses it.
+
 interface RateLimitConfig {
   maxAttempts: number;
   windowMs: number;
@@ -19,10 +35,48 @@ const defaultConfig: RateLimitConfig = {
   blockDurationMs: 5 * 60 * 1000, // 5 minute block
 };
 
-// Global store for rate limiting across components.
-// Keys are scoped per authenticated user or anonymous browser session.
+// Global in-memory store for rate limiting across components within a page
+// load. Keys are scoped per authenticated user or anonymous browser session.
+// State is also mirrored to sessionStorage so page refreshes don't bypass it.
 const rateLimitStore: Map<string, RateLimitState> = new Map();
 const ANONYMOUS_SCOPE_STORAGE_KEY = 'rate_limiter_anonymous_scope';
+
+// Persist attempt state to sessionStorage so a page refresh within the same
+// browser session does not silently reset the counter.
+function persistState(storageKey: string, state: RateLimitState): void {
+  try {
+    window.sessionStorage.setItem(storageKey, JSON.stringify(state));
+  } catch {
+    // sessionStorage may be unavailable (private browsing quota, etc.)
+  }
+}
+
+function loadPersistedState(storageKey: string): RateLimitState | null {
+  try {
+    const stored = sessionStorage.getItem(storageKey);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as RateLimitState;
+    // Basic shape validation to guard against corrupted storage values.
+    if (
+      typeof parsed.attempts === 'number' &&
+      (parsed.firstAttemptTime === null || typeof parsed.firstAttemptTime === 'number') &&
+      (parsed.blockedUntil === null || typeof parsed.blockedUntil === 'number')
+    ) {
+      return parsed;
+    }
+  } catch {
+    // Ignore parse errors — treat as no stored state.
+  }
+  return null;
+}
+
+function clearPersistedState(storageKey: string): void {
+  try {
+    sessionStorage.removeItem(storageKey);
+  } catch {
+    // ignore
+  }
+}
 
 function createAnonymousScope(forceNew = false): string {
   if (typeof window === 'undefined') {
@@ -73,17 +127,34 @@ export function useRateLimiter(key: string, config: Partial<RateLimitConfig> = {
   const scope = user?.id ?? anonymousScope;
   const scopedKey = `${scope}:${key}`;
 
+  // Store attempts in sessionStorage so refresh doesn't bypass the UX rate limit.
+  // The storageKey mirrors the in-memory scopedKey so the two stores stay in sync.
+  const storageKey = `rate_limit_${scopedKey}`;
+
   const getState = useCallback((): RateLimitState => {
-    return rateLimitStore.get(scopedKey) || {
+    // Prefer the in-memory store (authoritative for the current page load).
+    const inMemory = rateLimitStore.get(scopedKey);
+    if (inMemory) return inMemory;
+
+    // On first access after a page refresh, hydrate from sessionStorage.
+    const persisted = loadPersistedState(storageKey);
+    if (persisted) {
+      rateLimitStore.set(scopedKey, persisted);
+      return persisted;
+    }
+
+    return {
       attempts: 0,
       firstAttemptTime: null,
       blockedUntil: null,
     };
-  }, [scopedKey]);
+  }, [scopedKey, storageKey]);
 
   const setState = useCallback((state: RateLimitState) => {
     rateLimitStore.set(scopedKey, state);
-  }, [scopedKey]);
+    // Mirror to sessionStorage so the limit survives page refresh within the same session.
+    persistState(storageKey, state);
+  }, [scopedKey, storageKey]);
 
   const clearBlockTimer = useCallback(() => {
     if (intervalRef.current) {
@@ -244,10 +315,12 @@ export function useRateLimiter(key: string, config: Partial<RateLimitConfig> = {
       firstAttemptTime: null,
       blockedUntil: null,
     });
+    // Also clear the sessionStorage entry so a subsequent page refresh starts clean.
+    clearPersistedState(storageKey);
     setIsBlocked(false);
     setRemainingAttempts(maxAttempts);
     setBlockTimeRemaining(0);
-  }, [clearBlockTimer, maxAttempts, setState]);
+  }, [clearBlockTimer, maxAttempts, setState, storageKey]);
 
   return {
     isBlocked,

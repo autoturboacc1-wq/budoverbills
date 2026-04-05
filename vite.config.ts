@@ -25,11 +25,13 @@ export default defineConfig(async ({ mode }) => {
 
   const pwaPlugins = VitePWA({
       registerType: "autoUpdate",
+      strategies: "injectManifest",
+      srcDir: "public",
+      filename: "sw.js",
       includeAssets: ["favicon.png", "favicon.ico", "og-image.png"],
-      workbox: {
+      injectManifest: {
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB to accommodate large JS bundle
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        runtimeCaching: []
       },
       manifest: {
         lang: "th",
@@ -111,7 +113,7 @@ export default defineConfig(async ({ mode }) => {
       },
     },
     build: {
-      sourcemap: false,
+      sourcemap: true,
       rollupOptions: {
         output: {
           manualChunks: {

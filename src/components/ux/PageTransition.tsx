@@ -17,7 +17,6 @@ export function PageTransition({ children }: { children: ReactNode }) {
       animate="animate"
       exit="exit"
       transition={transition}
-      style={{ minHeight: "100dvh" }}
     >
       {children}
     </motion.div>

@@ -1,6 +1,6 @@
 const THAI_PHONE_DIGITS = 10;
 const THAI_PROMPTPAY_ID_DIGITS = 13;
-const THAI_BANK_ACCOUNT_DIGITS = 10;
+const THAI_BANK_ACCOUNT_DIGITS = [10, 12] as const;
 const DISPLAY_NAME_MAX_LENGTH = 50;
 const DISPLAY_NAME_ALLOWED_CHARS = /^[\p{L}\p{N}\p{M}\s.'_-]+$/u;
 
@@ -34,7 +34,8 @@ export function isValidPromptPay(value: string): boolean {
 }
 
 export function isValidBankAccount(value: string): boolean {
-  return normalizeDigits(value).length === THAI_BANK_ACCOUNT_DIGITS;
+  const length = normalizeDigits(value).length;
+  return THAI_BANK_ACCOUNT_DIGITS.includes(length as (typeof THAI_BANK_ACCOUNT_DIGITS)[number]);
 }
 
 export function getBankAccountError(bankName: string, value: string): string | null {
@@ -50,7 +51,7 @@ export function getBankAccountError(bankName: string, value: string): string | n
 
   return isValidBankAccount(value)
     ? null
-    : "เลขบัญชีธนาคารต้องเป็นตัวเลข 10 หลัก";
+    : "เลขบัญชีธนาคารต้องเป็นตัวเลข 10 หรือ 12 หลัก";
 }
 
 export function normalizeBankAccountForStorage(bankName: string, value: string): string {

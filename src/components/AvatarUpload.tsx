@@ -12,6 +12,63 @@ const ALLOWED_AVATAR_MIME_TYPES: Record<string, string> = {
   "image/webp": "webp",
 };
 
+async function readFileHeader(file: File, size: number): Promise<Uint8Array> {
+  const blob = file.slice(0, size);
+
+  if (typeof blob.arrayBuffer === "function") {
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read avatar header"));
+    reader.onload = () => {
+      if (!(reader.result instanceof ArrayBuffer)) {
+        reject(new Error("Failed to read avatar header"));
+        return;
+      }
+
+      resolve(new Uint8Array(reader.result));
+    };
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+async function validateAvatarMagicBytes(file: File): Promise<boolean> {
+  const header = await readFileHeader(file, 16);
+
+  switch (file.type) {
+    case "image/jpeg":
+      return header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
+    case "image/png":
+      return (
+        header.length >= 8 &&
+        header[0] === 0x89 &&
+        header[1] === 0x50 &&
+        header[2] === 0x4e &&
+        header[3] === 0x47 &&
+        header[4] === 0x0d &&
+        header[5] === 0x0a &&
+        header[6] === 0x1a &&
+        header[7] === 0x0a
+      );
+    case "image/webp":
+      return (
+        header.length >= 12 &&
+        header[0] === 0x52 &&
+        header[1] === 0x49 &&
+        header[2] === 0x46 &&
+        header[3] === 0x46 &&
+        header[8] === 0x57 &&
+        header[9] === 0x45 &&
+        header[10] === 0x42 &&
+        header[11] === 0x50
+      );
+    default:
+      return false;
+  }
+}
+
 function getAvatarStoragePathFromUrl(url: string | null | undefined): string | null {
   if (!url) return null;
 
@@ -54,7 +111,11 @@ export function AvatarUpload({ currentAvatarUrl, displayName, onAvatarChange }: 
       return;
     }
 
-    // Validate file size (max 5MB)
+    // BUG-PROF-04: This client-side size check improves UX by giving fast feedback,
+    // but it is NOT a security boundary — a malicious client can bypass it by
+    // sending the upload request directly. The real enforcement must be configured
+    // on the Supabase Storage "avatars" bucket (max_file_size_bytes policy), which
+    // is the authoritative guard. Keep both in sync.
     if (file.size > MAX_AVATAR_SIZE_BYTES) {
       toast.error("ไฟล์ใหญ่เกินไป (สูงสุด 5MB)");
       return;
@@ -66,6 +127,12 @@ export function AvatarUpload({ currentAvatarUrl, displayName, onAvatarChange }: 
     const oldAvatarPath = getAvatarStoragePathFromUrl(currentAvatarUrl);
 
     try {
+      const isValidBinary = await validateAvatarMagicBytes(file);
+      if (!isValidBinary) {
+        toast.error("ไฟล์รูปภาพไม่ถูกต้อง");
+        return;
+      }
+
       // Generate unique filename from the MIME type, not the original file name.
       const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
 

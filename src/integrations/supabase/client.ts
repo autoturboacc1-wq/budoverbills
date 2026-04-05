@@ -19,6 +19,13 @@ function requireEnv(name: string, value: string | undefined): string {
 const supabaseUrl = requireEnv("VITE_SUPABASE_URL", SUPABASE_URL);
 const supabasePublishableKey = requireEnv("VITE_SUPABASE_PUBLISHABLE_KEY", SUPABASE_PUBLISHABLE_KEY);
 
+// BUG-SEC-08 (trade-off acknowledged): Supabase stores the auth JWT in localStorage,
+// which is accessible to any JavaScript running on the page and therefore an XSS
+// exfiltration target. Moving to httpOnly cookies would require a custom auth proxy
+// and is a significant architectural change. The accepted mitigation is a strict
+// Content-Security-Policy (CSP) that prevents execution of injected scripts.
+// Ensure the production server/CDN sets a CSP header disallowing inline scripts
+// and restricting script-src to trusted origins only.
 export const supabase = createClient<Database>(supabaseUrl, supabasePublishableKey, {
   auth: {
     storage: localStorage,

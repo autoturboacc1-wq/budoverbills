@@ -116,6 +116,16 @@ type TranslationKeys = {
   'create.totalInterest': string;
   'create.perInstallment': string;
   'create.compareAll': string;
+
+  // PWA Install Prompt
+  'pwa.closeLabel': string;
+  'pwa.title': string;
+  'pwa.description': string;
+  'pwa.note': string;
+  'pwa.iosHint': string;
+  'pwa.iosAction': string;
+  'pwa.installLabel': string;
+  'pwa.installButton': string;
 };
 
 type Translations = Record<Language, TranslationKeys>;
@@ -205,6 +215,14 @@ const translations: Translations = {
     'create.totalInterest': 'ดอกเบี้ยรวม',
     'create.perInstallment': 'ชำระครั้งละ',
     'create.compareAll': 'เปรียบเทียบทุกแบบ',
+    'pwa.closeLabel': 'ปิดคำแนะนำการติดตั้งแอป',
+    'pwa.title': 'ติดตั้งแอป BOB',
+    'pwa.description': 'เข้าถึงได้เร็วขึ้นจากหน้าจอหลัก และบางหน้าจะเปิดได้เร็วขึ้นจากแคชเมื่อเคยใช้งานแล้ว',
+    'pwa.note': 'ข้อมูลสดและการทำรายการส่วนใหญ่ยังต้องต่อเน็ต',
+    'pwa.iosHint': 'แตะปุ่มแชร์ แล้วเลือก',
+    'pwa.iosAction': '"เพิ่มไปยังหน้าจอหลัก"',
+    'pwa.installLabel': 'ติดตั้งแอป BOB',
+    'pwa.installButton': 'ติดตั้งแอป',
   },
   en: {
     'common.loading': 'Loading...',
@@ -290,6 +308,14 @@ const translations: Translations = {
     'create.totalInterest': 'Total Interest',
     'create.perInstallment': 'Per Installment',
     'create.compareAll': 'Compare All',
+    'pwa.closeLabel': 'Close install app prompt',
+    'pwa.title': 'Install BOB',
+    'pwa.description': 'Open it faster from your home screen, and some pages may load faster from cache after you\'ve used them.',
+    'pwa.note': 'Live data and most actions still require an internet connection.',
+    'pwa.iosHint': 'Tap the share button, then choose',
+    'pwa.iosAction': '"Add to Home Screen"',
+    'pwa.installLabel': 'Install BOB',
+    'pwa.installButton': 'Install app',
   },
   zh: {
     'common.loading': '加载中...',
@@ -375,6 +401,14 @@ const translations: Translations = {
     'create.totalInterest': '总利息',
     'create.perInstallment': '每期金额',
     'create.compareAll': '全部比较',
+    'pwa.closeLabel': '关闭安装应用提示',
+    'pwa.title': '安装 BOB',
+    'pwa.description': '从主屏幕更快打开，部分页面在使用后可从缓存更快加载。',
+    'pwa.note': '实时数据和大多数操作仍需要网络连接。',
+    'pwa.iosHint': '点击分享按钮，然后选择',
+    'pwa.iosAction': '"添加到主屏幕"',
+    'pwa.installLabel': '安装 BOB',
+    'pwa.installButton': '安装应用',
   },
   vi: {
     'common.loading': 'Đang tải...',
@@ -460,6 +494,14 @@ const translations: Translations = {
     'create.totalInterest': 'Tổng lãi',
     'create.perInstallment': 'Mỗi kỳ',
     'create.compareAll': 'So sánh tất cả',
+    'pwa.closeLabel': 'Đóng gợi ý cài đặt ứng dụng',
+    'pwa.title': 'Cài đặt BOB',
+    'pwa.description': 'Mở nhanh hơn từ màn hình chính, một số trang có thể tải nhanh hơn từ bộ nhớ đệm.',
+    'pwa.note': 'Dữ liệu trực tiếp và hầu hết các thao tác vẫn cần kết nối internet.',
+    'pwa.iosHint': 'Nhấn nút chia sẻ, sau đó chọn',
+    'pwa.iosAction': '"Thêm vào màn hình chính"',
+    'pwa.installLabel': 'Cài đặt BOB',
+    'pwa.installButton': 'Cài đặt ứng dụng',
   },
   es: {
     'common.loading': 'Cargando...',
@@ -545,6 +587,14 @@ const translations: Translations = {
     'create.totalInterest': 'Interés total',
     'create.perInstallment': 'Por cuota',
     'create.compareAll': 'Comparar todo',
+    'pwa.closeLabel': 'Cerrar aviso de instalación',
+    'pwa.title': 'Instalar BOB',
+    'pwa.description': 'Ábrelo más rápido desde tu pantalla de inicio, algunas páginas pueden cargarse antes desde caché.',
+    'pwa.note': 'Los datos en vivo y la mayoría de acciones aún requieren conexión a internet.',
+    'pwa.iosHint': 'Toca el botón compartir y elige',
+    'pwa.iosAction': '"Añadir a pantalla de inicio"',
+    'pwa.installLabel': 'Instalar BOB',
+    'pwa.installButton': 'Instalar app',
   },
   ru: {
     'common.loading': 'Загрузка...',
@@ -630,6 +680,14 @@ const translations: Translations = {
     'create.totalInterest': 'Всего проценты',
     'create.perInstallment': 'За платёж',
     'create.compareAll': 'Сравнить все',
+    'pwa.closeLabel': 'Закрыть подсказку установки',
+    'pwa.title': 'Установить BOB',
+    'pwa.description': 'Открывайте быстрее с главного экрана, некоторые страницы загружаются быстрее из кэша.',
+    'pwa.note': 'Актуальные данные и большинство действий по-прежнему требуют интернета.',
+    'pwa.iosHint': 'Нажмите кнопку «Поделиться», затем выберите',
+    'pwa.iosAction': '"Добавить на экран «Домой»"',
+    'pwa.installLabel': 'Установить BOB',
+    'pwa.installButton': 'Установить',
   },
   ja: {
     'common.loading': '読み込み中...',
@@ -715,6 +773,14 @@ const translations: Translations = {
     'create.totalInterest': '合計利息',
     'create.perInstallment': '1回あたり',
     'create.compareAll': '全て比較',
+    'pwa.closeLabel': 'アプリインストール案内を閉じる',
+    'pwa.title': 'BOBをインストール',
+    'pwa.description': 'ホーム画面からすばやく起動でき、一部のページはキャッシュから速く読み込めます。',
+    'pwa.note': 'リアルタイムデータや多くの操作にはインターネット接続が必要です。',
+    'pwa.iosHint': '共有ボタンをタップして選択',
+    'pwa.iosAction': '「ホーム画面に追加」',
+    'pwa.installLabel': 'BOBをインストール',
+    'pwa.installButton': 'インストール',
   },
   ko: {
     'common.loading': '로딩 중...',
@@ -800,6 +866,14 @@ const translations: Translations = {
     'create.totalInterest': '총 이자',
     'create.perInstallment': '회당',
     'create.compareAll': '모두 비교',
+    'pwa.closeLabel': '앱 설치 안내 닫기',
+    'pwa.title': 'BOB 설치',
+    'pwa.description': '홈 화면에서 더 빠르게 열 수 있고, 사용 후 일부 페이지는 캐시에서 더 빠르게 로드됩니다.',
+    'pwa.note': '실시간 데이터와 대부분의 작업은 여전히 인터넷 연결이 필요합니다.',
+    'pwa.iosHint': '공유 버튼을 탭한 후 선택',
+    'pwa.iosAction': '"홈 화면에 추가"',
+    'pwa.installLabel': 'BOB 설치',
+    'pwa.installButton': '앱 설치',
   },
   id: {
     'common.loading': 'Memuat...',
@@ -885,6 +959,14 @@ const translations: Translations = {
     'create.totalInterest': 'Total Bunga',
     'create.perInstallment': 'Per Cicilan',
     'create.compareAll': 'Bandingkan Semua',
+    'pwa.closeLabel': 'Tutup petunjuk instalasi aplikasi',
+    'pwa.title': 'Pasang BOB',
+    'pwa.description': 'Buka lebih cepat dari layar utama, beberapa halaman dapat memuat lebih cepat dari cache.',
+    'pwa.note': 'Data langsung dan sebagian besar tindakan masih memerlukan koneksi internet.',
+    'pwa.iosHint': 'Ketuk tombol bagikan, lalu pilih',
+    'pwa.iosAction': '"Tambahkan ke Layar Utama"',
+    'pwa.installLabel': 'Pasang BOB',
+    'pwa.installButton': 'Pasang aplikasi',
   },
   hi: {
     'common.loading': 'लोड हो रहा है...',
@@ -970,6 +1052,14 @@ const translations: Translations = {
     'create.totalInterest': 'कुल ब्याज',
     'create.perInstallment': 'प्रति किस्त',
     'create.compareAll': 'सभी की तुलना करें',
+    'pwa.closeLabel': 'ऐप इंस्टॉल संकेत बंद करें',
+    'pwa.title': 'BOB इंस्टॉल करें',
+    'pwa.description': 'होम स्क्रीन से तेज़ी से खोलें, उपयोग के बाद कुछ पृष्ठ कैश से तेज़ लोड हो सकते हैं।',
+    'pwa.note': 'लाइव डेटा और अधिकांश क्रियाओं के लिए अभी भी इंटरनेट कनेक्शन आवश्यक है।',
+    'pwa.iosHint': 'शेयर बटन दबाएं, फिर चुनें',
+    'pwa.iosAction': '"होम स्क्रीन में जोड़ें"',
+    'pwa.installLabel': 'BOB इंस्टॉल करें',
+    'pwa.installButton': 'ऐप इंस्टॉल करें',
   },
 };
 

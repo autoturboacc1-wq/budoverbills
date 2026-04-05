@@ -108,8 +108,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return normalizeInternalPath(destinationPath);
   }, []);
 
-  const fetchProfile = useCallback(async (userId: string) => {
-    setProfileLoading(true);
+  /**
+   * Fetches the profile for `userId`.
+   *
+   * `setLoadingFlag` lets the caller decide which loading state to flip:
+   *  - calls from onAuthStateChange pass a no-op because `authLoading`
+   *    already covers the whole auth+profile window, preventing a race
+   *    where `profileLoading` briefly resets to false between the `finally`
+   *    block and the subsequent `setAuthLoading(false)` call.
+   *  - calls from `refreshProfile` pass `setProfileLoading` so the
+   *    dedicated profile-refresh spinner is shown correctly.
+   */
+  const fetchProfile = useCallback(async (
+    userId: string,
+    setLoadingFlag: (v: boolean) => void = () => undefined,
+  ) => {
+    setLoadingFlag(true);
 
     try {
       const { data, error } = await supabase
@@ -127,14 +141,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } finally {
       if (currentUserIdRef.current === userId) {
-        setProfileLoading(false);
+        setLoadingFlag(false);
       }
     }
   }, []);
 
   const refreshProfile = useCallback(async () => {
     if (user) {
-      await fetchProfile(user.id);
+      await fetchProfile(user.id, setProfileLoading);
     }
   }, [fetchProfile, user]);
 
@@ -164,6 +178,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           authStateTimeoutRef.current = setTimeout(() => {
             void (async () => {
+              // Pass no-op for setLoadingFlag: authLoading already covers the
+              // entire auth+profile initialisation window, so profileLoading
+              // must not toggle independently here (BUG-AUTH-07).
               await fetchProfile(nextUser.id);
               if (currentUserIdRef.current === nextUser.id) {
                 setAuthLoading(false);
