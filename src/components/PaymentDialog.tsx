@@ -206,6 +206,16 @@ export function PaymentDialog({
     void fetchUrl();
   }, [slipUrl, pendingVerification?.slip_url, installment?.payment_proof_url, open]);
 
+  // Revoke blob URLs when signedSlipUrl is replaced or the component unmounts,
+  // preventing memory leaks from object URLs created for local slip previews.
+  useEffect(() => {
+    return () => {
+      if (signedSlipUrl && signedSlipUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(signedSlipUrl);
+      }
+    };
+  }, [signedSlipUrl]);
+
   const numericAmount = useMemo(() => {
     const num = parseFloat(paymentAmount);
     return isNaN(num) ? 0 : num;
@@ -310,6 +320,8 @@ export function PaymentDialog({
     borrowerSubmitLockRef.current = true;
     setIsSubmitting(true);
 
+    // Track uploaded storage path so we can clean it up if DB operations fail
+    let uploadedSlipPath: string | null = slipUrl;
     let insertedSlipVerificationId: string | null = null;
 
     try {
@@ -361,21 +373,24 @@ export function PaymentDialog({
       // Update installment with slip URL
       const { error: updateError } = await supabase
         .from('installments')
-        .update({ 
+        .update({
           payment_proof_url: slipUrl,
           status: 'pending'
         })
         .eq('id', installment.id);
 
       if (updateError) {
-        if (insertedSlipVerificationId) {
-          await supabase
-            .from('slip_verifications')
-            .delete()
-            .eq('id', insertedSlipVerificationId);
-        }
+        // Roll back the verification record before propagating
+        await supabase
+          .from('slip_verifications')
+          .delete()
+          .eq('id', insertedSlipVerificationId);
+        insertedSlipVerificationId = null;
         throw updateError;
       }
+
+      // All DB operations succeeded — storage file is no longer orphaned
+      uploadedSlipPath = null;
 
       // Create notification for lender
       const isFee = freshInstallment.principal_portion === 0 && freshAmount > 0;
@@ -401,8 +416,11 @@ export function PaymentDialog({
       onOpenChange(false);
 
     } catch (error) {
-      if (slipUrl && !insertedSlipVerificationId) {
-        await deletePaymentSlip(slipUrl).catch(() => null);
+      // Cleanup orphaned storage file: file was uploaded but DB commit failed entirely
+      if (uploadedSlipPath) {
+        await deletePaymentSlip(uploadedSlipPath).catch(() => null);
+        setSlipUrl(null);
+        setSignedSlipUrl(null);
       }
       console.error("Submit payment error:", error);
       toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่");

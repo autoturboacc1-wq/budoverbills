@@ -107,10 +107,6 @@ export default function CreateAgreement() {
   const { friends } = useDbFriends();
   const {
     quota,
-    freeRemaining,
-    feeAmount,
-    feeCurrency,
-    isLoading: subscriptionLoading,
     refetch: refetchLimits,
   } = useSubscription();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -264,23 +260,6 @@ export default function CreateAgreement() {
       return;
     }
 
-    if (subscriptionLoading) {
-      toast.error("กำลังตรวจสอบสิทธิ์สร้างข้อตกลง กรุณาลองใหม่อีกครั้ง");
-      return;
-    }
-
-    if (!quota) {
-      toast.error("ไม่สามารถตรวจสอบสิทธิ์สร้างข้อตกลงได้ กรุณาลองใหม่อีกครั้ง");
-      return;
-    }
-
-    if ((quota.free_remaining ?? 0) <= 0 && (quota.credits ?? 0) <= 0) {
-      toast.error(
-        `สิทธิ์สร้างข้อตกลงไม่เพียงพอ (${feeAmount.toLocaleString()} ${feeCurrency}) กรุณาไปหน้าเลี้ยงกาแฟเพื่อซื้อสิทธิ์เพิ่ม`,
-      );
-      return;
-    }
-
     // VALIDATION: Lender cannot be the same as borrower
     if (selectedFriend.friend_user_id === user.id) {
       toast.error("ไม่สามารถสร้างข้อตกลงกับตัวเองได้");
@@ -294,14 +273,8 @@ export default function CreateAgreement() {
   // Actually submit after password verification
   const handleConfirmedSubmit = async () => {
     setIsSubmitting(true);
-    
-    try {
-      const currentQuota = quota;
-      if (!currentQuota) {
-        toast.error("ไม่สามารถตรวจสอบสิทธิ์สร้างข้อตกลงได้ กรุณาลองใหม่อีกครั้ง");
-        return;
-      }
 
+    try {
       const input: CreateAgreementInput = {
         borrower_id: selectedFriend?.friend_user_id || undefined,
         borrower_phone: formData.partnerPhone || undefined,
@@ -330,16 +303,24 @@ export default function CreateAgreement() {
       };
 
       const result = await createAgreement(input);
-      
+
       if (result) {
         await refetchLimits(); // Refresh limits after the RPC atomically consumes quota
-        toast.success("ส่งคำขอข้อตกลงสำเร็จ!", {
-          description: (currentQuota.free_remaining ?? 0) > 0
-            ? `เหลือสิทธิ์ฟรีอีก ${Math.max(0, (currentQuota.free_remaining ?? 0) - 1)} ครั้ง` 
-            : `ใช้สิทธิ์ที่ซื้อไว้แล้ว เหลืออีก ${Math.max(0, (currentQuota.credits ?? 0) - 1)} ครั้ง`,
-        });
+        toast.success("ส่งคำขอข้อตกลงสำเร็จ!");
         navigate("/");
       }
+    } catch (err: unknown) {
+      // The RPC raises 'Agreement quota exceeded' when the user has no remaining
+      // free slots and no purchased credits.  Catch it here so we can show a
+      // localised, actionable message instead of the generic error toast that
+      // createAgreement would produce.
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.toLowerCase().includes('quota exceeded')) {
+        toast.error(
+          `สิทธิ์สร้างข้อตกลงไม่เพียงพอ กรุณาไปหน้าเลี้ยงกาแฟเพื่อซื้อสิทธิ์เพิ่ม`,
+        );
+      }
+      // Non-quota errors are already surfaced by createAgreement via handleSupabaseError.
     } finally {
       setIsSubmitting(false);
     }
@@ -1474,7 +1455,6 @@ export default function CreateAgreement() {
                     type="submit"
                     disabled={
                       isSubmitting ||
-                      subscriptionLoading ||
                       (!formData.partnerName && !formData.partnerPhone) ||
                       !formData.amount
                     }

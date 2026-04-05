@@ -115,53 +115,32 @@ export function useUserPoints() {
     try {
       const todayKey = getBangkokDateKey();
 
-      // Fetch or create user points
-      let data: UserPointsRow | null = null;
-      const { data: existingData, error } = await supabase
+      // BUG-HOOK-05: Use upsert with ignoreDuplicates so concurrent first-time requests
+      // do not race to INSERT — the second concurrent request is silently ignored.
+      // BUG-POINTS-04: Do NOT reset daily_earned_today here; that is handled atomically
+      // inside the earn_points / redeem_points RPCs on the server side.
+      await supabase
         .from("user_points")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-
-      data = existingData as UserPointsRow | null;
-
-      if (error && error.code === "PGRST116") {
-        // No record found, create one
-        const { data: newData, error: insertError } = await supabase
-          .from("user_points")
-          .insert({
+        .upsert(
+          {
             user_id: user.id,
             last_daily_reset: todayKey,
             total_points: 0,
             lifetime_points: 0,
             daily_earned_today: 0,
-          })
-          .select()
-          .single();
+          },
+          { onConflict: "user_id", ignoreDuplicates: true }
+        );
 
-        if (insertError) throw insertError;
-        data = newData;
-      } else if (error) {
-        throw error;
-      }
+      const { data, error } = await supabase
+        .from("user_points")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
 
-      // Reset daily points if new day
-      if (data && data.last_daily_reset !== todayKey) {
-        const { data: updatedData } = await supabase
-          .from("user_points")
-          .update({ 
-            daily_earned_today: 0, 
-            last_daily_reset: todayKey
-          })
-          .eq("user_id", user.id)
-          .select()
-          .single();
+      if (error) throw error;
 
-        if (updatedData) data = updatedData;
-        else data = { ...data, daily_earned_today: 0, last_daily_reset: todayKey };
-      }
-
-      setPoints(data);
+      setPoints(data as UserPointsRow);
     } catch (error) {
       console.error("Error fetching points:", error);
     } finally {

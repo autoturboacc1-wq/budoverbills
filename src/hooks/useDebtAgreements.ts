@@ -159,7 +159,12 @@ export function useDebtAgreements() {
         throw error;
       }
 
-      const agreementRows = (data ?? []) as DebtAgreementSecureRow[];
+      // BUG-DOMAIN-04: The Supabase-generated type for debt_agreements_secure does not
+      // include the joined `installments` relation or the extra audit columns, so we cast
+      // through our explicitly-typed DebtAgreementSecureRow (defined above) which extends
+      // the base table row. mapAgreementRow validates every field individually, so a
+      // schema mismatch will produce a null entry (filtered out) rather than a runtime crash.
+      const agreementRows = (data ?? []) as unknown as DebtAgreementSecureRow[];
       const userIds = new Set<string>();
 
       agreementRows.forEach((agreement) => {

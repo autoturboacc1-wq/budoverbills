@@ -1,4 +1,10 @@
 function tlv(tag: string, value: string): string {
+  // BUG-SEC-12: Guard against TLV length field overflow. The EMV QR spec encodes
+  // the value length as exactly 2 decimal digits (00–99). A value longer than 99
+  // characters would produce a 3-digit length field and corrupt the TLV structure.
+  if (value.length > 99) {
+    throw new Error(`TLV value too long for tag ${tag}: length ${value.length} exceeds 99`);
+  }
   return `${tag}${value.length.toString().padStart(2, "0")}${value}`;
 }
 

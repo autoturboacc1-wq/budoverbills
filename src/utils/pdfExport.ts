@@ -1,6 +1,54 @@
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
 
+// BUG-MONEY-07 / BUG-PDF-07 — Helvetica has no Thai glyphs; Thai text renders as □□□□.
+// Fix: fetch Sarabun (a Thai-supporting font) from Google Fonts CDN at export time,
+// register it with jsPDF's VFS, and use it as the document font.
+// Fallback to Helvetica when the network fetch fails (Latin-only PDFs remain usable).
+const SARABUN_REGULAR_URL =
+  "https://fonts.gstatic.com/s/sarabun/v15/DtVmJx26TKEr37c9aApx_g.ttf";
+const SARABUN_BOLD_URL =
+  "https://fonts.gstatic.com/s/sarabun/v15/DtVhJx26TKEr37c9YHZJmnAI_g.ttf";
+
+async function fetchFontAsBase64(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, { cache: "force-cache" });
+    if (!response.ok) return null;
+    const buffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  } catch {
+    return null;
+  }
+}
+
+async function registerThaiFont(doc: jsPDF): Promise<string> {
+  const [regularB64, boldB64] = await Promise.all([
+    fetchFontAsBase64(SARABUN_REGULAR_URL),
+    fetchFontAsBase64(SARABUN_BOLD_URL),
+  ]);
+
+  if (!regularB64) {
+    // Network unavailable — fall back to Helvetica (Thai glyphs will be missing
+    // but the PDF still generates rather than throwing).
+    return "helvetica";
+  }
+
+  doc.addFileToVFS("Sarabun-Regular.ttf", regularB64);
+  doc.addFont("Sarabun-Regular.ttf", "Sarabun", "normal");
+
+  if (boldB64) {
+    doc.addFileToVFS("Sarabun-Bold.ttf", boldB64);
+    doc.addFont("Sarabun-Bold.ttf", "Sarabun", "bold");
+  }
+
+  return "Sarabun";
+}
+
 interface AgreementPDFData {
   agreementId: string;
   principalAmount: number;
@@ -89,6 +137,9 @@ export async function generateAgreementPDF(data: AgreementPDFData): Promise<Blob
     format: "a4",
   });
 
+  // BUG-MONEY-07 / BUG-PDF-07: register a Thai-capable font before drawing any text.
+  const fontFamily = await registerThaiFont(doc);
+
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 16;
@@ -97,7 +148,7 @@ export async function generateAgreementPDF(data: AgreementPDFData): Promise<Blob
   let y = 18;
 
   const setFont = (style: "normal" | "bold", size: number, color = 20) => {
-    doc.setFont("helvetica", style);
+    doc.setFont(fontFamily, style);
     doc.setFontSize(size);
     doc.setTextColor(color);
   };

@@ -10,7 +10,8 @@ import { PendingActionsCard } from "@/components/home/PendingActionsCard";
 import { useDebtAgreements } from "@/hooks/useDebtAgreements";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Plus, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { EmptyState, PageSection } from "@/components/ux";
 import { PageTransition } from "@/components/ux/PageTransition";
 
@@ -143,8 +144,21 @@ const Index = () => {
           </div>
 
           {isLoading || authLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="space-y-4">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="rounded-2xl border border-border bg-card p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                  <Skeleton className="h-6 w-24" />
+                  <div className="flex gap-4">
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                  <Skeleton className="h-2 w-full rounded-full" />
+                </div>
+              ))}
             </div>
           ) : filteredDebtCards.length === 0 ? (
             <EmptyState
