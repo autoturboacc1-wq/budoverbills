@@ -44,9 +44,12 @@ interface ChatRoomProps {
 }
 
 export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
+  const PAGE_SIZE = 50;
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
@@ -73,7 +76,8 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
       let query = supabase
         .from("messages")
         .select("id, content, sender_id, created_at, voice_url, voice_duration")
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false })
+        .limit(PAGE_SIZE);
 
       if (isDirectChat) {
         if (!thread.direct_chat_id) return;
@@ -88,7 +92,7 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
       if (error) throw error;
 
       // Map to Message interface (content -> text)
-      const mappedMessages: Message[] = (data || []).map((m) => ({
+      const mappedMessages: Message[] = ((data || []).slice().reverse()).map((m) => ({
         id: m.id,
         text: m.content,
         sender_id: m.sender_id,
@@ -98,6 +102,7 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
       }));
 
       setMessages(mappedMessages);
+      setHasMoreMessages((data?.length || 0) === PAGE_SIZE);
 
       // Mark messages as read
       const updateQuery = supabase
@@ -119,6 +124,55 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
       setLoading(false);
     }
   }, [thread, user]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!thread || !user || loadingOlder || messages.length === 0) return;
+
+    const oldestMessage = messages[0];
+    if (!oldestMessage) return;
+
+    setLoadingOlder(true);
+    try {
+      const isDirectChat = thread.chat_type === "direct";
+      let query = supabase
+        .from("messages")
+        .select("id, content, sender_id, created_at, voice_url, voice_duration")
+        .lt("created_at", oldestMessage.created_at)
+        .order("created_at", { ascending: false })
+        .limit(PAGE_SIZE);
+
+      if (isDirectChat) {
+        if (!thread.direct_chat_id) return;
+        query = query.eq("direct_chat_id", thread.direct_chat_id);
+      } else {
+        if (!thread.agreement_id) return;
+        query = query.eq("agreement_id", thread.agreement_id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const olderMessages: Message[] = ((data || []).slice().reverse()).map((m) => ({
+        id: m.id,
+        text: m.content,
+        sender_id: m.sender_id,
+        created_at: m.created_at,
+        voice_url: (m as { voice_url?: string | null }).voice_url ?? null,
+        voice_duration: (m as { voice_duration?: number | null }).voice_duration ?? null,
+      }));
+
+      setMessages((prev) => {
+        const existingIds = new Set(prev.map((message) => message.id));
+        const dedupedOlder = olderMessages.filter((message) => !existingIds.has(message.id));
+        return [...dedupedOlder, ...prev];
+      });
+      setHasMoreMessages((data?.length || 0) === PAGE_SIZE);
+    } catch (error) {
+      console.error("Error loading older messages:", error);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [loadingOlder, messages, thread, user]);
 
   useEffect(() => {
     fetchMessages();
@@ -282,6 +336,19 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
           </div>
         ) : (
           <>
+            {hasMoreMessages && (
+              <div className="mb-3 flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={loadOlderMessages}
+                  disabled={loadingOlder}
+                >
+                  {loadingOlder ? "กำลังโหลด..." : "โหลดข้อความเก่า"}
+                </Button>
+              </div>
+            )}
             {/* ==============================
                 CORE LOGIC: ChatRoom owns layout
                 isMe = message.sender_id === currentUserId

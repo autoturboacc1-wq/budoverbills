@@ -30,6 +30,7 @@ export function VoiceRecorder({
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
+  const stopRecordingRef = useRef<() => void>(() => {});
   const mountedRef = useRef(true);
   const previewUrlRef = useRef<string | null>(null);
   const discardRecordingRef = useRef(false);
@@ -115,6 +116,10 @@ export function VoiceRecorder({
     mediaRecorderRef.current?.stop();
   };
 
+  useEffect(() => {
+    stopRecordingRef.current = stopRecording;
+  }, [stopRecording]);
+
   const startRecording = async () => {
     if (isRecording || audioBlob) return;
 
@@ -168,7 +173,7 @@ export function VoiceRecorder({
       timerRef.current = window.setInterval(() => {
         setDuration((currentDuration) => {
           if (currentDuration >= MAX_DURATION_SECONDS) {
-            stopRecording();
+            stopRecordingRef.current();
             return currentDuration;
           }
 

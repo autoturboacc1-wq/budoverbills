@@ -40,6 +40,24 @@ export function AddFriendSection() {
   const userCode = profile?.user_code || "XXXXXXXX";
   const qrValue = `debtmate://add-friend/${userCode}`;
 
+  const lookupUserByCode = async (code: string) => {
+    const { data, error } = await supabase.rpc("search_profile_by_code", {
+      search_code: code.toUpperCase(),
+    });
+
+    if (error) throw error;
+
+    if (!Array.isArray(data) || data.length === 0) {
+      return null;
+    }
+
+    return data[0] as {
+      user_id: string;
+      display_name: string | null;
+      user_code: string | null;
+    };
+  };
+
   const handleCopyCode = () => {
     navigator.clipboard.writeText(userCode);
     setCopied(true);
@@ -74,13 +92,7 @@ export function AddFriendSection() {
     const scannedCode = match[1];
     
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("user_id, display_name, user_code")
-        .eq("user_code", scannedCode)
-        .maybeSingle();
-
-      if (error) throw error;
+      const data = await lookupUserByCode(scannedCode);
 
       if (!data) {
         toast.error("ไม่พบผู้ใช้ที่มีรหัสนี้");
@@ -126,13 +138,7 @@ export function AddFriendSection() {
     setFoundUser(null);
 
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("user_id, display_name, user_code")
-        .eq("user_code", searchCode.toUpperCase())
-        .maybeSingle();
-
-      if (error) throw error;
+      const data = await lookupUserByCode(searchCode);
 
       if (!data) {
         toast.error("ไม่พบผู้ใช้ที่มีรหัสนี้");
@@ -150,6 +156,7 @@ export function AddFriendSection() {
         toast.info("ผู้ใช้นี้เป็นเพื่อนของคุณอยู่แล้ว");
         setShowSearchDialog(false);
         setSearchCode("");
+        setFoundUser(null);
         return;
       }
 

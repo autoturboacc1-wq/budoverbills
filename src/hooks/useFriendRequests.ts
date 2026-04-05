@@ -158,6 +158,18 @@ function useFriendRequestsState(): FriendRequestsContextValue {
         throw new Error('ไม่สามารถยอมรับคำขอได้');
       }
 
+      try {
+        await rpcClient.rpc('earn_points', {
+          p_user_id: userId,
+          p_action_type: 'friend_added',
+          p_reference_id: requestId,
+          p_points: 50,
+          p_description: 'ยอมรับคำขอเป็นเพื่อนสำเร็จ',
+        });
+      } catch (pointsError) {
+        console.error('Error awarding friend request points:', pointsError);
+      }
+
       await fetchRequests();
       toast.success('ยอมรับคำขอเป็นเพื่อนแล้ว');
       return true;
@@ -264,7 +276,12 @@ function useFriendRequestsState(): FriendRequestsContextValue {
       return true;
     } catch (error: unknown) {
       console.error('Error sending friend request:', error);
-      if (error instanceof Error && (error as { code?: string }).code === '23505') {
+      // BUG-FRIEND-04: The DB has a UNIQUE constraint on (from_user_id, to_user_id) as the
+      // authoritative duplicate guard. Supabase returns a PostgrestError (plain object, NOT
+      // an Error instance) with code '23505' on a unique-constraint violation, so we check
+      // the code directly without the instanceof guard.
+      const pgCode = typeof error === 'object' && error !== null ? (error as { code?: string }).code : undefined;
+      if (pgCode === '23505') {
         toast.error('มีคำขอเป็นเพื่อนอยู่แล้ว');
       } else {
         toast.error('ไม่สามารถส่งคำขอได้');
