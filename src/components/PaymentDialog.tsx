@@ -87,7 +87,6 @@ export function PaymentDialog({
 }: PaymentDialogProps) {
   const { user } = useAuth();
   const [paymentAmount, setPaymentAmount] = useState<string>("");
-  const [verifiedAmount, setVerifiedAmount] = useState<string>("");
   const [slipUrl, setSlipUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -136,15 +135,11 @@ export function PaymentDialog({
 
     setPendingVerification(freshPending);
 
-    if (freshPending && isLender) {
-      setVerifiedAmount(freshPending.submitted_amount.toString());
-    }
-
     return {
       freshInstallment,
       freshPending,
     };
-  }, [installment, isLender]);
+  }, [installment]);
 
   const fetchVerificationHistory = useCallback(async () => {
     if (!installment) return;
@@ -161,21 +156,16 @@ export function PaymentDialog({
 
       const history = (data || []) as SlipVerification[];
       setVerificationHistory(history);
-      
+
       // Find pending verification (latest with status 'pending')
       const pending = history.find(v => v.status === 'pending');
       setPendingVerification(pending || null);
-      
-      // Set verified amount input to pending submission amount
-      if (pending && isLender) {
-        setVerifiedAmount(pending.submitted_amount.toString());
-      }
     } catch (error) {
       console.error("Error fetching verification history:", error);
     } finally {
       setLoadingHistory(false);
     }
-  }, [installment, isLender]);
+  }, [installment]);
 
   // Fetch verification history when dialog opens
   useEffect(() => {
@@ -183,7 +173,6 @@ export function PaymentDialog({
       void fetchVerificationHistory();
       setPaymentAmount(installment.amount.toString());
       setLiveInstallmentAmount(installment.amount);
-      setVerifiedAmount("");
       setSlipUrl(null);
       setSignedSlipUrl(null);
       void refreshPaymentState();
@@ -221,20 +210,19 @@ export function PaymentDialog({
     return isNaN(num) ? 0 : num;
   }, [paymentAmount]);
 
-  const numericVerifiedAmount = useMemo(() => {
-    const num = parseFloat(verifiedAmount);
-    return isNaN(num) ? 0 : num;
-  }, [verifiedAmount]);
+  // The amount being processed: for lender, it's the borrower's submitted amount;
+  // for borrower, it's what they're typing in the input.
+  const effectiveAmount = isLender
+    ? (pendingVerification?.submitted_amount ?? 0)
+    : numericAmount;
 
-  // Calculate extra payment if verified amount exceeds installment
   const extraPaymentPreview = useMemo(() => {
-    const amount = isLender ? numericVerifiedAmount : numericAmount;
-    if (!installment || amount <= liveInstallmentAmount) return null;
-    const extraAmount = amount - liveInstallmentAmount;
+    if (!installment || effectiveAmount <= liveInstallmentAmount) return null;
+    const extraAmount = effectiveAmount - liveInstallmentAmount;
     return calculateExtraPaymentPreview(agreement, extraAmount);
-  }, [numericAmount, numericVerifiedAmount, installment, agreement, calculateExtraPaymentPreview, isLender, liveInstallmentAmount]);
+  }, [effectiveAmount, installment, agreement, calculateExtraPaymentPreview, liveInstallmentAmount]);
 
-  const isExtraPayment = (isLender ? numericVerifiedAmount : numericAmount) > liveInstallmentAmount;
+  const isExtraPayment = effectiveAmount > liveInstallmentAmount;
 
   // Count rejected verifications
   const rejectionCount = useMemo(() => {
@@ -373,7 +361,7 @@ export function PaymentDialog({
       insertedSlipVerificationId = null;
 
       toast.success("ส่งสลิปสำเร็จ", {
-        description: "รอเจ้าหนี้ตรวจสอบและยืนยัน"
+        description: "รอผู้ให้ยืมตรวจสอบและยืนยัน"
       });
 
       onPaymentSubmitted();
@@ -396,16 +384,13 @@ export function PaymentDialog({
     }
   };
 
-  // Lender confirms amount matches
+  // Lender confirms — accepts the borrower's submitted amount as-is.
+  // To dispute the amount, lender uses Reject instead.
   const handleConfirmPayment = async () => {
     if (!installment || !pendingVerification || !user) return;
     if (lenderActionLockRef.current) return;
     if (!isLender || user.id !== agreement.lender_id) {
-      toast.error("เฉพาะเจ้าหนี้เท่านั้นที่ยืนยันการชำระได้");
-      return;
-    }
-    if (numericVerifiedAmount <= 0) {
-      toast.error("กรุณากรอกยอดเงินที่เห็นในสลิป");
+      toast.error("เฉพาะผู้ให้ยืมเท่านั้นที่ยืนยันการชำระได้");
       return;
     }
 
@@ -431,7 +416,7 @@ export function PaymentDialog({
       const { data, error } = await rpc("confirm_installment_payment", {
         p_installment_id: freshInstallment.id,
         p_verification_id: freshPending.id,
-        p_verified_amount: numericVerifiedAmount,
+        p_verified_amount: freshPending.submitted_amount,
       });
 
       if (error) throw error;
@@ -473,7 +458,7 @@ export function PaymentDialog({
     if (!installment || !pendingVerification || !user) return;
     if (lenderActionLockRef.current) return;
     if (!isLender || user.id !== agreement.lender_id) {
-      toast.error("เฉพาะเจ้าหนี้เท่านั้นที่ปฏิเสธสลิปได้");
+      toast.error("เฉพาะผู้ให้ยืมเท่านั้นที่ปฏิเสธสลิปได้");
       return;
     }
 
@@ -542,7 +527,7 @@ export function PaymentDialog({
     {
       id: "evidence",
       title: isLender ? "ตรวจสอบหลักฐาน" : "อัปโหลดหลักฐานการโอน",
-      description: isLender ? "ดูสลิปหรือ PDF ให้ครบก่อนยืนยัน" : "แนบไฟล์ภาพหรือ PDF เพื่อให้เจ้าหนี้ตรวจสอบ",
+      description: isLender ? "ดูสลิปหรือ PDF ให้ครบก่อนยืนยัน" : "แนบไฟล์ภาพหรือ PDF เพื่อให้ผู้ให้ยืมตรวจสอบ",
       status: displaySlipUrl ? "verifying" : "pending",
     },
     {
@@ -550,7 +535,7 @@ export function PaymentDialog({
       title: isLender ? "ยืนยันหรือปฏิเสธ" : "ส่งรอตรวจสอบ",
       description: isLender
         ? "เมื่อกดยืนยัน ระบบจะบันทึกผลทันทีและอัปเดตสถานะงวด"
-        : "เมื่อส่งแล้ว ระบบจะล็อกคำขอนี้ไว้จนกว่าเจ้าหนี้จะตรวจสอบเสร็จ",
+        : "เมื่อส่งแล้ว ระบบจะล็อกคำขอนี้ไว้จนกว่าผู้ให้ยืมจะตรวจสอบเสร็จ",
       status: pendingVerification ? "verifying" : "pending",
     },
   ];
@@ -567,7 +552,7 @@ export function PaymentDialog({
 
         <div className="space-y-4">
           <PageSection
-            title={isLender ? "ขั้นตอนตรวจโดยเจ้าหนี้" : "ขั้นตอนชำระของผู้ยืม"}
+            title={isLender ? "ขั้นตอนตรวจโดยผู้ให้ยืม" : "ขั้นตอนชำระของผู้ยืม"}
             description={
               isLender
                 ? "ตรวจจำนวนเงิน หลักฐาน และตัดสินใจอนุมัติหรือปฏิเสธได้จากหน้าจอเดียว"
@@ -630,7 +615,10 @@ export function PaymentDialog({
             >
               <div className="flex items-center gap-2 text-primary font-medium">
                 <Building className="w-4 h-4" />
-                <span>บัญชีรับเงิน</span>
+                <div className="flex flex-col">
+                  <span>บัญชีของผู้ให้ยืม (โอนไปที่นี่)</span>
+                  <span className="text-xs font-normal text-muted-foreground">โอนเงินเข้าบัญชีนี้ แล้วอัปโหลดสลิปด้านล่าง</span>
+                </div>
               </div>
               {agreement.bank_name && agreement.account_number ? (
                 <div className="space-y-1 text-sm">
@@ -738,77 +726,6 @@ export function PaymentDialog({
             </div>
           )}
 
-          {/* Lender: Verified Amount Input */}
-          {isLender && pendingVerification && (
-            <div>
-              <label className="text-sm font-medium text-foreground mb-2 block">
-                ยอดเงินที่เห็นในสลิป (กรอกตามจริง)
-              </label>
-              <Input
-                type="number"
-                value={verifiedAmount}
-                onChange={(e) => setVerifiedAmount(e.target.value)}
-                placeholder="กรอกยอดเงินที่เห็นในสลิป"
-                className={`text-lg font-semibold transition-colors ${
-                  numericVerifiedAmount > 0 && numericVerifiedAmount !== pendingVerification.submitted_amount
-                    ? 'border-destructive bg-destructive/5 focus-visible:ring-destructive'
-                    : numericVerifiedAmount > 0 && numericVerifiedAmount === pendingVerification.submitted_amount
-                    ? 'border-status-paid bg-status-paid/5 focus-visible:ring-status-paid'
-                    : ''
-                }`}
-                min={1}
-                step="0.01"
-              />
-              
-              {/* Amount Match/Mismatch Indicator */}
-              <AnimatePresence>
-                {numericVerifiedAmount > 0 && numericVerifiedAmount !== pendingVerification.submitted_amount && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg"
-                  >
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-destructive">
-                          ยอดไม่ตรงกัน!
-                        </p>
-                        <div className="mt-1 text-xs text-destructive/80 space-y-0.5">
-                          <p>• ผู้ยืมกรอก: <span className="font-semibold">฿{pendingVerification.submitted_amount.toLocaleString()}</span></p>
-                          <p>• เห็นในสลิป: <span className="font-semibold">฿{numericVerifiedAmount.toLocaleString()}</span></p>
-                          <p className="mt-1 text-destructive/70">
-                            ต่างกัน ฿{Math.abs(numericVerifiedAmount - pendingVerification.submitted_amount).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-                {numericVerifiedAmount > 0 && numericVerifiedAmount === pendingVerification.submitted_amount && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-2 p-3 bg-status-paid/10 border border-status-paid/30 rounded-lg"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-status-paid" />
-                      <p className="text-sm font-medium text-status-paid">
-                        ยอดตรงกัน ฿{numericVerifiedAmount.toLocaleString()}
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              
-              <p className="text-xs text-muted-foreground mt-2">
-                กรอกยอดที่เห็นในสลิปจริง เพื่อเก็บเป็นหลักฐาน
-              </p>
-            </div>
-          )}
-
           {/* Extra Payment Preview */}
           <AnimatePresence>
             {isExtraPayment && extraPaymentPreview && (
@@ -831,7 +748,7 @@ export function PaymentDialog({
                   </div>
                   <div className="flex justify-between text-primary font-medium">
                     <span>+ ตัดเงินต้นเพิ่ม</span>
-                    <span>฿{((isLender ? numericVerifiedAmount : numericAmount) - liveInstallmentAmount).toLocaleString()}</span>
+                    <span>฿{(effectiveAmount - liveInstallmentAmount).toLocaleString()}</span>
                   </div>
                   <div className="border-t border-border/50 pt-2 mt-2">
                     <div className="flex justify-between">
@@ -1062,9 +979,9 @@ export function PaymentDialog({
               className="bg-secondary/30 rounded-xl p-4 space-y-4"
             >
               <div className="text-center">
-                <p className="font-medium text-foreground mb-1">ตรวจสอบและยืนยัน</p>
+                <p className="font-medium text-foreground mb-1">ตรวจสอบสลิปและตัดสินใจ</p>
                 <p className="text-sm text-muted-foreground">
-                  กรอกยอดที่เห็นในสลิปจริง แล้วกดยืนยัน
+                  ดูยอด ฿{pendingVerification.submitted_amount.toLocaleString()} ในสลิปแล้ว ถ้าตรงกดยืนยัน ถ้าไม่ตรงกดปฏิเสธ
                 </p>
               </div>
 
@@ -1085,7 +1002,7 @@ export function PaymentDialog({
                 <Button
                   className="flex-1 bg-status-paid hover:bg-status-paid/90"
                   onClick={handleConfirmPayment}
-                  disabled={isSubmitting || numericVerifiedAmount <= 0}
+                  disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -1097,7 +1014,7 @@ export function PaymentDialog({
               </div>
 
               <p className="text-xs text-muted-foreground text-center">
-                กด "ยืนยัน" เพื่อรับเงินตามยอดที่กรอก / กด "ไม่ตรง" เพื่อแจ้งให้ผู้ยืมส่งใหม่
+                กด "ยืนยัน" เพื่อรับยอดตามที่ผู้ยืมแจ้ง / กด "ไม่ตรง" เพื่อให้ผู้ยืมส่งใหม่
               </p>
             </motion.div>
           )}
@@ -1106,7 +1023,7 @@ export function PaymentDialog({
           {!isLender && pendingVerification && (
             <AsyncResultState
               tone="warning"
-              title="รอเจ้าหนี้ตรวจสอบ"
+              title="รอผู้ให้ยืมตรวจสอบ"
               description={`ส่งยอด ฿${pendingVerification.submitted_amount.toLocaleString()} เมื่อ ${format(parseISO(pendingVerification.created_at), 'd MMM HH:mm', { locale: th })}`}
             />
           )}

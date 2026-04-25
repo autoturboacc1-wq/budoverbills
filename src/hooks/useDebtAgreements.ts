@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   calculateRemainingAmount,
@@ -360,7 +360,7 @@ export function useDebtAgreements() {
     }
 
     if (getUserRoleInAgreement(agreement, user.id) !== 'lender') {
-      toast.error('เฉพาะเจ้าหนี้เท่านั้นที่อัปเดตสถานะการชำระได้');
+      toast.error('เฉพาะผู้ให้ยืมเท่านั้นที่อัปเดตสถานะการชำระได้');
       return false;
     }
 
@@ -405,110 +405,24 @@ export function useDebtAgreements() {
       return false;
     }
 
-    const { data: freshInstallment, error: installmentError } = await supabase
-      .from('installments')
-      .select('id, agreement_id, amount, status, confirmed_by_lender, payment_proof_url')
-      .eq('id', installmentId)
-      .maybeSingle();
-
-    if (installmentError) {
-      handleSupabaseError(installmentError, 'upload-slip', 'ไม่สามารถตรวจสอบข้อมูลงวดได้');
-      return false;
-    }
-
-    if (!freshInstallment || freshInstallment.agreement_id !== agreement.id) {
+    const installment = agreement.installments?.find((i) => i.id === installmentId);
+    if (!installment) {
       toast.error('ไม่พบข้อมูลงวดที่ต้องการอัปโหลดสลิป');
       return false;
     }
 
-    if (freshInstallment.status === 'paid' || freshInstallment.confirmed_by_lender) {
-      toast.error('งวดนี้ถูกยืนยันแล้ว ไม่สามารถอัปโหลดสลิปใหม่ได้');
-      return false;
-    }
-
     try {
-      const { data: pendingVerification, error: verificationLookupError } = await supabase
-        .from('slip_verifications')
-        .select('id, slip_url, submitted_amount')
-        .eq('installment_id', installmentId)
-        .eq('status', 'pending')
-        .maybeSingle();
-
-      if (verificationLookupError) {
-        throw verificationLookupError;
-      }
-
-      const submittedAmount = toMoney(freshInstallment.amount);
-      const verificationPayload: TablesInsert<'slip_verifications'> = {
-        agreement_id: agreement.id,
-        installment_id: installmentId,
-        submitted_by: user.id,
-        submitted_amount: submittedAmount,
-        slip_url: slipUrl,
-        status: 'pending',
-      };
-
-      let verificationId = pendingVerification?.id ?? null;
-      const previousSubmittedAmount = pendingVerification?.submitted_amount ?? submittedAmount;
-
-      if (pendingVerification) {
-        const { error: updateVerificationError } = await supabase
-          .from('slip_verifications')
-          .update({
-            slip_url: slipUrl,
-            submitted_amount: submittedAmount,
-          })
-          .eq('id', pendingVerification.id);
-
-        if (updateVerificationError) {
-          throw updateVerificationError;
-        }
-      } else {
-        const { data: insertedVerification, error: insertVerificationError } = await supabase
-          .from('slip_verifications')
-          .insert(verificationPayload)
-          .select('id')
-          .single();
-
-        if (insertVerificationError) {
-          throw insertVerificationError;
-        }
-
-        verificationId = insertedVerification.id;
-      }
-
-      const previousSlipUrl = freshInstallment.payment_proof_url;
-      const { error } = await supabase
-        .from('installments')
-        .update({
-          payment_proof_url: slipUrl,
-          status: 'pending',
-        })
-        .eq('id', installmentId);
+      const rpc = supabase.rpc.bind(supabase) as unknown as RpcClient;
+      const { error } = await rpc('submit_installment_slip', {
+        p_installment_id: installmentId,
+        p_slip_url: slipUrl,
+        p_submitted_amount: toMoney(installment.amount),
+      });
 
       if (error) {
-        if (verificationId) {
-          if (pendingVerification) {
-            await supabase
-              .from('slip_verifications')
-              .update({
-                slip_url: pendingVerification.slip_url,
-                submitted_amount: previousSubmittedAmount,
-              })
-              .eq('id', verificationId);
-          } else {
-            await supabase.from('slip_verifications').delete().eq('id', verificationId);
-          }
-        }
-
-        if (previousSlipUrl !== slipUrl) {
-          await supabase
-            .from('installments')
-            .update({ payment_proof_url: previousSlipUrl })
-            .eq('id', installmentId);
-        }
-
-        throw error;
+        const message = getErrorMessage(error, 'ไม่สามารถอัปเดตสลิปได้');
+        toast.error(message);
+        return false;
       }
 
       await fetchAgreements();
@@ -532,7 +446,7 @@ export function useDebtAgreements() {
     }
 
     if (getUserRoleInAgreement(agreement, user.id) !== 'lender') {
-      toast.error('เฉพาะเจ้าหนี้เท่านั้นที่ยืนยันการชำระได้');
+      toast.error('เฉพาะผู้ให้ยืมเท่านั้นที่ยืนยันการชำระได้');
       return false;
     }
 
