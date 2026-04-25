@@ -97,7 +97,7 @@ const Notifications = () => {
         animate={{ opacity: 1, y: 0 }}
         className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border px-6 py-4"
       >
-        <div className="flex items-center justify-between max-w-lg mx-auto">
+        <div className="flex items-center justify-between max-w-md mx-auto">
           <div>
             <h1 className="text-2xl font-bold font-outfit text-foreground">แจ้งเตือน</h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -120,7 +120,7 @@ const Notifications = () => {
         </div>
       </motion.header>
 
-      <main className="px-4 py-4 max-w-lg mx-auto" aria-busy={loading}>
+      <main className="px-4 py-4 max-w-md mx-auto" aria-busy={loading}>
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

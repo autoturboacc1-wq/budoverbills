@@ -572,7 +572,7 @@ export default function CreateAgreement() {
   return (
     <PageTransition>
     <div className="min-h-screen">
-      <div className="page-shell max-w-5xl">
+      <div className="page-shell">
         <PageHeader
           title="สร้างข้อตกลงใหม่"
           description="คุณคือผู้ให้ยืม — เลือกผู้ยืม กำหนดวงเงิน เงื่อนไข และบัญชีของคุณสำหรับรับชำระคืน"

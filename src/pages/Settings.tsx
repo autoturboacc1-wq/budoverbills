@@ -255,7 +255,7 @@ export default function Settings() {
   return (
     <PageTransition>
     <div className="min-h-screen pb-24">
-      <div className="page-shell max-w-lg">
+      <div className="page-shell">
         <PageHeader
           title={t('profile.settings')}
           description="จัดการการแจ้งเตือน ความเป็นส่วนตัว การแสดงผล และสิทธิ์การใช้งานในหน้าเดียว"

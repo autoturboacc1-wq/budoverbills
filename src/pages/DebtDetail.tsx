@@ -402,7 +402,7 @@ export default function DebtDetail() {
   return (
     <PageTransition>
     <div className="min-h-screen pb-8">
-      <div className="page-shell max-w-lg">
+      <div className="page-shell">
         <PageHeader
           title="รายละเอียดข้อตกลง"
           description="ดูสถานะยอดคงเหลือ ตารางงวด หลักฐาน และคำขอที่เกี่ยวข้องในมุมมองเดียว"

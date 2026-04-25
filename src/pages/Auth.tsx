@@ -440,7 +440,7 @@ export default function Auth() {
         </button>
       </div>
 
-      <div className="page-shell flex-1 max-w-lg px-6">
+      <div className="page-shell flex-1">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

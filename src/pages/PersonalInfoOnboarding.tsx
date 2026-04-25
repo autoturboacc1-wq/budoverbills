@@ -83,7 +83,7 @@ export default function PersonalInfoOnboarding() {
   return (
     <PageTransition>
     <div className="min-h-screen">
-      <div className="page-shell max-w-lg">
+      <div className="page-shell">
         <PageHeader
           eyebrow="Onboarding"
           title="กรอกข้อมูลสำหรับเอกสารข้อตกลง"

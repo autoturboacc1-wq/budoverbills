@@ -159,7 +159,7 @@ export default function Support() {
   return (
     <PageTransition>
     <div className="min-h-screen bg-gradient-hero">
-      <div className="max-w-lg mx-auto px-4 pb-24">
+      <div className="max-w-md mx-auto px-5 pb-24">
         {/* Header */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
