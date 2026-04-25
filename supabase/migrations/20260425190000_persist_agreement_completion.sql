@@ -145,8 +145,10 @@ BEGIN
   END IF;
 
   IF v_agreement.borrower_id IS NOT NULL THEN
-    PERFORM set_config('app.notification_source', 'system', true);
-    PERFORM public.create_notification(
+    -- Direct insert (the lender calling this RPC isn't allowed to go through
+    -- public.create_notification for a cross-user target).
+    INSERT INTO public.notifications (user_id, type, title, message, related_type, related_id)
+    VALUES (
       v_agreement.borrower_id,
       CASE WHEN v_status_completed THEN 'agreement_completed' ELSE 'payment_confirmed' END,
       CASE

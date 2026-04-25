@@ -132,8 +132,13 @@ BEGIN
       updated_at        = v_now
   WHERE id = p_installment_id;
 
-  PERFORM set_config('app.notification_source', 'system', true);
-  PERFORM public.create_notification(
+  -- Insert notification directly.  We can't go through public.create_notification
+  -- because that function rejects cross-user calls (the borrower is creating a
+  -- notification for the lender).  This RPC runs as SECURITY DEFINER so the
+  -- direct INSERT bypasses RLS — which is fine because we've already
+  -- authenticated the borrower against the agreement above.
+  INSERT INTO public.notifications (user_id, type, title, message, related_type, related_id)
+  VALUES (
     v_agreement.lender_id,
     'payment_uploaded',
     CASE WHEN v_is_fee THEN 'มีการอัปโหลดสลิปค่าเลื่อนงวด' ELSE 'มีการอัปโหลดสลิป' END,
