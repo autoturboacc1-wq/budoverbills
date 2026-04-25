@@ -287,24 +287,29 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.create_agreement_with_installments(
+DROP FUNCTION IF EXISTS public.create_agreement_with_installments(
+  uuid, uuid, text, text, numeric, numeric, text, numeric, integer, text, date,
+  text, numeric, numeric, text, text, text, jsonb
+);
+
+CREATE FUNCTION public.create_agreement_with_installments(
   p_lender_id uuid,
-  p_borrower_id uuid DEFAULT NULL,
-  p_borrower_phone text DEFAULT NULL,
-  p_borrower_name text DEFAULT NULL,
+  p_borrower_id uuid,
+  p_borrower_phone text,
+  p_borrower_name text,
   p_principal_amount numeric,
-  p_interest_rate numeric DEFAULT 0,
-  p_interest_type text DEFAULT 'none',
+  p_interest_rate numeric,
+  p_interest_type text,
   p_total_amount numeric,
   p_num_installments integer,
-  p_frequency text DEFAULT 'monthly',
+  p_frequency text,
   p_start_date date,
-  p_description text DEFAULT NULL,
-  p_reschedule_fee_rate numeric DEFAULT 5,
-  p_reschedule_interest_multiplier numeric DEFAULT 1,
-  p_bank_name text DEFAULT NULL,
-  p_account_number text DEFAULT NULL,
-  p_account_name text DEFAULT NULL,
+  p_description text,
+  p_reschedule_fee_rate numeric,
+  p_reschedule_interest_multiplier numeric,
+  p_bank_name text,
+  p_account_number text,
+  p_account_name text,
   p_installments jsonb
 )
 RETURNS jsonb
