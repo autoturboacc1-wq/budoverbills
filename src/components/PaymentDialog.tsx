@@ -39,6 +39,7 @@ import {
   validatePaymentSlipFile,
 } from "@/utils/paymentSlipStorage";
 import { PromptPayQR } from "@/components/PromptPayQR";
+import { SlipOcrBadge } from "@/components/SlipOcrBadge";
 import { AsyncResultState, PageSection, ReviewPanel, StatusTimeline, type StatusTimelineItem } from "@/components/ux";
 
 interface PaymentDialogProps {
@@ -59,6 +60,10 @@ interface SlipVerification {
   rejection_reason: string | null;
   created_at: string;
   verified_at: string | null;
+  ocr_status?: string | null;
+  ocr_amount?: number | null;
+  ocr_receiver_account?: string | null;
+  ocr_mismatch_reasons?: string[] | null;
 }
 
 type InstallmentSnapshot = Pick<
@@ -114,9 +119,11 @@ export function PaymentDialog({
         .select("id, amount, installment_number, principal_portion, status, confirmed_by_lender, payment_proof_url")
         .eq("id", installment.id)
         .maybeSingle(),
+      // select * so we pick up ocr_* columns added in migration 20260425270000
+      // without depending on a types.ts regen.
       supabase
         .from("slip_verifications")
-        .select("id, submitted_amount, verified_amount, slip_url, status, rejection_reason, created_at, verified_at")
+        .select("*")
         .eq("installment_id", installment.id)
         .eq("status", "pending")
         .order("created_at", { ascending: false })
@@ -127,7 +134,9 @@ export function PaymentDialog({
     if (pendingResult.error) throw pendingResult.error;
 
     const freshInstallment = installmentResult.data as InstallmentSnapshot | null;
-    const freshPending = ((pendingResult.data ?? [])[0] ?? null) as SlipVerification | null;
+    // Cast through unknown: ocr_* columns are added by migration 20260425270000
+    // and the supabase types.ts regen happens out-of-band.
+    const freshPending = ((pendingResult.data ?? [])[0] ?? null) as unknown as SlipVerification | null;
 
     if (freshInstallment) {
       setLiveInstallmentAmount(freshInstallment.amount);
@@ -345,7 +354,7 @@ export function PaymentDialog({
       // updates installments, and creates the lender notification under a
       // single transaction with row locks — replacing the earlier 3-step
       // client-side dance that left orphans on partial failure.
-      const { error: rpcError } = await supabase.rpc(
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
         "submit_installment_slip" as never,
         {
           p_installment_id: installment.id,
@@ -359,6 +368,18 @@ export function PaymentDialog({
       // RPC succeeded — file is owned by a verification row now, no orphan.
       uploadedSlipPath = null;
       insertedSlipVerificationId = null;
+
+      // Fire-and-forget OCR verification.  Off by default in production —
+      // the edge function returns 200 with skipped:provider_not_configured
+      // until SLIP_OCR_PROVIDER is set in Supabase secrets.  See
+      // supabase/functions/verify-payment-slip/index.ts for the criteria
+      // governing when to enable it (volume threshold or fraud signal).
+      const verificationId = (rpcData as { verification_id?: string } | null)?.verification_id;
+      if (verificationId) {
+        void supabase.functions
+          .invoke("verify-payment-slip", { body: { verificationId } })
+          .catch((err) => console.warn("OCR verification trigger failed:", err));
+      }
 
       toast.success("ส่งสลิปสำเร็จ", {
         description: "รอผู้ให้ยืมตรวจสอบและยืนยัน"
@@ -985,6 +1006,12 @@ export function PaymentDialog({
                 </p>
               </div>
 
+              <SlipOcrBadge
+                ocrStatus={pendingVerification.ocr_status ?? null}
+                ocrAmount={pendingVerification.ocr_amount ?? null}
+                ocrMismatchReasons={pendingVerification.ocr_mismatch_reasons ?? null}
+              />
+
               <div className="flex gap-3">
                 <Button
                   variant="outline"
@@ -1021,11 +1048,18 @@ export function PaymentDialog({
 
           {/* Waiting for verification message for borrower */}
           {!isLender && pendingVerification && (
-            <AsyncResultState
-              tone="warning"
-              title="รอผู้ให้ยืมตรวจสอบ"
-              description={`ส่งยอด ฿${pendingVerification.submitted_amount.toLocaleString()} เมื่อ ${format(parseISO(pendingVerification.created_at), 'd MMM HH:mm', { locale: th })}`}
-            />
+            <>
+              <AsyncResultState
+                tone="warning"
+                title="รอผู้ให้ยืมตรวจสอบ"
+                description={`ส่งยอด ฿${pendingVerification.submitted_amount.toLocaleString()} เมื่อ ${format(parseISO(pendingVerification.created_at), 'd MMM HH:mm', { locale: th })}`}
+              />
+              <SlipOcrBadge
+                ocrStatus={pendingVerification.ocr_status ?? null}
+                ocrAmount={pendingVerification.ocr_amount ?? null}
+                ocrMismatchReasons={pendingVerification.ocr_mismatch_reasons ?? null}
+              />
+            </>
           )}
 
           {/* Action Buttons */}

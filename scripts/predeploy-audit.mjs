@@ -19,6 +19,7 @@ const functionVerifyJwtExpectations = {
   "notify-unconfirmed-transfers": false,
   "send-chat-push-notification": true,
   "downgrade-expired-trials": false,
+  "verify-payment-slip": true,
 };
 
 const requiredEdgeFunctions = [
@@ -26,6 +27,7 @@ const requiredEdgeFunctions = [
   "notify-unconfirmed-transfers",
   "downgrade-expired-trials",
   "send-chat-push-notification",
+  "verify-payment-slip",
 ];
 
 const requiredFrontendEnvKeys = [

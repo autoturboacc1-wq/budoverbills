@@ -24,3 +24,10 @@ verify_jwt = false
 [functions.admin-session]
 # Authenticated admin session mint/validate endpoint.
 verify_jwt = true
+
+[functions.verify-payment-slip]
+# Authenticated user endpoint.
+# Borrower invokes after submit_installment_slip; lender may invoke on demand.
+# Handler validates the caller is a participant of the agreement that owns the
+# slip_verifications row before reading the slip and calling the OCR provider.
+verify_jwt = true
