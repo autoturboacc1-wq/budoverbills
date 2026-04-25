@@ -316,8 +316,7 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
         });
       });
 
-      // Apply role filter (no longer has "all" option)
-      items = items.filter(item => item.role === roleFilter);
+      // No longer filtering by role, show all events on calendar
       
       if (!statusFilters.includes("all")) {
         items = items.filter(item => statusFilters.includes(item.status as StatusFilter));
@@ -421,8 +420,7 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
 
     calendarDays.forEach(day => {
       day.items.forEach(item => {
-        // Only process items for the current role filter
-        if (item.role !== roleFilter) return;
+        // Show all summary data naturally
         if (!item.frequency) return;
         
         const freq = item.frequency;
@@ -495,7 +493,7 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
       day.items.forEach(item => {
         if (item.dueDate && item.status !== "paid") {
           const itemMs = getBangkokMidnightTimestamp(item.dueDate);
-          if (itemMs >= todayMs && itemMs <= threeDaysLaterMs && item.role === roleFilter) {
+          if (itemMs >= todayMs && itemMs <= threeDaysLaterMs) {
             upcoming.push(item);
           }
         }
@@ -593,49 +591,7 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
       transition={{ duration: 0.5, delay: 0.2 }}
       className="bg-card rounded-2xl p-5 shadow-card relative"
     >
-      {/* Segmented Control for Role */}
-      <div className="flex items-center bg-secondary/50 rounded-xl p-1 mb-4">
-        <button
-          onClick={() => setRoleFilter("lender")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-medium transition-all ${
-            roleFilter === "lender"
-              ? "bg-status-paid text-background shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <ArrowDownLeft className="w-4 h-4" />
-          <span>ให้ยืม</span>
-          {agreementCounts.lenderCount > 0 && (
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-              roleFilter === "lender" 
-                ? "bg-background/20" 
-                : "bg-status-paid/10 text-status-paid"
-            }`}>
-              {agreementCounts.lenderCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setRoleFilter("borrower")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-medium transition-all ${
-            roleFilter === "borrower"
-              ? "bg-status-pending text-background shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <ArrowUpRight className="w-4 h-4" />
-          <span>ยืม</span>
-          {agreementCounts.borrowerCount > 0 && (
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-              roleFilter === "borrower" 
-                ? "bg-background/20" 
-                : "bg-status-pending/10 text-status-pending"
-            }`}>
-              {agreementCounts.borrowerCount}
-            </span>
-          )}
-        </button>
-      </div>
+      {/* Role filter removed for simpler UX */}
 
       {/* Header with navigation and filter */}
       <div className="flex items-center justify-between mb-3">

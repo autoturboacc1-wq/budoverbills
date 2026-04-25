@@ -8,9 +8,9 @@ import {
   ChevronRight,
   Clock,
   FileText,
+  type LucideIcon,
   Trash2,
 } from "lucide-react";
-import type { ComponentType } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { th } from "date-fns/locale";
 
@@ -25,7 +25,7 @@ interface NotificationListItemProps {
   compact?: boolean;
 }
 
-const iconMap: Record<string, ComponentType<{ className?: string; strokeWidth?: number }>> = {
+const iconMap: Record<string, LucideIcon> = {
   payment_due: Clock,
   payment_reminder: Clock,
   payment_uploaded: AlertCircle,

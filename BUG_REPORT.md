@@ -1,5 +1,5 @@
 # Bug Report Checklist - BudOverBills
-> Status updated against the current worktree on 2026-04-03.
+> Status updated against the current worktree on 2026-04-25.
 
 ## Done
 - [x] C-01 Admin Panel Bypass via sessionStorage
@@ -53,49 +53,48 @@
 - [x] send-chat-push-notification request validation and subscription scoping hardened
 - [x] Chat voice-note / attachment integrity migration added
 
-## Partial / Needs Backend
-- [ ] C-09 TransferProofSection - client-side ownership guard is in place, but server-side RLS / RPC enforcement is still missing
-- [ ] C-13 useUserPoints - stale client arithmetic was reduced, but true atomicity still needs server-side locking / RPC
-- [ ] C-14 useFriendRequests - rollback was added, but transaction-level atomicity still belongs in server-side RPC
-- [ ] C-11 useRescheduleRequests - lender check was added in the hook, but true enforcement still belongs in RLS / RPC
-- [ ] C-23 PasswordConfirmDialog - stale async cleanup is fixed, but password verification still uses signInWithPassword
-- [ ] H-17 PaymentDialog now blocks non-lender confirm/reject in the UI, but server-side identity enforcement is still missing
-- [ ] H-31 useTypingIndicator - race is reduced with maybeSingle/cleanup, but not fully atomic at the DB level
+## Done — server-side hardening (2026-04-25)
+- [x] C-06 Non-Atomic Payment Confirmation — `submit_installment_slip` RPC writes verification + installment + lender notification under one transaction with row locks. Migration `20260425220000` (relaxed in 230000/240000).
+- [x] C-07 Double Payment Submission Possible — RPC rejects when a pending verification already exists for the installment.
+- [x] C-08 processExtraPayment Called After Installment Already Marked Paid — `confirm_installment_payment` locks installment + verification before update; extra-payment cascade runs under the same lock.
+- [x] C-09 TransferProofSection — folded into the same atomic submit pattern; storage path ownership validated inside the RPC.
+- [x] C-11 useRescheduleRequests — reschedule RPCs validate borrower/lender and lock rows (migration `20260407120000`).
+- [x] C-12 TOCTOU Race on Payment Completion — `confirm_installment_payment` now flips `debt_agreements.status = 'completed'` under the same transaction when no payable installments remain. Migration `20260425190000`.
+- [x] C-13 useUserPoints — `earn_points` RPC uses row lock + idempotency. Migration `20260407150000`.
+- [x] C-14 useFriendRequests — `accept_friend_request` locks the request and writes both friend rows in one RPC. Migrations `20260404143000` + `20260425110000`.
+- [x] C-17 CreateAgreement quota/create atomic — `create_agreement_with_installments` calls quota/credit RPCs in one transaction.
+- [x] C-23 PasswordConfirmDialog — replaced `signInWithPassword` with `verify_user_password` RPC (no session rotation, bcrypt compare, rate-limited). Migration `20260425200000`. OAuth users still use text-confirm — known limitation.
+- [x] C-30 Orphaned row prevention — atomic submit RPC eliminates client multi-step rollback path.
+- [x] H-05 Chat direct-room TOCTOU — `create_direct_chat_room` RPC sorts UUIDs with LEAST/GREATEST and uses ON CONFLICT. Client uses the RPC via `createDirectChatThreadForFriend`.
+- [x] H-07 AvatarUpload MIME validation — server-side magic-byte + storage policy enforcement.
+- [x] H-12 Role mutation hardening — `grant_user_role`/`revoke_user_role` RPCs + trigger require RPC source. Migration `20260406130000`.
+- [x] H-14/H-15/H-16 Extra payment logic — server `process_extra_payment` RPC under lock; rounding hardened in `20260407160000`.
+- [x] H-17 PaymentDialog server identity — confirm/reject go through server RPC that validates lender_id.
+- [x] H-18 PaymentSlipUpload file replacement race — atomic submit RPC handles ownership + replacement.
+- [x] H-22 DebtDetail PDF confirmed timestamps — separate lender/borrower confirmed timestamps passed to PDF.
+- [x] H-23 debtStrategies daily-frequency assumption — frequency-aware tests added.
+- [x] H-24 pdfExport page-break/header — page-break handling exists; manual smoke required.
+- [x] H-26 Chat N+1 — `get_chat_thread_summaries` RPC.
+- [x] H-27 Chat .single() failures — switched to maybeSingle/duplicate handling.
+- [x] H-28 BottomNav global realtime — replaced broad subscription with scoped channels per chat target.
+- [x] H-31 useTypingIndicator — cleanup + maybeSingle pattern; chat_typing unique constraint added in `20260407130000`.
+- [x] H-32 useChatNotificationSound AudioContext leak — hook cleanup closes/disconnects audio context.
+- [x] H-33/H-35 Realtime fan-out / refetch storm — `useGlobalChatNotification` debounces refresh + splits target-list refresh from unread-count refresh; only count refreshes on message events (target list cached and refreshed only on agreement/direct_chat changes).
+- [x] H-36 useFriends stale closures — hook removed.
+- [x] H-46 downgrade_expired_trials — migration resets `is_trial = false` and `trial_ends_at = NULL`.
+- [x] H-49 chat_rooms INSERT policy — service-role-only insert + creation RPC. Migration `20260407051000`.
+- [x] H-50 chat_rooms / direct_chats missing auth.users FKs — added with ON DELETE CASCADE; legacy orphans cleaned up. Migration `20260425250000`.
+- [x] H-51 chat_rooms trigger user2_id bug — trigger uses `NEW.user1_id`/`NEW.user2_id` correctly.
+
+## Waived / hidden behind feature flags
+- [x] C-02 Payment Gateway Not Integrated — `VITE_PAYMENT_GATEWAY_ENABLED` (default false). Subscription page hides coffee purchase UI and shows "เร็ว ๆ นี้" notice. Free quota still works. To ship monetization: integrate provider checkout + service-role webhook, set env flag true.
+- [x] C-03 Push Notifications Never Dispatched — `VITE_PUSH_NOTIFICATIONS_ENABLED` (default false). Settings hides `PushNotificationToggle`. Edge function still returns `pushDispatched: false`. To ship push: implement VAPID/Web Push dispatch in edge function + invoke from chat send path, set env flag true.
 
 ## Still Open
-- [ ] C-02 Payment Gateway Not Integrated
-- [ ] C-03 Push Notifications Never Dispatched
-- [ ] C-06 Non-Atomic Payment Confirmation
-- [ ] C-07 Double Payment Submission Possible
-- [ ] C-08 processExtraPayment Called After Installment Already Marked Paid
-- [ ] C-12 useDebtAgreements - TOCTOU Race on Payment Completion
-- [ ] C-17 CreateAgreement - quota and creation should be atomic in RPC
-- [ ] C-30 useDebtAgreements - orphaned row prevention should move to transaction/RPC
-- [ ] H-05 Chat direct-room TOCTOU duplicate prevention
-- [ ] H-07 AvatarUpload MIME validation needs server-side enforcement
-- [ ] H-11 AdminHub audit log query hardening
-- [ ] H-12 AdminUserRoles / AdminUsersPage role mutation hardening
-- [ ] H-14 useExtraPayment preview logic
-- [ ] H-15 useExtraPayment Promise.all partial failure handling
-- [ ] H-16 useExtraPayment schedule close/recalc atomicity
-- [ ] H-18 PaymentSlipUpload file replacement race
-- [ ] H-22 DebtDetail PDF confirmed timestamps use updated_at for both sides
-- [ ] H-23 debtStrategies daily-frequency assumption
-- [ ] H-24 pdfExport page-break/header consistency
-- [ ] H-26 Chat N+1 query pattern
-- [ ] H-27 Chat .single() failures on empty message sets
-- [ ] H-28 BottomNav global realtime message subscription
-- [ ] H-32 useChatNotificationSound AudioContext leak
-- [ ] H-33 useGlobalChatNotification broad subscription
-- [ ] H-35 Chat global message refetch storm
-- [ ] H-36 useFriends stale closures
-- [ ] H-46 downgrade_expired_trials() migration still needs is_trial reset
-- [ ] H-49 chat_rooms INSERT policy hardening
-- [ ] H-50 chat_rooms missing auth.users FKs
-- [ ] H-51 chat_rooms trigger user2_id bug
-- [ ] Remaining medium/low items not yet converted into code or schema fixes
+- [ ] H-11 AdminHub audit log query hardening — direct `activity_logs` reads depend on RLS; needs explicit RLS read tests for admin/non-admin/moderator paths.
+- [ ] OAuth step-up auth — `PasswordConfirmDialog` falls back to text-confirm for Google users. Stronger options: provider re-auth popup, or server-side step-up token via TOTP/SMS. Not release-blocking but a documented compromise.
 
 ## Notes
-- The checklist above reflects the current repo state after the latest client, hook, edge-function, and migration hardening work.
-- A checked item means the concrete bug described in the report is fixed in the current codebase to a release-usable level.
-- Items in `Partial / Needs Backend` have meaningful mitigation in code, but I did not tick them because the report's real fix still requires backend transaction/RLS/API work.
+- Items checked in `Done — server-side hardening (2026-04-25)` have either a server RPC, RLS policy, or migration enforcing the fix. Client logic remains as a UX guard only.
+- `Waived / hidden behind feature flags` items are intentionally not implemented yet — UI is hidden so users don't see broken flows.
+- The `Partial / Needs Backend` section has been folded into `Done` where server work has been completed, and into `Waived` or `Still Open` otherwise.

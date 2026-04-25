@@ -147,7 +147,7 @@ const Notifications = () => {
                 className="space-y-2"
                 role="list"
                 aria-live="polite"
-                aria-relevant="additions removals text"
+                aria-relevant="additions removals"
               >
                 <AnimatePresence initial={false}>
                   {sortedNotifications.map((notification, index) => (

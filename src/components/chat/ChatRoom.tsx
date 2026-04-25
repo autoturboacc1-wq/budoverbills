@@ -350,47 +350,54 @@ export const ChatRoom = ({ thread, onBack, onMessagesRead }: ChatRoomProps) => {
   // Guard: require authenticated user
   if (!user || !currentUserId) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex h-full items-center justify-center">
         <p className="text-muted-foreground">กรุณาเข้าสู่ระบบ</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="mx-auto flex h-[100dvh] w-full max-w-md flex-col bg-background">
       {/* Header */}
-      <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-background">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="w-5 h-5" />
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3">
+        <Button className="h-9 w-9 shrink-0" variant="ghost" size="icon" onClick={onBack}>
+          <ArrowLeft className="h-[18px] w-[18px]" />
         </Button>
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-2">
           {thread.counterparty_avatar ? (
             <img
               src={thread.counterparty_avatar}
               alt={thread.counterparty_name}
-              className="w-10 h-10 rounded-full object-cover"
+              className="h-9 w-9 shrink-0 rounded-full object-cover"
             />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground font-semibold">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
               {thread.counterparty_name.charAt(0).toUpperCase()}
             </div>
           )}
-          <span className="font-semibold text-foreground">{thread.counterparty_name}</span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold leading-5 text-foreground">
+              {thread.counterparty_name}
+            </p>
+            {thread.room_type === "debt" ? (
+              <p className="text-[11px] leading-none text-muted-foreground">แชทการเงิน</p>
+            ) : null}
+          </div>
         </div>
       </header>
 
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto px-2 py-4 bg-muted/20">
+      <div className="flex-1 overflow-y-auto bg-muted/20 px-2 py-3">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">กำลังโหลด...</p>
+            <p className="text-xs text-muted-foreground">กำลังโหลด...</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <span className="text-3xl">👋</span>
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <span className="text-2xl">👋</span>
             </div>
-            <p className="text-muted-foreground">ส่งข้อความแรกเพื่อเริ่มสนทนา</p>
+            <p className="text-sm text-muted-foreground">ส่งข้อความแรกเพื่อเริ่มสนทนา</p>
           </div>
         ) : (
           <>
@@ -419,7 +426,7 @@ export const ChatRoom = ({ thread, onBack, onMessagesRead }: ChatRoomProps) => {
               return (
                 <div
                   key={message.id}
-                  className={`w-full flex ${isMe ? "justify-end" : "justify-start"} px-2 mb-2`}
+                  className={`mb-1.5 flex w-full ${isMe ? "justify-end" : "justify-start"} px-2`}
                 >
                   <ChatMessageBubble message={message} isMe={isMe} />
                 </div>
@@ -431,59 +438,65 @@ export const ChatRoom = ({ thread, onBack, onMessagesRead }: ChatRoomProps) => {
       </div>
 
       {/* Input */}
-      <div className="border-t border-border bg-background px-4 py-3">
+      <div className="shrink-0 border-t border-border bg-background px-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] pt-2">
         {isCounterpartyTyping ? (
-          <p className="mb-2 px-1 text-xs text-muted-foreground">
+          <p className="mb-1.5 px-1 text-[11px] text-muted-foreground">
             {thread.counterparty_name} กำลังพิมพ์...
           </p>
         ) : null}
         <div className="flex items-center gap-2">
-        {showVoiceRecorder ? (
-          <VoiceRecorder
-            chatId={thread.chat_id}
-            onCancel={() => {
-              setShowVoiceRecorder(false);
-              stopTyping();
-            }}
-            onVoiceReady={handleVoiceReady}
-            ownerId={user.id}
-          />
-        ) : (
-          <>
-            <Button
-              disabled={sending}
-              onClick={() => setShowVoiceRecorder(true)}
-              size="icon"
-              type="button"
-              variant="ghost"
-            >
-              <Mic className="w-5 h-5" />
-            </Button>
-            <Input
-              value={inputText}
-              onChange={(e) => {
-                const nextValue = e.target.value;
-                setInputText(nextValue);
-                if (nextValue.trim()) {
-                  startTyping();
-                } else {
-                  stopTyping();
-                }
+          {showVoiceRecorder ? (
+            <VoiceRecorder
+              chatId={thread.chat_id}
+              onCancel={() => {
+                setShowVoiceRecorder(false);
+                stopTyping();
               }}
-              placeholder="พิมพ์ข้อความ..."
-              className="flex-1"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
+              onVoiceReady={handleVoiceReady}
+              ownerId={user.id}
             />
-            <Button onClick={handleSend} disabled={!inputText.trim() || sending} size="icon">
-              <Send className="w-5 h-5" />
-            </Button>
-          </>
-        )}
+          ) : (
+            <>
+              <Button
+                className="h-9 w-9 shrink-0"
+                disabled={sending}
+                onClick={() => setShowVoiceRecorder(true)}
+                size="icon"
+                type="button"
+                variant="ghost"
+              >
+                <Mic className="h-5 w-5" />
+              </Button>
+              <Input
+                value={inputText}
+                onChange={(e) => {
+                  const nextValue = e.target.value;
+                  setInputText(nextValue);
+                  if (nextValue.trim()) {
+                    startTyping();
+                  } else {
+                    stopTyping();
+                  }
+                }}
+                placeholder="พิมพ์ข้อความ..."
+                className="h-9 flex-1 rounded-full text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+              />
+              <Button
+                className="h-9 w-9 shrink-0 rounded-full"
+                onClick={handleSend}
+                disabled={!inputText.trim() || sending}
+                size="icon"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>

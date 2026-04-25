@@ -37,8 +37,8 @@ export const ChatMessageBubble = ({ message, isMe }: ChatMessageBubbleProps) => 
     <div
       className={`
         max-w-full
-        px-3 py-2
-        rounded-2xl text-sm
+        px-3 py-1.5
+        rounded-2xl text-[13px] leading-5
         ${isMe
           ? "bg-primary text-primary-foreground rounded-br-none"
           : "bg-muted text-foreground rounded-bl-none"
@@ -50,10 +50,10 @@ export const ChatMessageBubble = ({ message, isMe }: ChatMessageBubbleProps) => 
   );
 
   return (
-    <div className={`flex max-w-[80%] flex-col ${isMe ? "items-end" : "items-start"}`}>
+    <div className={`flex max-w-[76%] flex-col ${isMe ? "items-end" : "items-start"}`}>
       {bubble}
       {readStatus ? (
-        <span className="mt-1 px-1 text-[11px] leading-none text-muted-foreground">
+        <span className="mt-0.5 px-1 text-[10px] leading-none text-muted-foreground">
           {readStatus}
         </span>
       ) : null}

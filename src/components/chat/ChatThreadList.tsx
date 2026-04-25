@@ -23,17 +23,23 @@ export const ChatThreadList = ({
 }: ChatThreadListProps) => {
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">กำลังโหลด...</p>
+      <div className="space-y-2 px-4 py-3">
+        {[0, 1, 2, 3].map((item) => (
+          <div
+            key={item}
+            className="h-[68px] animate-pulse rounded-md border border-border bg-card"
+          />
+        ))}
+        <p className="px-1 pt-1 text-xs text-muted-foreground">กำลังโหลด...</p>
       </div>
     );
   }
 
   if (threads.length === 0) {
     return (
-      <div className="px-4 py-8">
+      <div className="px-5 py-8">
         <EmptyState
-          icon={<MessageCircle className="h-7 w-7" />}
+          icon={<MessageCircle className="h-6 w-6" strokeWidth={1.5} />}
           title="ยังไม่มีข้อความ"
           description="เริ่มสนทนากับเพื่อนหรือสร้างข้อตกลงใหม่ แล้ว thread การเงินจะปรากฏที่นี่"
         />
@@ -52,7 +58,7 @@ export const ChatThreadList = ({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             onClick={() => onSelectThread(thread)}
-            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${
+            className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors active:bg-muted/60 ${
               selectedThreadId === thread.chat_id ? "bg-muted/50" : ""
             }`}
           >
@@ -61,42 +67,41 @@ export const ChatThreadList = ({
               <img
                 src={thread.counterparty_avatar}
                 alt={thread.counterparty_name}
-                className="w-12 h-12 rounded-full object-cover shrink-0"
+                className="h-10 w-10 shrink-0 rounded-full object-cover"
               />
             ) : (
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground font-semibold shrink-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
                 {thread.counterparty_name.charAt(0).toUpperCase()}
               </div>
             )}
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate font-semibold text-foreground">{thread.counterparty_name}</span>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold leading-5 text-foreground">
+                      {thread.counterparty_name}
+                    </span>
                     {thread.has_pending_action ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                        <CreditCard className="h-3 w-3" />
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-primary">
+                        <CreditCard className="h-2.5 w-2.5" />
                         Action
                       </span>
                     ) : null}
                     {thread.room_type === "debt" ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
-                        <CircleAlert className="h-3 w-3" />
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-status-pending/10 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-status-pending">
+                        <CircleAlert className="h-2.5 w-2.5" />
                         การเงิน
                       </span>
                     ) : null}
                     {thread.chat_type === "direct" ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                        <MessageCircle className="h-3 w-3" />
-                        แชททั่วไป
-                      </span>
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden />
                     ) : null}
                   </div>
                 </div>
                 {thread.last_message_at && (
-                  <span className="text-xs text-muted-foreground shrink-0">
+                  <span className="shrink-0 pt-0.5 text-[11px] text-muted-foreground">
                     {new Date(thread.last_message_at).toLocaleDateString("th-TH", {
                       day: "numeric",
                       month: "short",
@@ -104,15 +109,17 @@ export const ChatThreadList = ({
                   </span>
                 )}
               </div>
-              <p className="truncate text-sm text-muted-foreground">{thread.last_message || "ยังไม่มีข้อความ"}</p>
-              <p className={`mt-0.5 text-xs font-medium ${isUnread ? "text-primary" : "text-muted-foreground"}`}>
+              <p className="truncate text-xs leading-5 text-muted-foreground">
+                {thread.last_message || "ยังไม่มีข้อความ"}
+              </p>
+              <p className={`text-[11px] font-medium ${isUnread ? "text-primary" : "text-muted-foreground/70"}`}>
                 {isUnread ? "ยังไม่อ่าน" : "อ่านแล้ว"}
               </p>
             </div>
 
             {/* Unread badge */}
             {isUnread && (
-              <div className="min-w-[20px] h-5 px-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-full flex items-center justify-center shrink-0">
+              <div className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-medium text-primary-foreground">
                 {thread.unread_count}
               </div>
             )}

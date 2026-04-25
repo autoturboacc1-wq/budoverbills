@@ -66,7 +66,7 @@ export function VoiceMessagePlayer({
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+      <div className="rounded-2xl border border-destructive/20 bg-destructive/5 px-3 py-1.5 text-xs text-destructive">
         ไม่สามารถโหลด voice note ได้
       </div>
     );
@@ -74,7 +74,7 @@ export function VoiceMessagePlayer({
 
   return (
     <div
-      className={`min-w-[180px] max-w-[260px] rounded-2xl px-3 py-2 ${
+      className={`min-w-[168px] max-w-[230px] rounded-2xl px-2.5 py-1.5 ${
         isSender
           ? "bg-primary text-primary-foreground"
           : "bg-muted text-foreground"
@@ -96,7 +96,7 @@ export function VoiceMessagePlayer({
       ) : null}
       <div className="flex items-center gap-2">
         <Button
-          className={isSender ? "hover:bg-primary-foreground/10" : undefined}
+          className={isSender ? "h-8 w-8 hover:bg-primary-foreground/10" : "h-8 w-8"}
           disabled={isLoading || !signedUrl}
           onClick={() => {
             void togglePlay();

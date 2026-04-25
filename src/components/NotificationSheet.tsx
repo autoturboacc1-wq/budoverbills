@@ -109,7 +109,7 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
         <div
           className="flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-3"
           aria-live="polite"
-          aria-relevant="additions removals text"
+          aria-relevant="additions removals"
           aria-busy={loading}
         >
           {loading ? (

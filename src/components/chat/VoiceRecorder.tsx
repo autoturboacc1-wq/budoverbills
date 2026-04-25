@@ -307,11 +307,11 @@ export function VoiceRecorder({
   };
 
   return (
-    <div className="flex w-full items-center gap-2 rounded-2xl border border-border bg-muted/40 p-2">
+    <div className="flex w-full items-center gap-2 rounded-md border border-border bg-muted/40 p-1.5">
       {audioBlob && previewUrl ? (
         <>
-          <audio controls className="h-9 flex-1" src={previewUrl} />
-          <span className="min-w-10 text-xs font-medium text-muted-foreground">
+          <audio controls className="h-8 min-w-0 flex-1" src={previewUrl} />
+          <span className="min-w-9 text-[11px] font-medium text-muted-foreground">
             {formatDuration(duration)}
           </span>
           <Button
@@ -327,17 +327,18 @@ export function VoiceRecorder({
         <>
           <Button
             onClick={isRecording ? stopRecording : startRecording}
+            className="h-9 w-9 shrink-0"
             size="icon"
             type="button"
             variant={isRecording ? "destructive" : "outline"}
           >
             {isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </Button>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-foreground">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-medium text-foreground">
               {isRecording ? "กำลังบันทึกเสียง..." : "บันทึก voice note"}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="truncate text-[11px] text-muted-foreground">
               {isRecording
                 ? `● ${formatDuration(duration)} / ${formatDuration(MAX_DURATION_SECONDS)}`
                 : "กดไมค์เพื่อเริ่ม และกดหยุดเมื่อพร้อมส่ง"}
@@ -348,7 +349,7 @@ export function VoiceRecorder({
           ) : null}
         </>
       )}
-      <Button onClick={handleCancel} size="icon" type="button" variant="ghost">
+      <Button className="h-9 w-9 shrink-0" onClick={handleCancel} size="icon" type="button" variant="ghost">
         <X className="h-4 w-4" />
       </Button>
     </div>

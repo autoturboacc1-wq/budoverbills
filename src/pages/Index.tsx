@@ -22,11 +22,6 @@ const Index = () => {
   const navigate = useNavigate();
   const { user, profile, isLoading: authLoading } = useAuth();
   const { agreements, isLoading } = useDebtAgreements();
-  const [agreementRoleFilter, setAgreementRoleFilter] = useState<AgreementRole>("lender");
-
-  const handleCalendarRoleChange = useCallback((role: AgreementRole) => {
-    setAgreementRoleFilter(role);
-  }, []);
 
   const displayName = profile?.display_name || user?.email?.split('@')[0] || "ผู้เยี่ยมชม";
 
@@ -38,15 +33,8 @@ const Index = () => {
     return mapAgreementsToDebtCards(activeAgreements, user?.id);
   }, [agreements, user?.id]);
 
-  const filteredDebtCards = useMemo(() =>
-    debtCards.filter(card =>
-      agreementRoleFilter === "lender" ? card.isLender : !card.isLender
-    ),
-    [debtCards, agreementRoleFilter]
-  );
-
-  const lenderCount = debtCards.filter(c => c.isLender).length;
-  const borrowerCount = debtCards.filter(c => !c.isLender).length;
+  const lenderCards = useMemo(() => debtCards.filter(card => card.isLender), [debtCards]);
+  const borrowerCards = useMemo(() => debtCards.filter(card => !card.isLender), [debtCards]);
 
   return (
     <PageTransition>
@@ -76,36 +64,6 @@ const Index = () => {
               </Button>
             </div>
 
-            {/* Role toggle — minimal, hairline-only */}
-            <div className="flex items-center gap-6 text-sm" role="tablist">
-              {(["lender", "borrower"] as AgreementRole[]).map((role) => {
-                const isActive = agreementRoleFilter === role;
-                const count = role === "lender" ? lenderCount : borrowerCount;
-                return (
-                  <button
-                    key={role}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    onClick={() => setAgreementRoleFilter(role)}
-                    className={`relative flex items-baseline gap-2 pb-2 transition-colors ${
-                      isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <span className="font-medium">
-                      {role === "lender" ? "มุมผู้ให้ยืม" : "มุมผู้ยืม"}
-                    </span>
-                    <span className="num text-[11px] text-muted-foreground">{count}</span>
-                    {isActive && (
-                      <motion.span
-                        layoutId="role-toggle-underline"
-                        className="absolute bottom-0 left-0 right-0 h-px bg-foreground"
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
           </section>
 
           {!isLoading && !authLoading && <PendingActionsCard />}
@@ -114,24 +72,20 @@ const Index = () => {
             <PendingAgreements agreements={agreements} userId={user?.id} />
           )}
 
-          <DashboardStats roleFilter={agreementRoleFilter} />
+          <DashboardStats />
 
           <PageSection
             title="Payment Calendar"
-            description="มองเห็นกำหนดชำระถัดไปตามมุมมองที่คุณเลือก"
+            description="มองเห็นกำหนดชำระถัดไปของคุณ"
           >
-            <PaymentCalendar onRoleChange={handleCalendarRoleChange} />
+            <PaymentCalendar />
           </PageSection>
 
           <PageSection
-            title="Active Agreements"
-            description={
-              agreementRoleFilter === "lender"
-                ? "ติดตามคู่สัญญาที่คุณให้ยืมและยอดที่ยังคงค้าง"
-                : "ติดตามภาระชำระของคุณและงวดถัดไปที่ต้องจ่าย"
-            }
+            title="ลูกหนี้ของคุณ"
+            description="บุคคคที่ติดหนี้และต้องชำระเงินให้คุณ"
             action={
-              filteredDebtCards.length > 5 ? (
+              lenderCards.length > 5 ? (
                 <button
                   type="button"
                   onClick={() => navigate("/history")}
@@ -144,57 +98,55 @@ const Index = () => {
           >
             {isLoading || authLoading ? (
               <div className="space-y-3">
-                {[0, 1, 2].map((i) => (
+                {[0, 1].map((i) => (
                   <div key={i} className="rounded-md border border-border bg-card p-5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-16" />
-                    </div>
+                    <Skeleton className="h-4 w-32" />
                     <Skeleton className="h-7 w-32" />
-                    <Skeleton className="h-px w-full" />
-                    <Skeleton className="h-3 w-24" />
                   </div>
                 ))}
               </div>
-            ) : filteredDebtCards.length === 0 ? (
+            ) : lenderCards.length === 0 ? (
               <EmptyState
-                icon={
-                  agreementRoleFilter === "lender" ? (
-                    <ArrowDownLeft className="h-6 w-6" strokeWidth={1.5} />
-                  ) : (
-                    <ArrowUpRight className="h-6 w-6" strokeWidth={1.5} />
-                  )
-                }
-                title={agreementRoleFilter === "lender" ? "ยังไม่มีสัญญาที่คุณให้ยืม" : "ยังไม่มีสัญญาที่คุณยืม"}
-                description={
-                  agreementRoleFilter === "lender"
-                    ? "เริ่มต้นด้วยการสร้างข้อตกลงใหม่เพื่อบันทึกยอดเงิน รอบชำระ และเงื่อนไขให้ชัดเจน"
-                    : "เมื่อคุณเป็นผู้ยืม ระบบจะแสดงยอดคงเหลือ งวดถัดไป และสถานะการชำระในส่วนนี้"
-                }
+                icon={<ArrowDownLeft className="h-6 w-6" strokeWidth={1.5} />}
+                title="ยังไม่มีคนติดหนี้คุณ"
+                description="เริ่มต้นด้วยการสร้างข้อตกลงใหม่เพื่อบันทึกยอดเงิน"
                 action={
-                  agreementRoleFilter === "lender" ? (
-                    <Button onClick={() => navigate("/create")} size="sm" className="rounded-md">
-                      <Plus className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
-                      สร้างข้อตกลงใหม่
-                    </Button>
-                  ) : null
+                  <Button onClick={() => navigate("/create")} size="sm" className="rounded-md">
+                    <Plus className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
+                    สร้างข้อตกลงใหม่
+                  </Button>
                 }
               />
             ) : (
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={agreementRoleFilter}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                  className="space-y-3"
-                >
-                  {filteredDebtCards.slice(0, 5).map((debt) => (
-                    <DebtCard key={debt.id} {...debt} id={debt.id} />
-                  ))}
-                </motion.div>
-              </AnimatePresence>
+              <div className="space-y-3">
+                {lenderCards.slice(0, 5).map((debt) => (
+                  <DebtCard key={debt.id} {...debt} id={debt.id} />
+                ))}
+              </div>
+            )}
+          </PageSection>
+
+          <PageSection
+            title="เจ้าหนี้ของคุณ"
+            description="บุคคลที่คุณต้องจัดการชำระค่างวดให้"
+          >
+            {isLoading || authLoading ? (
+              <div className="space-y-3">
+                {[0, 1].map((i) => (
+                  <div key={i} className="rounded-md border border-border bg-card p-5 space-y-3">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-7 w-32" />
+                  </div>
+                ))}
+              </div>
+            ) : borrowerCards.length === 0 ? (
+              <p className="text-sm text-muted-foreground w-full text-center py-4 rounded-xl border border-border/50 bg-secondary/30">คุณไม่มีภาระหนี้สินในระบบ</p>
+            ) : (
+              <div className="space-y-3">
+                {borrowerCards.slice(0, 5).map((debt) => (
+                  <DebtCard key={debt.id} {...debt} id={debt.id} />
+                ))}
+              </div>
             )}
           </PageSection>
         </div>

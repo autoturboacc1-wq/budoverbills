@@ -29,11 +29,7 @@ function getDueDot(days: number): string {
   return "bg-muted-foreground/60";
 }
 
-interface DashboardStatsProps {
-  roleFilter?: AgreementRole;
-}
-
-export function DashboardStats({ roleFilter }: DashboardStatsProps) {
+export function DashboardStats() {
   const { agreements, stats } = useDebtAgreements();
   const { user } = useAuth();
 
@@ -41,45 +37,18 @@ export function DashboardStats({ roleFilter }: DashboardStatsProps) {
     return mapToUpcomingInstallments(agreements, user?.id, 7, 3);
   }, [agreements, user?.id]);
 
-  const filteredUpcomingInstallments = useMemo(() => {
-    if (!roleFilter) return upcomingInstallments;
-    return upcomingInstallments.filter((item) =>
-      roleFilter === "lender" ? item.isLender : !item.isLender,
-    );
-  }, [roleFilter, upcomingInstallments]);
+  const filteredUpcomingInstallments = upcomingInstallments;
 
   const roleSummary = useMemo(() => {
-    if (roleFilter === "lender") {
-      const count = agreements.filter(
-        (a) => a.lender_id === user?.id && a.status === "active",
-      ).length;
-      return {
-        label: "สัญญาที่คุณให้ยืม",
-        value: count,
-        hint: "สัญญาที่กำลังติดตามการชำระ",
-      };
-    }
-
-    if (roleFilter === "borrower") {
-      const count = agreements.filter(
-        (a) => a.borrower_id === user?.id && a.status === "active",
-      ).length;
-      return {
-        label: "สัญญาที่คุณยืม",
-        value: count,
-        hint: "สัญญาที่คุณต้องจัดการชำระ",
-      };
-    }
-
     return {
       label: "ข้อตกลงที่ใช้งาน",
       value: stats.activeCount,
       hint: "ทุกข้อตกลงที่ยังดำเนินอยู่",
     };
-  }, [agreements, roleFilter, stats.activeCount, user?.id]);
+  }, [stats.activeCount]);
 
-  const showReceivable = roleFilter !== "borrower";
-  const showPayable = roleFilter !== "lender";
+  const showReceivable = true;
+  const showPayable = true;
 
   return (
     <motion.section
