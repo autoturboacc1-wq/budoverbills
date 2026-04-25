@@ -53,7 +53,7 @@ export function useExtraPayment() {
       }
 
       try {
-        const rpc = supabase.rpc as unknown as RpcClient;
+        const rpc = supabase.rpc.bind(supabase) as unknown as RpcClient;
         const { data, error } = await rpc('process_extra_payment', {
           p_agreement_id: agreement.id,
           p_extra_amount: toMoney(extraAmount),

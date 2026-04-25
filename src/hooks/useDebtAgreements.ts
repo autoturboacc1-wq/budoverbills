@@ -293,7 +293,7 @@ export function useDebtAgreements() {
     }
 
     try {
-      const rpc = supabase.rpc as unknown as RpcClient;
+      const rpc = supabase.rpc.bind(supabase) as unknown as RpcClient;
       const { data, error } = await rpc('create_agreement_with_installments', {
         p_lender_id: user.id,
         p_borrower_id: input.borrower_id ?? null,
@@ -574,7 +574,7 @@ export function useDebtAgreements() {
         return false;
       }
 
-      const rpc = supabase.rpc as unknown as RpcClient;
+      const rpc = supabase.rpc.bind(supabase) as unknown as RpcClient;
       const { data, error } = await rpc('confirm_installment_payment', {
         p_installment_id: installmentId,
         p_verification_id: pendingVerification.id,

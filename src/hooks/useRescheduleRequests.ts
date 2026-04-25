@@ -154,7 +154,7 @@ export function useRescheduleRequests() {
     if (!user) return false;
     
     try {
-      const rpc = supabase.rpc as unknown as RpcClient;
+      const rpc = supabase.rpc.bind(supabase) as unknown as RpcClient;
       const { error } = await rpc('create_reschedule_request', {
         p_installment_id: input.installmentId,
         p_agreement_id: input.agreementId,
@@ -186,7 +186,7 @@ export function useRescheduleRequests() {
     if (!user) return false;
     
     try {
-      const rpc = supabase.rpc as unknown as RpcClient;
+      const rpc = supabase.rpc.bind(supabase) as unknown as RpcClient;
       const { data, error } = await rpc('approve_reschedule_request', {
         p_request_id: requestId,
       });
@@ -211,7 +211,7 @@ export function useRescheduleRequests() {
     if (!user) return false;
     
     try {
-      const rpc = supabase.rpc as unknown as RpcClient;
+      const rpc = supabase.rpc.bind(supabase) as unknown as RpcClient;
       const { error } = await rpc('reject_reschedule_request', {
         p_request_id: requestId,
         p_rejection_reason: reason ?? null,

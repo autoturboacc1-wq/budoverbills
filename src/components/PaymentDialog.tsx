@@ -461,7 +461,7 @@ export function PaymentDialog({
         return;
       }
 
-      const rpc = supabase.rpc as unknown as RpcClient;
+      const rpc = supabase.rpc.bind(supabase) as unknown as RpcClient;
       const { data, error } = await rpc("confirm_installment_payment", {
         p_installment_id: freshInstallment.id,
         p_verification_id: freshPending.id,
@@ -524,7 +524,7 @@ export function PaymentDialog({
         return;
       }
 
-      const rpc = supabase.rpc as unknown as RpcClient;
+      const rpc = supabase.rpc.bind(supabase) as unknown as RpcClient;
       const { data, error } = await rpc("reject_installment_payment", {
         p_installment_id: freshInstallment.id,
         p_verification_id: freshPending.id,
