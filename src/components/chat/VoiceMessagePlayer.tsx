@@ -17,6 +17,7 @@ export function VoiceMessagePlayer({
 }: VoiceMessagePlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackError, setPlaybackError] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const { signedUrl, isLoading, error } = useSignedUrl("chat-attachments", voicePath, 3600);
 
@@ -53,10 +54,12 @@ export function VoiceMessagePlayer({
     }
 
     try {
+      setPlaybackError(false);
       await audioRef.current.play();
       setIsPlaying(true);
     } catch (playError) {
       setIsPlaying(false);
+      setPlaybackError(true);
       console.error("Error playing voice message:", playError);
     }
   };
@@ -87,6 +90,7 @@ export function VoiceMessagePlayer({
           }}
           onPause={() => setIsPlaying(false)}
           onPlay={() => setIsPlaying(true)}
+          onError={() => setPlaybackError(true)}
           onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
         />
       ) : null}
@@ -116,6 +120,24 @@ export function VoiceMessagePlayer({
           </div>
         </div>
       </div>
+      {playbackError ? (
+        <div className="mt-2 text-[11px] leading-snug opacity-85">
+          อุปกรณ์นี้เปิดไฟล์เสียงนี้ไม่ได้
+          {signedUrl ? (
+            <>
+              {" "}
+              <a
+                className="underline underline-offset-2"
+                href={signedUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                เปิดไฟล์
+              </a>
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

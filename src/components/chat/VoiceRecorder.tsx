@@ -14,6 +14,76 @@ interface VoiceRecorderProps {
 
 const MAX_DURATION_SECONDS = 120;
 
+type VoiceMimeOption = {
+  extension: string;
+  mimeType: string;
+  uploadMimeType: string;
+};
+
+const VOICE_MIME_OPTIONS: VoiceMimeOption[] = [
+  {
+    extension: "m4a",
+    mimeType: "audio/mp4;codecs=mp4a.40.2",
+    uploadMimeType: "audio/mp4",
+  },
+  {
+    extension: "m4a",
+    mimeType: "audio/mp4",
+    uploadMimeType: "audio/mp4",
+  },
+  {
+    extension: "aac",
+    mimeType: "audio/aac",
+    uploadMimeType: "audio/aac",
+  },
+  {
+    extension: "webm",
+    mimeType: "audio/webm;codecs=opus",
+    uploadMimeType: "audio/webm",
+  },
+  {
+    extension: "webm",
+    mimeType: "audio/webm",
+    uploadMimeType: "audio/webm",
+  },
+  {
+    extension: "ogg",
+    mimeType: "audio/ogg;codecs=opus",
+    uploadMimeType: "audio/ogg",
+  },
+  {
+    extension: "ogg",
+    mimeType: "audio/ogg",
+    uploadMimeType: "audio/ogg",
+  },
+];
+
+function getSupportedVoiceMimeOption(): VoiceMimeOption | null {
+  if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) {
+    return null;
+  }
+
+  return VOICE_MIME_OPTIONS.find((option) => MediaRecorder.isTypeSupported(option.mimeType)) ?? null;
+}
+
+function getVoiceMimeOptionForBlob(blob: Blob): VoiceMimeOption {
+  const blobType = blob.type.toLowerCase();
+
+  if (blobType.includes("mp4") || blobType.includes("m4a")) {
+    return VOICE_MIME_OPTIONS[1];
+  }
+
+  if (blobType.includes("aac")) {
+    return VOICE_MIME_OPTIONS[2];
+  }
+
+  if (blobType.includes("ogg")) {
+    return VOICE_MIME_OPTIONS[5];
+  }
+
+  return VOICE_MIME_OPTIONS[4];
+}
+
 export function VoiceRecorder({
   ownerId,
   chatId,
@@ -124,13 +194,17 @@ export function VoiceRecorder({
     if (isRecording || audioBlob) return;
 
     try {
+      if (typeof MediaRecorder === "undefined") {
+        throw new Error("MediaRecorder is not supported");
+      }
+
       discardRecordingRef.current = false;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : "audio/webm";
+      const voiceMimeOption = getSupportedVoiceMimeOption();
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = voiceMimeOption
+        ? new MediaRecorder(stream, { mimeType: voiceMimeOption.mimeType })
+        : new MediaRecorder(stream);
 
       streamRef.current = stream;
       mediaRecorderRef.current = recorder;
@@ -159,7 +233,9 @@ export function VoiceRecorder({
           return;
         }
 
-        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const blob = new Blob(chunksRef.current, {
+          type: voiceMimeOption?.uploadMimeType || chunksRef.current[0]?.type || "audio/webm",
+        });
         const url = URL.createObjectURL(blob);
 
         setAudioBlob(blob);
@@ -197,10 +273,11 @@ export function VoiceRecorder({
     setIsUploading(true);
 
     try {
-      const extension = audioBlob.type.includes("ogg") ? "ogg" : "webm";
+      const voiceMimeOption = getVoiceMimeOptionForBlob(audioBlob);
+      const extension = voiceMimeOption.extension;
       const filePath = `${ownerId}/voice/${chatId}-${Date.now()}.${extension}`;
       const file = new File([audioBlob], filePath.split("/").pop() ?? `voice-note.${extension}`, {
-        type: audioBlob.type || `audio/${extension}`,
+        type: voiceMimeOption.uploadMimeType,
       });
 
       const result = await uploadToPrivateBucket("chat-attachments", filePath, file, {
