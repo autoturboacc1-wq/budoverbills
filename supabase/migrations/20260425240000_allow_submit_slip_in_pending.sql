@@ -1,0 +1,147 @@
+-- Further relax submit_installment_slip status gate.
+--
+-- 230000 allowed only 'active' and 'rescheduling'.  Real-world flows have
+-- borrowers submitting evidence of payment while the agreement is still
+-- 'pending_confirmation' (e.g. the lender transferred funds out-of-band and
+-- the borrower wants to log the first repayment before both sides finalise
+-- the in-app confirmation handshake).  The pre-RPC client code never
+-- checked status at all, so that path used to work.
+--
+-- New rule: reject only the terminal states ('completed', 'cancelled') —
+-- everything else is fair game.
+
+CREATE OR REPLACE FUNCTION public.submit_installment_slip(
+  p_installment_id  uuid,
+  p_slip_url        text,
+  p_submitted_amount numeric
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id      uuid := auth.uid();
+  v_installment  public.installments%ROWTYPE;
+  v_agreement    public.debt_agreements%ROWTYPE;
+  v_pending_id   uuid;
+  v_verification_id uuid;
+  v_path_prefix  text;
+  v_is_fee       boolean;
+  v_label        text;
+  v_extra        numeric := 0;
+  v_now          timestamptz := now();
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF coalesce(btrim(p_slip_url), '') = '' OR length(p_slip_url) > 500 THEN
+    RAISE EXCEPTION 'Invalid slip URL';
+  END IF;
+
+  IF p_submitted_amount IS NULL OR p_submitted_amount <= 0 THEN
+    RAISE EXCEPTION 'Invalid submitted amount';
+  END IF;
+
+  SELECT a.*
+  INTO v_agreement
+  FROM public.installments i
+  JOIN public.debt_agreements a ON a.id = i.agreement_id
+  WHERE i.id = p_installment_id
+  FOR UPDATE OF a;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Installment not found';
+  END IF;
+
+  IF v_agreement.borrower_id IS DISTINCT FROM v_user_id THEN
+    RAISE EXCEPTION 'Only the borrower may submit a payment slip';
+  END IF;
+
+  IF v_agreement.status IN ('completed', 'cancelled') THEN
+    RAISE EXCEPTION 'Agreement is not in a payable state (status: %)', v_agreement.status;
+  END IF;
+
+  SELECT *
+  INTO v_installment
+  FROM public.installments
+  WHERE id = p_installment_id
+  FOR UPDATE;
+
+  IF v_installment.confirmed_by_lender OR v_installment.status = 'paid' THEN
+    RAISE EXCEPTION 'Installment is already paid';
+  END IF;
+
+  SELECT id INTO v_pending_id
+  FROM public.slip_verifications
+  WHERE installment_id = p_installment_id
+    AND status = 'pending'
+  LIMIT 1;
+
+  IF v_pending_id IS NOT NULL THEN
+    RAISE EXCEPTION 'A pending slip verification already exists for this installment';
+  END IF;
+
+  IF p_submitted_amount < v_installment.amount THEN
+    RAISE EXCEPTION 'Submitted amount is less than the installment amount';
+  END IF;
+
+  v_path_prefix := v_agreement.id::text || '/installment/' || p_installment_id::text || '-';
+  IF position(v_path_prefix in p_slip_url) <> 1 THEN
+    RAISE EXCEPTION 'Slip URL does not belong to this installment';
+  END IF;
+
+  v_is_fee := COALESCE(v_installment.principal_portion, 0) = 0
+           AND COALESCE(v_installment.amount, 0) > 0;
+  v_label := CASE
+    WHEN v_is_fee THEN 'ค่าเลื่อนงวด'
+    ELSE format('งวดที่ %s', v_installment.installment_number)
+  END;
+
+  IF p_submitted_amount > v_installment.amount THEN
+    v_extra := ROUND(p_submitted_amount - v_installment.amount, 2);
+  END IF;
+
+  INSERT INTO public.slip_verifications (
+    installment_id, agreement_id, submitted_by, submitted_amount,
+    slip_url, status, created_at
+  ) VALUES (
+    p_installment_id, v_agreement.id, v_user_id, p_submitted_amount,
+    p_slip_url, 'pending', v_now
+  )
+  RETURNING id INTO v_verification_id;
+
+  UPDATE public.installments
+  SET payment_proof_url = p_slip_url,
+      status            = CASE WHEN status = 'overdue' THEN 'overdue' ELSE 'pending' END,
+      updated_at        = v_now
+  WHERE id = p_installment_id;
+
+  INSERT INTO public.notifications (user_id, type, title, message, related_type, related_id)
+  VALUES (
+    v_agreement.lender_id,
+    'payment_uploaded',
+    CASE WHEN v_is_fee THEN 'มีการอัปโหลดสลิปค่าเลื่อนงวด' ELSE 'มีการอัปโหลดสลิป' END,
+    CASE
+      WHEN v_extra > 0 THEN format('มีการชำระเงิน%s ยอด ฿%s (เกินค่างวด ฿%s) - รอตรวจสอบสลิป',
+                                    v_label,
+                                    to_char(p_submitted_amount, 'FM999G999G999G990D00'),
+                                    to_char(v_extra, 'FM999G999G999G990D00'))
+      ELSE format('มีการชำระเงิน%s ยอด ฿%s - รอตรวจสอบสลิป',
+                  v_label,
+                  to_char(p_submitted_amount, 'FM999G999G999G990D00'))
+    END,
+    'installment',
+    p_installment_id
+  );
+
+  RETURN jsonb_build_object(
+    'success',           true,
+    'verification_id',   v_verification_id,
+    'installment_id',    p_installment_id,
+    'submitted_amount',  p_submitted_amount,
+    'extra_amount',      v_extra
+  );
+END;
+$$;
