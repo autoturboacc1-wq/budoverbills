@@ -98,6 +98,17 @@ supabase functions deploy send-chat-push-notification --project-ref taihdoldpcbo
 - internal functions ต้อง reject secret ที่ไม่มีหรือผิด
 - cron schedules ต้องยังถูกตั้งใน Supabase dashboard หรือ infra จริง เพราะ repo นี้ไม่ได้ provision ให้อัตโนมัติ
 
+### Payment Reminder Cron Readiness
+
+ก่อนเปิด schedule จริงสำหรับ `payment-reminder-cron`:
+- ตั้ง `INTERNAL_FUNCTION_SECRET` ใน Supabase functions ให้ตรงกับ caller
+- schedule ต้องเรียก `POST` พร้อม header `x-internal-secret`
+- manual invoke ด้วย secret ถูกต้องต้องได้ `success: true`
+- manual invoke ด้วย secret ผิดต้องได้ `401`
+- notification ที่สร้างใหม่ต้องมี `action_url` รูปแบบ `/debt/{agreement_id}?pay={installment_id}`
+- run ซ้ำสำหรับวัน/offset เดิมต้องเพิ่ม `duplicates_skipped` ไม่สร้าง notification ซ้ำ
+- กด notification แล้วต้องเปิดหน้ารายละเอียดสัญญาและ dialog ชำระงวดที่ตรงกับ `pay`
+
 ## 6. Smoke Test Checklist
 
 ### Auth And Access
@@ -122,6 +133,9 @@ supabase functions deploy send-chat-push-notification --project-ref taihdoldpcbo
 - invoke internal functions ด้วย secret ถูกต้องแล้วทำงาน
 - invoke ด้วย secret ผิดแล้วได้ `401`
 - payment reminder ไม่สร้าง notification ซ้ำในวันเดียวกัน
+- payment reminder notification มี `action_url` ไปยัง `/debt/:agreementId?pay=:installmentId`
+- borrower submit slip แล้ว lender notification เปิด review dialog ของงวดนั้นได้
+- lender confirm/reject แล้ว borrower notification เปิด payment dialog ของงวดนั้นได้
 - ถ้า push notifications ยังไม่ส่งจริง end-to-end ให้ block release หรือ hard-disable flow นั้นก่อน
 
 ## 7. Go/No-Go Rule
