@@ -294,7 +294,7 @@ export function useDebtAgreements() {
 
     try {
       const rpc = supabase.rpc.bind(supabase) as unknown as RpcClient;
-      const { data, error } = await rpc('create_agreement_with_installments', {
+      const rpcArgs: Record<string, unknown> = {
         p_lender_id: user.id,
         p_borrower_id: input.borrower_id ?? null,
         p_borrower_phone: input.borrower_phone ?? null,
@@ -319,8 +319,15 @@ export function useDebtAgreements() {
           principal_portion: toMoney(installment.principal_portion),
           interest_portion: toMoney(installment.interest_portion),
         })),
-        p_invitation_token: input.invitation_token ?? null,
-      });
+      };
+      // Only include p_invitation_token when an invite is actually being issued.
+      // PostgREST resolves RPCs by argument names; omitting it lets calls match
+      // either the legacy 18-arg signature or the new 19-arg one (where the
+      // tail param defaults to NULL).
+      if (input.invitation_token) {
+        rpcArgs.p_invitation_token = input.invitation_token;
+      }
+      const { data, error } = await rpc('create_agreement_with_installments', rpcArgs);
 
       if (error) {
         throw error;

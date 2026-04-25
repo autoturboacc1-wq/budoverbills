@@ -1010,6 +1010,7 @@ export function PaymentDialog({
                 ocrStatus={pendingVerification.ocr_status ?? null}
                 ocrAmount={pendingVerification.ocr_amount ?? null}
                 ocrMismatchReasons={pendingVerification.ocr_mismatch_reasons ?? null}
+                submittedAt={pendingVerification.created_at}
               />
 
               <div className="flex gap-3">
@@ -1058,6 +1059,7 @@ export function PaymentDialog({
                 ocrStatus={pendingVerification.ocr_status ?? null}
                 ocrAmount={pendingVerification.ocr_amount ?? null}
                 ocrMismatchReasons={pendingVerification.ocr_mismatch_reasons ?? null}
+                submittedAt={pendingVerification.created_at}
               />
             </>
           )}

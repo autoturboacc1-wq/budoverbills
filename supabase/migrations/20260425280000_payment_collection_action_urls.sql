@@ -134,7 +134,7 @@ BEGIN
     'installment',
     p_installment_id,
     v_action_url,
-    'important'
+    'important'::public.notification_priority
   );
 
   RETURN jsonb_build_object(
@@ -301,7 +301,7 @@ BEGIN
       CASE WHEN v_status_completed THEN 'agreement' ELSE 'installment' END,
       CASE WHEN v_status_completed THEN v_agreement.id ELSE p_installment_id END,
       v_action_url,
-      CASE WHEN v_status_completed THEN 'info' ELSE 'important' END
+      (CASE WHEN v_status_completed THEN 'info' ELSE 'important' END)::public.notification_priority
     );
   END IF;
 
@@ -426,7 +426,7 @@ BEGIN
       'installment',
       p_installment_id,
       v_action_url,
-      'critical'
+      'critical'::public.notification_priority
     );
   END IF;
 

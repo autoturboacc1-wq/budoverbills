@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Check, AlertTriangle, ScanLine, Loader2 } from "lucide-react";
 
 const REASON_LABELS: Record<string, string> = {
@@ -11,10 +12,13 @@ const REASON_LABELS: Record<string, string> = {
   provider_error: "ระบบตรวจสอบสลิปไม่ตอบสนอง",
 };
 
+const OCR_TIMEOUT_MS = 30_000;
+
 interface SlipOcrBadgeProps {
   ocrStatus?: string | null;
   ocrAmount?: number | null;
   ocrMismatchReasons?: string[] | null;
+  submittedAt?: string | null;
   className?: string;
 }
 
@@ -22,9 +26,25 @@ export function SlipOcrBadge({
   ocrStatus,
   ocrAmount,
   ocrMismatchReasons,
+  submittedAt,
   className,
 }: SlipOcrBadgeProps) {
-  if (!ocrStatus) {
+  const elapsedMs = submittedAt ? Date.now() - new Date(submittedAt).getTime() : 0;
+  const initialTimedOut = !ocrStatus && submittedAt != null && elapsedMs >= OCR_TIMEOUT_MS;
+  const [timedOut, setTimedOut] = useState(initialTimedOut);
+
+  useEffect(() => {
+    if (ocrStatus || !submittedAt) return;
+    const remaining = OCR_TIMEOUT_MS - elapsedMs;
+    if (remaining <= 0) {
+      setTimedOut(true);
+      return;
+    }
+    const handle = window.setTimeout(() => setTimedOut(true), remaining);
+    return () => window.clearTimeout(handle);
+  }, [ocrStatus, submittedAt, elapsedMs]);
+
+  if (!ocrStatus && !timedOut) {
     return (
       <div
         className={`flex items-center gap-2 text-xs text-muted-foreground ${className ?? ""}`}
@@ -79,7 +99,7 @@ export function SlipOcrBadge({
     );
   }
 
-  // failed
+  // failed OR timed out (provider not configured / network slow)
   return (
     <div
       className={`flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400 ${className ?? ""}`}

@@ -48,7 +48,7 @@ git status --short
 ```bash
 supabase --version
 supabase login
-supabase link --project-ref taihdoldpcbovubzjjah
+supabase link --project-ref ogztislwhfbipaotdbly
 ```
 
 ถ้าใช้ token ผ่าน environment:
@@ -114,7 +114,7 @@ frontend env ที่ต้องมี:
 ตัวอย่าง:
 
 ```bash
-supabase secrets list --project-ref taihdoldpcbovubzjjah
+supabase secrets list --project-ref ogztislwhfbipaotdbly
 ```
 
 ถ้ายังไม่มี `ADMIN_SESSION_JWT_SECRET` ห้ามเปิดใช้ admin-session path ใน production
@@ -189,12 +189,12 @@ supabase db push --linked
 deploy functions ที่เกี่ยวข้อง:
 
 ```bash
-supabase functions deploy admin-session --project-ref taihdoldpcbovubzjjah
-supabase functions deploy request-client-context --project-ref taihdoldpcbovubzjjah
-supabase functions deploy payment-reminder-cron --project-ref taihdoldpcbovubzjjah
-supabase functions deploy notify-unconfirmed-transfers --project-ref taihdoldpcbovubzjjah
-supabase functions deploy downgrade-expired-trials --project-ref taihdoldpcbovubzjjah
-supabase functions deploy send-chat-push-notification --project-ref taihdoldpcbovubzjjah
+supabase functions deploy admin-session --project-ref ogztislwhfbipaotdbly
+supabase functions deploy request-client-context --project-ref ogztislwhfbipaotdbly
+supabase functions deploy payment-reminder-cron --project-ref ogztislwhfbipaotdbly
+supabase functions deploy notify-unconfirmed-transfers --project-ref ogztislwhfbipaotdbly
+supabase functions deploy downgrade-expired-trials --project-ref ogztislwhfbipaotdbly
+supabase functions deploy send-chat-push-notification --project-ref ogztislwhfbipaotdbly
 ```
 
 หลัง deploy:

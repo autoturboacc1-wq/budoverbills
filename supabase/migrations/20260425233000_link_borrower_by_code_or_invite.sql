@@ -40,7 +40,7 @@ CREATE FUNCTION public.create_agreement_with_installments(
   p_account_number text,
   p_account_name text,
   p_installments jsonb,
-  p_invitation_token text
+  p_invitation_token text DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql

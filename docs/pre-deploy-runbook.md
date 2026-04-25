@@ -10,7 +10,7 @@
 ```bash
 supabase --version
 supabase login
-supabase link --project-ref taihdoldpcbovubzjjah
+supabase link --project-ref ogztislwhfbipaotdbly
 supabase projects list
 ```
 
@@ -82,10 +82,10 @@ supabase db push --linked
 deploy ให้ตรงกับ code ปัจจุบัน:
 
 ```bash
-supabase functions deploy payment-reminder-cron --project-ref taihdoldpcbovubzjjah
-supabase functions deploy notify-unconfirmed-transfers --project-ref taihdoldpcbovubzjjah
-supabase functions deploy downgrade-expired-trials --project-ref taihdoldpcbovubzjjah
-supabase functions deploy send-chat-push-notification --project-ref taihdoldpcbovubzjjah
+supabase functions deploy payment-reminder-cron --project-ref ogztislwhfbipaotdbly
+supabase functions deploy notify-unconfirmed-transfers --project-ref ogztislwhfbipaotdbly
+supabase functions deploy downgrade-expired-trials --project-ref ogztislwhfbipaotdbly
+supabase functions deploy send-chat-push-notification --project-ref ogztislwhfbipaotdbly
 ```
 
 ก่อน deploy ต้องยืนยัน production secrets:
