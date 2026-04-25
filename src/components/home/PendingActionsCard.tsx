@@ -1,12 +1,12 @@
 import { motion } from "framer-motion";
-import { CreditCard, CheckCircle, Clock, AlertTriangle, ChevronRight, Loader2 } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
-import { EmptyState, PageSection } from "@/components/ux";
+import { PageSection } from "@/components/ux";
 
 interface PendingAction {
   id: string;
@@ -259,28 +259,11 @@ export const PendingActionsCard = () => {
   }, [agreementIds, queryClient, user?.id]);
 
   if (isLoading) {
-    return (
-      <div className="surface-panel">
-        <div className="flex items-center justify-center py-6">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (!pendingActions || pendingActions.length === 0) {
-    return (
-      <PageSection
-        title="Primary Action Queue"
-        description="เมื่อไม่มีงานค้าง คุณจะเห็นคิวว่างและกลับมาติดตามได้จากที่นี่"
-      >
-        <EmptyState
-          icon={<CheckCircle className="h-6 w-6" />}
-          title="ไม่มีงานการเงินที่ต้องทำตอนนี้"
-          description="ยังไม่มีรายการค้างชำระ รอยืนยัน หรือคำขอเลื่อนกำหนดที่ต้องจัดการทันที"
-        />
-      </PageSection>
-    );
+    return null;
   }
 
   const formatAmount = (amount: number) => {
@@ -289,8 +272,7 @@ export const PendingActionsCard = () => {
 
   return (
     <PageSection
-      title="Primary Action Queue"
-      description="จัดลำดับงานที่ต้องกดทำตอนนี้ก่อนงานข้อมูลภาพรวม"
+      title="ต้องทำ"
       action={
         <span className="rounded-full border border-destructive/15 bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
           {pendingActions.length} รายการ
@@ -309,11 +291,11 @@ export const PendingActionsCard = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
               onClick={() => navigate(`/debt/${action.agreementId}`)}
-              className={`w-full rounded-[1.1rem] border p-4 text-left transition-colors ${config.bgClass}`}
+              className={`w-full rounded-[1.1rem] border p-3 text-left transition-colors ${config.bgClass}`}
             >
               <div className="flex items-center gap-3">
-                <div className={`flex h-11 w-11 items-center justify-center rounded-full ${config.iconBg}`}>
-                  <Icon className={`w-6 h-6 ${config.iconColor}`} />
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${config.iconBg}`}>
+                  <Icon className={`w-4 h-4 ${config.iconColor}`} />
                 </div>
                 
                 <div className="flex-1 min-w-0">
@@ -321,20 +303,15 @@ export const PendingActionsCard = () => {
                     <span className={`font-medium ${config.iconColor}`}>
                       {action.title}
                     </span>
-                    {action.priority === "critical" && (
-                      <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                        ด่วน!
-                      </span>
-                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground truncate">
+                  <p className="truncate text-xs text-muted-foreground">
                     {action.description}
                   </p>
                 </div>
 
                 {action.amount && (
                   <div className="text-right">
-                    <p className={`font-bold ${config.iconColor}`}>
+                    <p className={`text-sm font-semibold ${config.iconColor}`}>
                       ฿{formatAmount(action.amount)}
                     </p>
                     {action.dueDate && (

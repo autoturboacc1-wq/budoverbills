@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Clock, ArrowRight, Bell } from "lucide-react";
+import { Clock, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DebtAgreement } from "@/hooks/useDebtAgreements";
 import { PageSection } from "@/components/ux";
@@ -27,8 +27,7 @@ export function PendingAgreements({ agreements, userId }: PendingAgreementsProps
 
   return (
     <PageSection
-      title="รอการยืนยัน"
-      description="ข้อตกลงที่ต้องมีอีกฝ่ายกดยืนยันก่อนเริ่มใช้งาน"
+      title="รอยืนยัน"
       action={
         <span className="rounded-full border border-status-pending/20 bg-status-pending/10 px-2.5 py-1 text-xs font-medium text-status-pending">
           {pendingAgreements.length} รายการ
@@ -49,7 +48,7 @@ export function PendingAgreements({ agreements, userId }: PendingAgreementsProps
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
               onClick={() => navigate(`/agreement/${agreement.id}/confirm`)}
-              className={`cursor-pointer rounded-[1.1rem] border p-4 text-left transition-colors ${
+              className={`cursor-pointer rounded-[1.1rem] border p-3 text-left transition-colors ${
                 needsMyConfirmation 
                   ? "border-status-pending/30 bg-status-pending/10 hover:border-status-pending/50"
                   : "border-border/80 bg-card/90 hover:border-foreground/20"
@@ -57,10 +56,10 @@ export function PendingAgreements({ agreements, userId }: PendingAgreementsProps
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-full border ${
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-full border ${
                     needsMyConfirmation ? "border-status-pending/20 bg-status-pending/10" : "border-border/80 bg-secondary/60"
                   }`}>
-                    <Clock className={`w-5 h-5 ${
+                    <Clock className={`w-4 h-4 ${
                       needsMyConfirmation ? "text-status-pending" : "text-muted-foreground"
                     }`} />
                   </div>

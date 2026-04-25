@@ -16,6 +16,7 @@ export function ProtectedRoute({ requireAdminSession = false }: ProtectedRoutePr
   const hasAdminAccess = isAdmin || isModerator;
   const isOnPersonalInfoPage = location.pathname === '/personal-info';
   const isOnPdpaPage = location.pathname === '/pdpa-consent';
+  const requiresPersonalInfo = location.pathname === '/create' || location.pathname.startsWith('/agreement/');
   const [adminSessionValid, setAdminSessionValid] = useState<boolean | null>(requireAdminSession ? null : true);
 
   useEffect(() => {
@@ -62,16 +63,12 @@ export function ProtectedRoute({ requireAdminSession = false }: ProtectedRoutePr
     return <Navigate to="/auth" replace state={{ from: location }} />;
   }
 
-  if (!profile?.first_name && !isOnPersonalInfoPage) {
+  if (!profile?.first_name && requiresPersonalInfo && !isOnPersonalInfoPage) {
     return <Navigate to="/personal-info" replace />;
   }
 
-  if (profile?.first_name && !profile.pdpa_accepted_at && !isOnPdpaPage) {
+  if (profile && !profile.pdpa_accepted_at && !isOnPdpaPage) {
     return <Navigate to="/pdpa-consent" replace />;
-  }
-
-  if (!profile?.first_name && isOnPdpaPage) {
-    return <Navigate to="/personal-info" replace />;
   }
 
   if (requireAdminSession) {

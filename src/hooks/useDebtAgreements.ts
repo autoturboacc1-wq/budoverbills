@@ -319,6 +319,7 @@ export function useDebtAgreements() {
           principal_portion: toMoney(installment.principal_portion),
           interest_portion: toMoney(installment.interest_portion),
         })),
+        p_invitation_token: input.invitation_token ?? null,
       });
 
       if (error) {

@@ -1,76 +1,19 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, MailCheck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRateLimiter } from "@/hooks/useRateLimiter";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { z } from "zod";
 import { BobLogo } from "@/components/BobLogo";
 import { getSafeInternalPath } from "@/utils/navigation";
-import { InlineValidationMessage } from "@/components/ux";
 import { PageTransition } from "@/components/ux/PageTransition";
 
-const emailSchema = z.string().email("อีเมลไม่ถูกต้อง");
-const passwordSchema = z.string().min(6, "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
-
-function getSafeAuthErrorMessage(error: unknown, fallback: string): string {
-  if (!(error instanceof Error)) {
-    return fallback;
-  }
-
-  const message = error.message.toLowerCase();
-
-  if (message.includes("invalid login") || message.includes("invalid credentials") || message.includes("wrong password")) {
-    return "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
-  }
-
-  if (message.includes("already registered") || message.includes("already been registered")) {
-    return "อีเมลนี้ถูกใช้งานแล้ว";
-  }
-
-  if (message.includes("email not confirmed")) {
-    return "กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ";
-  }
-
-  if (message.includes("weak password") || message.includes("password should be")) {
-    return "รหัสผ่านไม่ผ่านเงื่อนไขความปลอดภัย";
-  }
-
-  return fallback;
-}
-
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [resetEmailSent, setResetEmailSent] = useState(false);
-
-  const { signIn, signUp, signInWithGoogle, user, profile, isPasswordRecovery } = useAuth();
+  const { signInWithGoogle, user, profile, isPasswordRecovery } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Rate limiting for login attempts
-  const { 
-    isBlocked, 
-    remainingAttempts, 
-    blockTimeRemaining, 
-    recordAttempt 
-  } = useRateLimiter('auth_login', {
-    maxAttempts: 5,
-    windowMs: 60 * 1000, // 1 minute
-    blockDurationMs: 5 * 60 * 1000, // 5 minutes
-  });
 
   const locationState = location.state as { from?: { pathname?: string }; returnTo?: string } | null;
   const fromQuery = new URLSearchParams(location.search).get("from");
@@ -84,19 +27,13 @@ export default function Auth() {
           return;
         }
         
-        // If user hasn't filled personal info (no first_name), redirect there
-        if (profile && !profile.first_name) {
-          navigate("/personal-info", { replace: true });
-          return;
-        }
-        
         // If user hasn't accepted PDPA yet, redirect to PDPA consent
         if (profile && !profile.pdpa_accepted_at) {
           navigate("/pdpa-consent", { replace: true });
           return;
         }
         
-        if (profile?.pdpa_accepted_at) {
+        if (!profile || profile.pdpa_accepted_at) {
           // Check if user is admin or moderator
           const { data: roles } = await supabase
             .from("user_roles")
@@ -119,63 +56,6 @@ export default function Auth() {
     checkRoleAndRedirect();
   }, [user, profile, navigate, from, isPasswordRecovery, isRecoveryCallback]);
 
-  const validateForm = () => {
-    const newErrors: { email?: string; password?: string } = {};
-
-    try {
-      emailSchema.parse(email);
-    } catch (e) {
-      newErrors.email = "อีเมลไม่ถูกต้อง";
-    }
-
-    try {
-      passwordSchema.parse(password);
-    } catch (e) {
-      newErrors.password = "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Check rate limit for login
-    if (isLogin && isBlocked) {
-      toast.error(`กรุณารอ ${blockTimeRemaining} วินาที ก่อนลองอีกครั้ง`);
-      return;
-    }
-
-    if (!validateForm()) return;
-
-    setIsLoading(true);
-
-    try {
-      if (isLogin) {
-        const { error } = await signIn(email, password);
-        if (error) {
-          const result = recordAttempt(false);
-          const message = getSafeAuthErrorMessage(error, "เข้าสู่ระบบไม่สำเร็จ");
-          toast.error(result.message ? `${message} (${result.message})` : message);
-        } else {
-          recordAttempt(true);
-          toast.success("เข้าสู่ระบบสำเร็จ");
-        }
-      } else {
-        const { error } = await signUp(email, password, displayName);
-        if (error) {
-          toast.error(getSafeAuthErrorMessage(error, "สร้างบัญชีไม่สำเร็จ"));
-        } else {
-          // Show email confirmation screen
-          setShowEmailConfirmation(true);
-        }
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleGoogleSignIn = async () => {
     const { error } = await signInWithGoogle(from);
     if (error) {
@@ -183,247 +63,6 @@ export default function Auth() {
       console.error("Google sign in error:", error);
     }
   };
-
-  const handleLineSignIn = async () => {
-    toast.info("การเข้าสู่ระบบด้วย LINE กำลังพัฒนา");
-  };
-
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      emailSchema.parse(email);
-    } catch {
-      setErrors({ email: "กรุณากรอกอีเมลที่ถูกต้อง" });
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      const redirectUrl = `${window.location.origin}/auth?type=recovery`;
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectUrl,
-      });
-      
-      if (error) {
-        toast.error("ไม่สามารถส่งลิงก์รีเซ็ตรหัสผ่านได้");
-      } else {
-        setResetEmailSent(true);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Forgot Password Screen
-  if (showForgotPassword) {
-    if (resetEmailSent) {
-      return (
-        <PageTransition>
-        <div className="min-h-screen bg-gradient-hero flex flex-col">
-          <div className="p-4">
-              <button
-                onClick={() => {
-                  setShowForgotPassword(false);
-                  setResetEmailSent(false);
-                }}
-                type="button"
-                aria-label="กลับ"
-                className="p-2 -ml-2 hover:bg-secondary/50 rounded-full transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 text-foreground" aria-hidden="true" />
-              </button>
-          </div>
-
-          <div className="flex-1 flex flex-col justify-center items-center px-6 pb-12">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="max-w-sm mx-auto w-full text-center"
-            >
-              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <MailCheck className="w-10 h-10 text-primary" aria-hidden="true" />
-              </div>
-              
-              <h1 className="text-2xl font-heading font-semibold text-foreground mb-3">
-                ตรวจสอบอีเมลของคุณ
-              </h1>
-              
-              <p className="text-muted-foreground mb-2">
-                เราได้ส่งลิงก์รีเซ็ตรหัสผ่านไปที่
-              </p>
-              <p className="font-medium text-foreground mb-6">
-                {email}
-              </p>
-              
-              <div className="bg-secondary/50 rounded-xl p-4 mb-6">
-                <p className="text-sm text-muted-foreground">
-                  กรุณาคลิกลิงก์ในอีเมลเพื่อตั้งรหัสผ่านใหม่
-                  <br />
-                  หากไม่พบอีเมล กรุณาตรวจสอบโฟลเดอร์จดหมายขยะ (Spam)
-                </p>
-              </div>
-
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  setShowForgotPassword(false);
-                  setResetEmailSent(false);
-                  setIsLogin(true);
-                }}
-              >
-                กลับไปหน้าเข้าสู่ระบบ
-              </Button>
-            </motion.div>
-          </div>
-        </div>
-        </PageTransition>
-      );
-    }
-
-    return (
-      <PageTransition>
-      <div className="min-h-screen bg-gradient-hero flex flex-col">
-        <div className="p-4">
-          <button
-            onClick={() => setShowForgotPassword(false)}
-            type="button"
-            aria-label="กลับ"
-            className="p-2 -ml-2 hover:bg-secondary/50 rounded-full transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-foreground" aria-hidden="true" />
-          </button>
-        </div>
-
-        <div className="flex-1 flex flex-col justify-center px-6 pb-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-sm mx-auto w-full"
-          >
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-8 h-8 text-primary" aria-hidden="true" />
-              </div>
-              <h1 className="text-2xl font-heading font-semibold text-foreground">
-                ลืมรหัสผ่าน?
-              </h1>
-              <p className="text-muted-foreground mt-2">
-                กรอกอีเมลที่ใช้สมัครสมาชิก เราจะส่งลิงก์รีเซ็ตรหัสผ่านให้คุณ
-              </p>
-            </div>
-
-            <form onSubmit={handleForgotPassword} className="space-y-4">
-              <div>
-                <Label htmlFor="resetEmail" className="text-foreground">
-                  อีเมล
-                </Label>
-                <div className="relative mt-1">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-                  <Input
-                    id="resetEmail"
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setErrors({});
-                    }}
-                    placeholder="name@example.com"
-                    className={`pl-10 h-12 ${errors.email ? "border-destructive" : ""}`}
-                    autoComplete="email"
-                  />
-                </div>
-                {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
-              </div>
-
-              <Button 
-                type="submit" 
-                className="w-full h-12 text-base" 
-                disabled={isLoading}
-              >
-                {isLoading ? "กำลังส่ง..." : "ส่งลิงก์รีเซ็ตรหัสผ่าน"}
-              </Button>
-            </form>
-
-            <p className="text-center text-muted-foreground mt-6">
-              จำรหัสผ่านได้แล้ว?{" "}
-              <button
-                type="button"
-                onClick={() => setShowForgotPassword(false)}
-                className="text-primary font-medium hover:underline"
-              >
-                เข้าสู่ระบบ
-              </button>
-            </p>
-          </motion.div>
-        </div>
-      </div>
-      </PageTransition>
-    );
-  }
-
-  // Email Confirmation Screen
-  if (showEmailConfirmation) {
-    return (
-      <PageTransition>
-      <div className="min-h-screen bg-gradient-hero flex flex-col">
-        <div className="p-4">
-          <button
-            onClick={() => setShowEmailConfirmation(false)}
-            type="button"
-            aria-label="กลับ"
-            className="p-2 -ml-2 hover:bg-secondary/50 rounded-full transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-foreground" aria-hidden="true" />
-          </button>
-        </div>
-
-        <div className="flex-1 flex flex-col justify-center items-center px-6 pb-12">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="max-w-sm mx-auto w-full text-center"
-          >
-            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <MailCheck className="w-10 h-10 text-primary" aria-hidden="true" />
-            </div>
-            
-            <h1 className="text-2xl font-heading font-semibold text-foreground mb-3">
-              ยืนยันอีเมลของคุณ
-            </h1>
-            
-            <p className="text-muted-foreground mb-2">
-              เราได้ส่งลิงก์ยืนยันไปที่
-            </p>
-            <p className="font-medium text-foreground mb-6">
-              {email}
-            </p>
-            
-            <div className="bg-secondary/50 rounded-xl p-4 mb-6">
-              <p className="text-sm text-muted-foreground">
-                กรุณาคลิกลิงก์ในอีเมลเพื่อยืนยันบัญชีของคุณ
-                <br />
-                หากไม่พบอีเมล กรุณาตรวจสอบโฟลเดอร์จดหมายขยะ (Spam)
-              </p>
-            </div>
-
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setShowEmailConfirmation(false);
-                setIsLogin(true);
-              }}
-            >
-              กลับไปหน้าเข้าสู่ระบบ
-            </Button>
-          </motion.div>
-        </div>
-      </div>
-      </PageTransition>
-    );
-  }
 
   return (
     <PageTransition>
@@ -454,12 +93,10 @@ export default function Auth() {
               การเข้าถึงแบบปลอดภัย
             </p>
             <h1 className="mt-1 text-2xl font-heading font-semibold text-foreground">
-              {isLogin ? "เข้าสู่ระบบอย่างปลอดภัย" : "สร้างบัญชี Bud Over Bills"}
+              เข้าสู่ระบบด้วย Google
             </h1>
             <p className="text-muted-foreground mt-2">
-              {isLogin
-                ? "เข้าถึงข้อตกลง การชำระ และหลักฐานของคุณในมุมมองเดียว"
-                : "เริ่มต้นด้วยบัญชีสำหรับจัดการข้อตกลงทางการเงินอย่างเป็นระบบ"}
+              ใช้บัญชี Google เพื่อสมัครและเข้าสู่ระบบ Bud Over Bills
             </p>
           </div>
 
@@ -485,148 +122,10 @@ export default function Auth() {
               </svg>
               เข้าสู่ระบบด้วย Google
             </Button>
-
-            <Button
-              variant="outline"
-              className="w-full h-12 text-base bg-[#06C755] hover:bg-[#06C755]/90 text-white border-[#06C755]"
-              onClick={handleLineSignIn}
-              type="button"
-            >
-              <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-              </svg>
-              เข้าสู่ระบบด้วย LINE
-            </Button>
           </div>
-
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-background text-muted-foreground">หรือใช้อีเมลและรหัสผ่าน</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="surface-panel space-y-4">
-            {!isLogin && (
-              <div>
-                <Label htmlFor="displayName" className="text-foreground">
-                  ชื่อที่แสดง
-                </Label>
-                <div className="relative mt-1">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-                  <Input
-                    id="displayName"
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="ชื่อของคุณ"
-                    className="pl-10 h-12"
-                    autoComplete="name"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <Label htmlFor="email" className="text-foreground">
-                อีเมล
-              </Label>
-              <div className="relative mt-1">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className={`pl-10 h-12 ${errors.email ? "border-destructive" : ""}`}
-                  autoComplete="email"
-                />
-              </div>
-              {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
-            </div>
-
-            <div>
-              <Label htmlFor="password" className="text-foreground">
-                รหัสผ่าน
-              </Label>
-              <div className="relative mt-1">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className={`pl-10 pr-10 h-12 ${errors.password ? "border-destructive" : ""}`}
-                  autoComplete={isLogin ? "current-password" : "new-password"}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
-                </button>
-              </div>
-              {errors.password && (
-                <p className="text-destructive text-sm mt-1">{errors.password}</p>
-              )}
-              {isLogin && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForgotPassword(true);
-                    setErrors({});
-                  }}
-                  className="text-sm text-primary hover:underline"
-                >
-                  ลืมรหัสผ่าน?
-                </button>
-              )}
-            </div>
-
-            {isLogin && isBlocked && (
-              <InlineValidationMessage
-                message={`ลองผิดเกินกำหนด กรุณารอ ${blockTimeRemaining} วินาที`}
-              />
-            )}
-
-            {isLogin && !isBlocked && remainingAttempts < 5 && remainingAttempts > 0 && (
-              <InlineValidationMessage
-                tone="warning"
-                message={`เหลือโอกาสอีก ${remainingAttempts} ครั้งก่อนระบบพักการลองชั่วคราว`}
-              />
-            )}
-
-            <Button 
-              type="submit" 
-              className="w-full h-12 text-base" 
-              disabled={isLoading || (isLogin && isBlocked)}
-            >
-              {isLoading ? "กำลังดำเนินการ..." : isLogin ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
-            </Button>
-          </form>
 
           <div className="surface-panel mt-5">
-            <p className="text-center text-muted-foreground">
-            {isLogin ? "ยังไม่มีบัญชี?" : "มีบัญชีแล้ว?"}{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setErrors({});
-              }}
-              className="text-primary font-medium hover:underline"
-            >
-              {isLogin ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}
-            </button>
-            </p>
-
-            <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap justify-center gap-2 text-sm text-muted-foreground">
               <Link to="/terms" className="hover:text-foreground transition-colors">
                 ข้อกำหนดการใช้งาน
               </Link>

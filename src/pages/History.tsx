@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, FileText, Check, Calendar, Loader2, Download } from "lucide-react";
+import { ArrowLeft, FileText, Check, Calendar, Loader2, Download, Sparkles } from "lucide-react";
 import { PageTransition } from "@/components/ux/PageTransition";
 import { useNavigate } from "react-router-dom";
 import { useDebtAgreements } from "@/hooks/useDebtAgreements";
@@ -17,6 +17,7 @@ import {
   mapToCompletedAgreements,
   getAgreementDisplayStatus,
   CompletedAgreementData,
+  calculateRemainingAmount,
 } from "@/domains/debt";
 
 export default function History() {
@@ -46,6 +47,15 @@ export default function History() {
   // Use domain function for completed agreements
   const completedAgreements = useMemo<CompletedAgreementData[]>(() => {
     return mapToCompletedAgreements(agreements, user?.id);
+  }, [agreements, user?.id]);
+
+  const borrowerActiveAgreements = useMemo(() => {
+    return agreements.filter(
+      (agreement) =>
+        !isUserLender(agreement, user?.id) &&
+        agreement.status === "active" &&
+        calculateRemainingAmount(agreement.installments) > 0,
+    );
   }, [agreements, user?.id]);
 
   // Summary stats

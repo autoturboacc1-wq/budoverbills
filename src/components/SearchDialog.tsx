@@ -28,7 +28,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       navigate("/create", {
         state: {
           partnerName: result.name,
-          partnerPhone: result.subtitle === "ไม่มีเบอร์โทร" ? "" : result.subtitle,
         },
       });
     }

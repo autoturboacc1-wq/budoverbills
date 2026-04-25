@@ -49,7 +49,7 @@ export default function AgreementConfirm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { getAgreement, refresh } = useDebtAgreements();
+  const { getAgreement, refresh, isLoading } = useDebtAgreements();
   const [agreement, setAgreement] = useState<DebtAgreement | null>(null);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -322,6 +322,14 @@ export default function AgreementConfirm() {
     flat: "Flat Rate",
     effective: "Effective Rate",
   };
+
+  if (!agreement && isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+      </div>
+    );
+  }
 
   if (!agreement) {
     return (

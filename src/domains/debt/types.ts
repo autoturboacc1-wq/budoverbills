@@ -78,6 +78,7 @@ export interface CreateAgreementInput {
   borrower_id?: string;
   borrower_phone?: string;
   borrower_name?: string;
+  invitation_token?: string;
   principal_amount: number;
   interest_rate: number;
   interest_type: InterestType;

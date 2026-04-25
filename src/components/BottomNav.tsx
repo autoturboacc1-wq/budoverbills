@@ -1,6 +1,6 @@
-import { Bell, CalendarCheck, FileText, Plus, User } from "lucide-react";
+import { CalendarCheck, FileText, MessageCircle, Plus, User } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useUnreadChatMessageCount } from "@/hooks/useGlobalChatNotification";
 
 interface NavItem {
   icon?: React.ElementType;
@@ -13,15 +13,13 @@ interface NavItem {
 export function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { notifications } = useNotifications();
-
-  const unreadNotifications = notifications?.filter((n) => !n.is_read).length || 0;
+  const unreadMessages = useUnreadChatMessageCount();
 
   const navItems: NavItem[] = [
     { icon: CalendarCheck, label: "ภาพรวม", path: "/" },
     { icon: FileText, label: "ประวัติ", path: "/history" },
     { icon: Plus, label: "ปล่อยยืม", path: "/create", isPrimary: true },
-    { icon: Bell, label: "แจ้งเตือน", path: "/notifications", badge: unreadNotifications },
+    { icon: MessageCircle, label: "แชท", path: "/chat", badge: unreadMessages },
     { icon: User, label: "โปรไฟล์", path: "/profile" },
   ];
 

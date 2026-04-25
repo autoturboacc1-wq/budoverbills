@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
 import { PageTransition } from "@/components/ux/PageTransition";
-import { User, Calendar, Percent, Calculator, Info, AlertTriangle, ShieldCheck, Coins, Building, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight, Send, User, Calendar, Percent, Calculator, Info, AlertTriangle, Coins, Building, CheckCircle, Loader2, Scan, Link as LinkIcon } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useDebtAgreements, CreateAgreementInput } from "@/hooks/useDebtAgreements";
 import { useAuth } from "@/contexts/AuthContext";
 import { PasswordConfirmDialog } from "@/components/PasswordConfirmDialog";
+import { QRCodeScanner } from "@/components/QRCodeScanner";
 import { supabase } from "@/integrations/supabase/client";
 import { THAI_BANKS } from "@/constants/thaibanks";
 import { buildEffectiveRateSchedule, getPeriodsPerYear } from "@/domains/debt/recalculateEffectiveRateSchedule";
@@ -27,6 +28,7 @@ import {
   InlineValidationMessage,
   PageHeader,
   PrimaryActionBar,
+  ReviewPanel,
   StepFlowLayout,
 } from "@/components/ux";
 
@@ -47,7 +49,14 @@ interface PaymentScheduleItem {
   interest: number;
 }
 
+interface BorrowerProfile {
+  user_id: string;
+  display_name: string | null;
+  user_code: string;
+}
+
 const BANGKOK_TIME_ZONE = "Asia/Bangkok";
+const BORROWER_CODE_LENGTH = 8;
 const bangkokDateFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: BANGKOK_TIME_ZONE,
   year: "numeric",
@@ -86,6 +95,25 @@ const addBangkokMonths = (date: Date, months: number) => {
   return nextDate;
 };
 
+const normalizeBorrowerCode = (value: string) =>
+  value.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, BORROWER_CODE_LENGTH);
+
+const extractBorrowerCodeFromQr = (decodedText: string) => {
+  const trimmed = decodedText.trim();
+  const appLinkMatch = trimmed.match(/debtmate:\/\/add-friend\/([A-Z0-9]{8})/i);
+  if (appLinkMatch?.[1]) {
+    return normalizeBorrowerCode(appLinkMatch[1]);
+  }
+
+  return /^[A-Z0-9]{8}$/i.test(trimmed) ? normalizeBorrowerCode(trimmed) : null;
+};
+
+const createInvitationToken = () => {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
 export default function CreateAgreement() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -93,10 +121,14 @@ export default function CreateAgreement() {
   const { createAgreement } = useDebtAgreements();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const [showBorrowerScanner, setShowBorrowerScanner] = useState(false);
+  const [borrowerProfile, setBorrowerProfile] = useState<BorrowerProfile | null>(null);
+  const [borrowerCodeError, setBorrowerCodeError] = useState<string | null>(null);
+  const [isResolvingBorrower, setIsResolvingBorrower] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   
   const [formData, setFormData] = useState({
-    partnerPhone: "",
+    partnerCode: "",
     partnerName: "",
     amount: "",
     installments: "4",
@@ -113,15 +145,102 @@ export default function CreateAgreement() {
   });
 
   useEffect(() => {
-    const state = location.state as { partnerName?: string; partnerPhone?: string } | null;
-    if (!state?.partnerName && !state?.partnerPhone) return;
+    const state = location.state as { partnerName?: string; partnerCode?: string } | null;
+    if (!state?.partnerName && !state?.partnerCode) return;
 
     setFormData((prev) => ({
       ...prev,
       partnerName: prev.partnerName || state.partnerName || "",
-      partnerPhone: prev.partnerPhone || state.partnerPhone || "",
+      partnerCode: prev.partnerCode || normalizeBorrowerCode(state.partnerCode || ""),
     }));
   }, [location.state]);
+
+  const lookupBorrowerByCode = useCallback(async (code: string) => {
+    const { data, error } = await supabase.rpc("search_profile_by_code", {
+      search_code: normalizeBorrowerCode(code),
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (!Array.isArray(data) || data.length === 0) {
+      return null;
+    }
+
+    return data[0] as BorrowerProfile;
+  }, []);
+
+  const handleBorrowerQrScanned = useCallback((decodedText: string) => {
+    const code = extractBorrowerCodeFromQr(decodedText);
+    if (!code) {
+      toast.error("QR code ไม่ถูกต้อง");
+      return;
+    }
+
+    setFormData((prev) => ({ ...prev, partnerCode: code }));
+  }, []);
+
+  useEffect(() => {
+    const code = normalizeBorrowerCode(formData.partnerCode);
+
+    if (!code) {
+      setBorrowerProfile(null);
+      setBorrowerCodeError(null);
+      setIsResolvingBorrower(false);
+      return;
+    }
+
+    if (code.length < BORROWER_CODE_LENGTH) {
+      setBorrowerProfile(null);
+      setBorrowerCodeError(null);
+      setIsResolvingBorrower(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsResolvingBorrower(true);
+    setBorrowerCodeError(null);
+
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const profile = await lookupBorrowerByCode(code);
+
+          if (cancelled) {
+            return;
+          }
+
+          if (!profile) {
+            setBorrowerProfile(null);
+            setBorrowerCodeError("ไม่พบผู้ใช้รหัสนี้");
+            return;
+          }
+
+          setBorrowerProfile(profile);
+          setFormData((prev) => ({
+            ...prev,
+            partnerName: prev.partnerName || profile.display_name || `User ${profile.user_code}`,
+          }));
+        } catch (error) {
+          if (!cancelled) {
+            console.error("Borrower code lookup error:", error);
+            setBorrowerProfile(null);
+            setBorrowerCodeError("ตรวจสอบรหัสผู้ยืมไม่สำเร็จ");
+          }
+        } finally {
+          if (!cancelled) {
+            setIsResolvingBorrower(false);
+          }
+        }
+      })();
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [formData.partnerCode, lookupBorrowerByCode]);
 
   // Fetch bank account from previous agreements
   useEffect(() => {
@@ -200,6 +319,22 @@ export default function CreateAgreement() {
       return;
     }
 
+    const borrowerCode = normalizeBorrowerCode(formData.partnerCode);
+    if (borrowerCode && borrowerCode.length !== BORROWER_CODE_LENGTH) {
+      toast.error("รหัสผู้ยืมต้องมี 8 ตัวอักษร");
+      return;
+    }
+
+    if (isResolvingBorrower) {
+      toast.error("กรุณารอระบบตรวจสอบรหัสผู้ยืม");
+      return;
+    }
+
+    if (borrowerCode && !borrowerProfile) {
+      toast.error(borrowerCodeError || "ไม่พบผู้ใช้รหัสนี้");
+      return;
+    }
+
     // Show password confirmation dialog
     setShowPasswordConfirm(true);
   };
@@ -209,10 +344,12 @@ export default function CreateAgreement() {
     setIsSubmitting(true);
 
     try {
+      const invitationToken = borrowerProfile ? undefined : createInvitationToken();
       const input: CreateAgreementInput = {
-        borrower_id: undefined,
-        borrower_phone: formData.partnerPhone || undefined,
+        borrower_id: borrowerProfile?.user_id,
+        borrower_phone: undefined,
         borrower_name: formData.partnerName.trim() || undefined,
+        invitation_token: invitationToken,
         principal_amount: principalAmount,
         interest_rate: annualInterestRate,
         interest_type: formData.interestType,
@@ -239,7 +376,21 @@ export default function CreateAgreement() {
       const result = await createAgreement(input);
 
       if (result) {
-        toast.success("ส่งคำขอให้ผู้ยืมยืนยันสำเร็จ");
+        if (invitationToken) {
+          const inviteUrl = `${window.location.origin}/agreement/invite/${invitationToken}`;
+          try {
+            await navigator.clipboard.writeText(inviteUrl);
+            toast.success("สร้างข้อตกลงและคัดลอกลิงก์เชิญแล้ว", {
+              description: "ส่งลิงก์นี้ให้ผู้ยืมเพื่อผูกบัญชีและยืนยันข้อตกลง",
+            });
+          } catch {
+            toast.success("สร้างข้อตกลงสำเร็จ", {
+              description: inviteUrl,
+            });
+          }
+        } else {
+          toast.success("ส่งคำขอให้ผู้ยืมยืนยันสำเร็จ");
+        }
         navigate("/");
       }
     } catch (err: unknown) {
@@ -379,9 +530,9 @@ export default function CreateAgreement() {
   }, [annualInterestRate, formData.frequency, formData.interestType, formData.rescheduleFeeRate, formData.rescheduleInterestPercent, installmentCount, principalAmount, principalPerInstallment, selectedCalculation]);
 
   const interestTypeLabels: Record<InterestType, { title: string; desc: string }> = {
-    none: { title: "ไม่คิดดอกเบี้ย", desc: "แบ่งจ่ายเท่ากันทุกงวด" },
-    flat: { title: "Flat Rate", desc: "ดอกเบี้ยคงที่ เหมาะกับยืมเพื่อน" },
-    effective: { title: "Effective Rate", desc: "ลดต้นลดดอก แบบสถาบันการเงิน" },
+    none: { title: "ไม่มีดอก", desc: "จ่ายเท่ากัน" },
+    flat: { title: "Flat", desc: "ดอกคงที่" },
+    effective: { title: "Effective", desc: "ลดต้นลดดอก" },
   };
 
   // Generate payment schedule dates
@@ -451,24 +602,66 @@ export default function CreateAgreement() {
     monthly: "รายเดือน",
   };
 
+  const borrowerCode = normalizeBorrowerCode(formData.partnerCode);
+  const hasBorrowerCode = borrowerCode.length > 0;
+  const isBorrowerCodeComplete = borrowerCode.length === BORROWER_CODE_LENGTH;
+  const canUseBorrowerCode =
+    !hasBorrowerCode || (isBorrowerCodeComplete && Boolean(borrowerProfile) && !borrowerCodeError);
+
   const stepDefinitions = [
-    { title: "ข้อมูลผู้ยืม", description: "ระบุชื่อและเบอร์ของผู้ยืม" },
-    { title: "กำหนดวงเงิน", description: "ตั้งเงินต้น งวด และดอกเบี้ย" },
-    { title: "บัญชีรับชำระคืน", description: "บัญชีของคุณสำหรับให้ผู้ยืมโอนคืน" },
-    { title: "ตรวจสอบก่อนส่ง", description: "สรุปเงื่อนไขและยืนยัน" },
+    { title: "ผู้ยืม", description: "ชื่อและรหัส" },
+    { title: "ยอดเงิน", description: "เงิน งวด ดอก" },
+    { title: "บัญชี", description: "รับเงินคืน" },
+    { title: "ตรวจสอบ", description: "Review all" },
   ];
 
   const canProceedByStep = [
-    !!formData.partnerName.trim(),
-    !!formData.amount && principalAmount > 0 && installmentCount > 0,
-    !!selectedCalculation && paymentSchedule.length > 0 && !!formData.bankName && !!formData.accountNumber,
-    !!selectedCalculation && !!formData.partnerName.trim(),
+    !!formData.partnerName.trim() && canUseBorrowerCode && !isResolvingBorrower,
+    !!formData.amount && principalAmount > 0 && installmentCount > 0 && !!selectedCalculation,
+    !!formData.bankName && !!formData.accountNumber,
+    !!selectedCalculation && !!formData.partnerName.trim() && canUseBorrowerCode && !isResolvingBorrower && !!formData.amount && !!formData.bankName && !!formData.accountNumber,
   ];
 
+  const selectedBankLabel =
+    THAI_BANKS.find((bank) => bank.value === formData.bankName)?.label || formData.bankName || "ยังไม่ได้เลือก";
+
+  const reviewRows = selectedCalculation
+    ? [
+        { label: "ผู้ยืม", value: formData.partnerName || "-" },
+        {
+          label: "การผูกบัญชีผู้ยืม",
+          value: borrowerProfile ? `รหัส ${borrowerProfile.user_code}` : "ลิงก์เชิญให้มายืนยัน",
+        },
+        { label: "เงินต้น", value: `฿${principalAmount.toLocaleString()}` },
+        {
+          label: "โครงสร้างดอกเบี้ย",
+          value:
+            formData.interestType === "none"
+              ? "ไม่คิดดอกเบี้ย"
+              : `${interestTypeLabels[formData.interestType].title} ${annualInterestRate.toLocaleString()}% ต่อปี`,
+        },
+        {
+          label: "แผนการชำระ",
+          value: `${installmentCount} งวด / ${frequencyLabels[formData.frequency]}`,
+          hint:
+            formData.frequency === "weekly"
+              ? `ทุกวัน${THAI_DAY_NAMES[Number(formData.weeklyDay)]}`
+              : `เริ่ม ${parseBangkokDate(formData.startDate)?.toLocaleDateString("th-TH") || formData.startDate}`,
+        },
+        { label: "ชำระต่องวด", value: `฿${selectedCalculation.perInstallment.toLocaleString()}` },
+        { label: "ยอดรวมทั้งหมด", value: `฿${selectedCalculation.totalAmount.toLocaleString()}` },
+        {
+          label: "ค่าเลื่อนงวด",
+          value: `฿${rescheduleFeeAnalysis.feePerRequest.toLocaleString()}/ครั้ง`,
+        },
+        { label: "บัญชีรับเงิน", value: selectedBankLabel },
+        { label: "เลขบัญชี/PromptPay", value: formData.accountNumber || "-" },
+        { label: "ชื่อบัญชี", value: formData.accountName || "-" },
+      ]
+    : [];
+
   useEffect(() => {
-    const sectionIds = ["agreement-step-0", "agreement-step-1", "agreement-step-2", "agreement-step-3"];
-    const target = document.getElementById(sectionIds[currentStep]);
-    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentStep]);
 
   return (
@@ -477,69 +670,13 @@ export default function CreateAgreement() {
       <div className="page-shell">
         <PageHeader
           eyebrow="สำหรับผู้ให้ยืม"
-          title="ปล่อยยืมและสร้างข้อตกลง"
-          description="หน้านี้ใช้เมื่อคุณเป็นฝ่ายปล่อยเงินให้เพื่อนยืม ผู้ยืมไม่ต้องเข้ามาสร้างเอง แต่จะได้รับคำขอให้เข้ามายืนยันภายหลัง"
+          title="สร้างข้อตกลง"
+          description="กรอกข้อมูล แล้วส่งให้ผู้ยืมยืนยัน"
           onBack={() => navigate(-1)}
         />
 
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="mb-4 grid gap-3 md:grid-cols-2"
-        >
-          <div className="rounded-[1.25rem] border border-primary/15 bg-primary/5 p-4">
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary/15 bg-primary/5 text-primary">
-                <ArrowUpRight className="h-5 w-5" />
-              </span>
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-foreground">ฉันเป็นคนปล่อยยืม</p>
-                <p className="text-sm text-foreground">
-                  flow นี้ถูกต้องสำหรับกรณีที่ <span className="font-medium">คุณเป็นผู้ให้ยืม</span> และกำลังเลือกคนที่จะรับเงินไป
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  คุณจะเป็นคนตั้งวงเงิน งวด ดอกเบี้ย และบัญชีรับชำระคืน
-                </p>
-                {formData.partnerName ? (
-                  <p className="inline-flex rounded-full border border-primary/15 bg-background/80 px-2.5 py-1 text-xs font-medium text-primary">
-                    กำลังเตรียมปล่อยให้ {formData.partnerName} ยืม
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[1.25rem] border border-border/80 bg-card/80 p-4">
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/80 bg-secondary/60 text-muted-foreground">
-                <ArrowDownLeft className="h-5 w-5" />
-              </span>
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-foreground">ฉันเป็นคนยืม</p>
-                <p className="text-sm text-foreground">
-                  คุณ <span className="font-medium">ไม่ต้องสร้างข้อตกลงเองในหน้านี้</span> ให้รออีกฝ่ายส่งคำขอมา แล้วค่อยเข้ามายืนยัน
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  เมื่อมีคำขอใหม่ ระบบจะพาไปยืนยันผ่านหน้าแจ้งเตือนและรายละเอียดสัญญา
-                </p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="px-0 text-xs"
-                  onClick={() => navigate("/notifications")}
-                >
-                  ไปดูหน้าแจ้งเตือน
-                </Button>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
         <StepFlowLayout
-          title="สร้างข้อตกลงฝั่งผู้ให้ยืม"
-          description="เดินทีละขั้นเพื่อกรอกข้อมูลผู้ยืม กำหนดเงื่อนไข และส่งคำขอให้ผู้ยืมเข้ามายืนยัน"
+          title="รายละเอียดข้อตกลง"
           currentStep={currentStep}
           steps={stepDefinitions}
         >
@@ -550,52 +687,92 @@ export default function CreateAgreement() {
             onSubmit={handleSubmitClick}
             className="space-y-6"
           >
-          {/* Partner */}
-          <div
-            id="agreement-step-0"
-            className={`space-y-4 rounded-[1.25rem] border border-border/80 bg-card/90 p-5 transition-all ${
-              currentStep === 0 ? "border-primary/25 bg-primary/[0.03]" : ""
-            }`}
-          >
-            <div className="flex items-center gap-2 text-foreground font-medium">
-              <User className="w-5 h-5 text-primary" />
-              <span>ผู้ยืม (ผู้รับเงินไป)</span>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="partnerName">ชื่อผู้ยืม</Label>
-                <Input
-                  id="partnerName"
-                  placeholder="เช่น สมชาย ใจดี"
-                  value={formData.partnerName}
-                  onChange={(e) => setFormData({ ...formData, partnerName: e.target.value })}
-                />
+          {currentStep === 0 && (
+            <motion.div
+              key="borrower-step"
+              id="agreement-step-0"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4 rounded-[1.25rem] border border-primary/25 bg-primary/[0.03] p-5 transition-all"
+            >
+              <div className="flex items-center gap-2 text-foreground font-medium">
+                <User className="w-5 h-5 text-primary" />
+                <span>ผู้ยืม (ผู้รับเงินไป)</span>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="partnerPhone">เบอร์โทรผู้ยืม (ไม่บังคับ)</Label>
-                <Input
-                  id="partnerPhone"
-                  inputMode="tel"
-                  placeholder="0812345678"
-                  value={formData.partnerPhone}
-                  onChange={(e) => setFormData({ ...formData, partnerPhone: e.target.value })}
-                />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="partnerName">ชื่อผู้ยืม</Label>
+                  <Input
+                    id="partnerName"
+                    placeholder="เช่น สมชาย ใจดี"
+                    value={formData.partnerName}
+                    onChange={(e) => setFormData({ ...formData, partnerName: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="partnerCode">รหัสผู้ใช้ผู้ยืม (ไม่บังคับ)</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 gap-1 px-2 text-xs"
+                      onClick={() => setShowBorrowerScanner(true)}
+                    >
+                      <Scan className="h-3.5 w-3.5" aria-hidden="true" />
+                      สแกน QR
+                    </Button>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="partnerCode"
+                      inputMode="text"
+                      autoCapitalize="characters"
+                      placeholder="ABC12345"
+                      value={formData.partnerCode}
+                      onChange={(e) =>
+                        setFormData({ ...formData, partnerCode: normalizeBorrowerCode(e.target.value) })
+                      }
+                      className="pr-10 font-mono uppercase tracking-wider"
+                      maxLength={BORROWER_CODE_LENGTH}
+                    />
+                    {isResolvingBorrower ? (
+                      <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                    ) : borrowerProfile ? (
+                      <CheckCircle className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-status-paid" />
+                    ) : null}
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <p className="text-xs text-muted-foreground">
-              ใช้กรอกข้อมูลพื้นฐานเพื่อส่งคำขอได้ทันที ไม่จำเป็นต้องเพิ่มเพื่อนก่อน
-            </p>
-          </div>
+              {borrowerCodeError ? (
+                <InlineValidationMessage tone="warning" message={borrowerCodeError} />
+              ) : borrowerProfile ? (
+                <InlineValidationMessage
+                  tone="success"
+                  message={`พบผู้ยืม: ${borrowerProfile.display_name || `User ${borrowerProfile.user_code}`} ระบบจะผูก borrower_id ทันที`}
+                />
+              ) : (
+                <div className="flex items-start gap-2 rounded-xl border border-border/70 bg-background/70 p-3 text-xs text-muted-foreground">
+                  <LinkIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  <p>
+                    ถ้าไม่มีรหัสผู้ใช้ เวลาสร้างเสร็จระบบจะสร้างลิงก์เชิญให้ผู้ยืมกดผูกบัญชีและยืนยันเอง
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
 
-          {/* Amount */}
-          <div
-            id="agreement-step-1"
-            className={`space-y-4 rounded-[1.25rem] border border-border/80 bg-card/90 p-5 transition-all ${
-              currentStep === 1 ? "border-primary/25 bg-primary/[0.03]" : ""
-            }`}
-          >
+          {currentStep === 1 && (
+            <motion.div
+              key="terms-step"
+              id="agreement-step-1"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+          <div className="space-y-4 rounded-[1.25rem] border border-primary/25 bg-primary/[0.03] p-5 transition-all">
             <div className="flex items-center gap-2 text-foreground font-medium">
               <Calculator className="w-5 h-5 text-primary" />
               <span>จำนวนเงิน</span>
@@ -716,9 +893,9 @@ export default function CreateAgreement() {
                   <p className="text-sm text-muted-foreground">
                     {formData.frequency === "monthly" && (() => {
                       const dayOfMonth = parseBangkokDate(formData.startDate)?.getUTCDate() ?? 1;
-                      return `→ ชำระทุกวันที่ ${dayOfMonth} ของเดือน`;
+                      return `ชำระทุกวันที่ ${dayOfMonth}`;
                     })()}
-                    {formData.frequency === "daily" && "→ ชำระทุกวัน"}
+                    {formData.frequency === "daily" && "ชำระทุกวัน"}
                   </p>
                 )}
               </div>
@@ -772,7 +949,7 @@ export default function CreateAgreement() {
                 />
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Info className="w-3 h-3" />
-                  ไม่เกิน 15% ต่อปี ไม่คิดดอกเบี้ยทบต้น
+                  สูงสุด 15% ต่อปี
                 </p>
               </div>
             )}
@@ -782,7 +959,7 @@ export default function CreateAgreement() {
               <div className="space-y-3 pt-3 border-t border-border/50">
                 <Label className="flex items-center gap-2">
                   <Coins className="w-4 h-4 text-amber-500" />
-                  อัตราค่าเลื่อนงวด (ถ้ามีการขอเลื่อน)
+                  ค่าเลื่อนงวด
                 </Label>
                 
                 <div className="bg-amber-500/10 rounded-xl p-4 space-y-3">
@@ -823,11 +1000,6 @@ export default function CreateAgreement() {
                     );
                   })()}
                 </div>
-                
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Info className="w-3 h-3" />
-                  ค่าเลื่อนงวดจะคิดเมื่อผู้ยืมขอเลื่อนกำหนดชำระ (คิด % จากค่างวด)
-                </p>
               </div>
             )}
 
@@ -877,11 +1049,6 @@ export default function CreateAgreement() {
                     );
                   })()}
                 </div>
-                
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Info className="w-3 h-3" />
-                  ถ้าขอเลื่อน ให้จ่ายดอกงวดนั้นก่อน (ตัดดอกก่อนต้น) - ไม่เพิ่มดอกเบี้ยใหม่
-                </p>
               </div>
             )}
 
@@ -948,7 +1115,7 @@ export default function CreateAgreement() {
                           ? 'text-red-700 dark:text-red-400' 
                           : 'text-amber-700 dark:text-amber-400'
                       }`}>
-                        💰 ค่าเลื่อนงวด (ถ้ามี)
+                        ค่าเลื่อนงวด
                       </span>
                       <span className={`font-semibold ${
                         rescheduleFeeAnalysis.isOverCeiling 
@@ -958,10 +1125,6 @@ export default function CreateAgreement() {
                         ฿{rescheduleFeeAnalysis.feePerRequest.toLocaleString()}/ครั้ง
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      วิธีคิด: ค่างวด ฿{Math.ceil(Number(formData.amount) / Number(formData.installments)).toLocaleString()} × {formData.rescheduleFeeRate}%
-                    </p>
-                    
                     {/* 15% Annual Ceiling Warning */}
                     {rescheduleFeeAnalysis.isNearCeiling && !rescheduleFeeAnalysis.isOverCeiling && (
                       <div className="flex items-start gap-2 pt-2 border-t border-amber-500/20">
@@ -969,9 +1132,6 @@ export default function CreateAgreement() {
                         <div className="text-xs">
                           <p className="font-medium text-amber-700 dark:text-amber-400">
                             ใกล้เพดาน 15%/ปี
-                          </p>
-                          <p className="text-muted-foreground">
-                            หากเลื่อนทุกงวด อาจถึง ~{rescheduleFeeAnalysis.annualRateIfRescheduleEveryMonth?.toFixed(1)}%/ปี
                           </p>
                         </div>
                       </div>
@@ -982,25 +1142,12 @@ export default function CreateAgreement() {
                         <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
                         <div className="text-xs">
                           <p className="font-medium text-red-700 dark:text-red-400">
-                            ⚠️ เกินเพดาน 15%/ปี
-                          </p>
-                          <p className="text-muted-foreground">
-                            หากเลื่อนทุกงวด จะถึง ~{rescheduleFeeAnalysis.annualRateIfRescheduleEveryMonth?.toFixed(1)}%/ปี ซึ่งผิดกฎหมาย
+                            เกินเพดาน 15%/ปี
                           </p>
                           <p className="text-amber-700 dark:text-amber-400 mt-1">
-                            แนะนำลด % ค่าเลื่อนงวดลง
+                            แนะนำลดค่าเลื่อนงวด
                           </p>
                         </div>
-                      </div>
-                    )}
-                    
-                    {/* Safe indicator */}
-                    {!rescheduleFeeAnalysis.isNearCeiling && !rescheduleFeeAnalysis.isOverCeiling && (
-                      <div className="flex items-center gap-2 pt-2 border-t border-green-500/20">
-                        <ShieldCheck className="w-4 h-4 text-green-600 dark:text-green-400" />
-                        <p className="text-xs text-green-700 dark:text-green-400">
-                          อยู่ในเกณฑ์ปลอดภัย ไม่เกิน 15%/ปี
-                        </p>
                       </div>
                     )}
                   </div>
@@ -1011,74 +1158,32 @@ export default function CreateAgreement() {
                   <div className="pt-2 border-t -mx-4 -mb-4 px-4 pb-4 rounded-b-xl space-y-2 border-primary/30 bg-primary/5">
                     <div className="flex justify-between items-center text-sm pt-2">
                       <span className="flex items-center gap-1 font-medium text-primary">
-                        💰 ค่าเลื่อนงวด (จ่ายดอกก่อน)
+                        ค่าเลื่อนงวด
                       </span>
                       <span className="font-semibold text-primary">
                         ฿{rescheduleFeeAnalysis.feePerRequest.toLocaleString()}/ครั้ง
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      วิธีคิด: ดอกเบี้ยงวดนั้น ฿{(rescheduleFeeAnalysis.interestPerInstallment || 0).toLocaleString()} × {formData.rescheduleInterestPercent}%
-                    </p>
-                    
-                    {/* Explanation */}
-                    <div className="flex items-center gap-2 pt-2 border-t border-primary/20">
-                      <ShieldCheck className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <p className="text-xs text-green-700 dark:text-green-400">
-                        ไม่เพิ่มดอก - แค่จ่ายดอกงวดนั้นล่วงหน้า (ตัดดอกก่อน)
-                      </p>
-                    </div>
                   </div>
                 )}
               </motion.div>
             )}
-
-            {/* Comparison Table (when interest is set) */}
-            {Number(formData.amount) > 0 &&
-              formData.interestType !== "none" &&
-              Number(formData.interest) > 0 && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="bg-muted/30 rounded-xl p-4 space-y-2"
-                >
-                  <p className="text-xs font-medium text-foreground">เปรียบเทียบทุกแบบ</p>
-                  <div className="space-y-2">
-                    {(["flat", "effective"] as InterestType[]).map((type) => {
-                      const calc = calculations[type];
-                      if (!calc) return null;
-                      const isSelected = formData.interestType === type;
-                      return (
-                        <div
-                          key={type}
-                          className={`flex justify-between items-center text-xs p-2 rounded-lg ${
-                            isSelected ? "bg-primary/10" : ""
-                          }`}
-                        >
-                          <span className={isSelected ? "font-medium text-primary" : "text-muted-foreground"}>
-                            {interestTypeLabels[type].title}
-                          </span>
-                          <span className={isSelected ? "font-medium text-primary" : "text-foreground"}>
-                            ฿{calc.perInstallment.toLocaleString()}/งวด
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-            )}
           </div>
+            </motion.div>
+          )}
 
-          <div
-            className={`space-y-4 rounded-[1.25rem] border border-border/80 bg-card/90 p-5 transition-all ${
-              currentStep === 2 ? "border-primary/25 bg-primary/[0.03]" : ""
-            }`}
-          >
+          {currentStep === 2 && (
+            <motion.div
+              key="account-step"
+              id="agreement-step-2"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4 rounded-[1.25rem] border border-primary/25 bg-primary/[0.03] p-5 transition-all"
+            >
             <div className="flex items-center gap-2 text-foreground font-medium">
               <Building className="w-5 h-5 text-primary" />
               <div className="flex flex-col">
-                <span>บัญชีของคุณ (สำหรับรับชำระคืน)</span>
-                <span className="text-xs font-normal text-muted-foreground">ผู้ยืมจะโอนเงินเข้าบัญชีนี้ทุกงวด</span>
+                <span>บัญชีรับเงินคืน</span>
               </div>
             </div>
 
@@ -1122,23 +1227,22 @@ export default function CreateAgreement() {
               </div>
             </div>
 
-            {currentStep === 2 && (!formData.bankName || !formData.accountNumber) ? (
+            {!formData.bankName || !formData.accountNumber ? (
               <InlineValidationMessage
                 tone="warning"
                 message="กรุณาระบุบัญชีของคุณให้ครบก่อนขยับไปขั้นตรวจสอบสุดท้าย"
               />
             ) : null}
-          </div>
+            </motion.div>
+          )}
 
-          {/* Real-time Calculation Summary */}
-          {selectedCalculation && Number(formData.amount) > 0 && (
+          {/* Final review */}
+          {currentStep === 3 && selectedCalculation && Number(formData.amount) > 0 && (
             <motion.div
-              id="agreement-step-2"
+              id="agreement-review-summary"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`space-y-4 rounded-[1.25rem] border border-primary/20 bg-card/90 p-5 transition-all ${
-                currentStep === 2 ? "bg-primary/[0.03]" : ""
-              }`}
+              className="space-y-4 rounded-[1.25rem] border border-primary/20 bg-card/90 p-5 transition-all"
             >
               <div className="flex items-center gap-2 text-foreground font-medium">
                 <Calculator className="w-5 h-5 text-primary" />
@@ -1304,58 +1408,19 @@ export default function CreateAgreement() {
             </motion.div>
           )}
 
-          {/* Payment Summary before Submit */}
-          {Number(formData.amount) > 0 && selectedCalculation && (
+          {/* Review before Submit */}
+          {currentStep === 3 && Number(formData.amount) > 0 && selectedCalculation && (
             <motion.div
               id="agreement-step-3"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`space-y-3 rounded-[1.25rem] border border-border/80 bg-card/90 p-5 transition-all ${
-                currentStep === 3 ? "border-primary/25 bg-primary/[0.03]" : ""
-              }`}
+              className="transition-all"
             >
-              <p className="text-sm font-medium text-foreground text-center">สรุปการชำระเงิน</p>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">ยอดที่ให้ยืม</span>
-                  <span className="font-medium text-foreground">฿{Number(formData.amount).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">% ดอกเบี้ย</span>
-                  <span className="font-medium text-foreground">
-                    {formData.interestType === "none" ? "ไม่มี" : `${formData.interest || 0}% ต่อปี`}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">ค่าดอกเบี้ย</span>
-                  <span className="font-medium text-foreground">฿{selectedCalculation.totalInterest.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">จำนวนครั้งที่ชำระ</span>
-                  <span className="font-medium text-foreground">
-                    {formData.installments} งวด / {frequencyLabels[formData.frequency]}
-                  </span>
-                </div>
-                
-                {/* Reschedule Fee in Payment Summary */}
-                <div className="flex justify-between items-center py-2 border-b border-amber-500/30 bg-amber-500/5 -mx-5 px-5">
-                  <span className="text-amber-700 dark:text-amber-400 flex items-center gap-1">
-                    💰 ค่าเลื่อนงวด (ถ้ามี)
-                  </span>
-                  <span className="font-medium text-amber-700 dark:text-amber-400">
-                    {formData.interestType === "none" 
-                      ? `฿${Math.ceil((Math.ceil(Number(formData.amount) / Number(formData.installments)) * Number(formData.rescheduleFeeRate)) / 100).toLocaleString()}/ครั้ง`
-                      : `฿${Math.ceil(((selectedCalculation?.schedule?.[0]?.interest || 0) * Number(formData.rescheduleInterestPercent)) / 100).toLocaleString()}/ครั้ง`
-                    }
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground pt-1">
-                  {formData.interestType === "none"
-                    ? `วิธีคิด: ค่างวด ฿${Math.ceil(Number(formData.amount) / Number(formData.installments)).toLocaleString()} × ${formData.rescheduleFeeRate}%`
-                    : `วิธีคิด: ดอกเบี้ยงวดนั้น ฿${(selectedCalculation?.schedule?.[0]?.interest || 0).toLocaleString()} × ${formData.rescheduleInterestPercent}%`
-                  }
-                </p>
-              </div>
+              <ReviewPanel
+                title="ตรวจสอบทั้งหมดก่อนส่ง"
+                description="ข้อมูลนี้จะถูกส่งให้ผู้ยืมยืนยันในขั้นถัดไป"
+                rows={reviewRows}
+              />
             </motion.div>
           )}
 
@@ -1364,7 +1429,7 @@ export default function CreateAgreement() {
               <div className="text-sm text-muted-foreground">
                 {currentStep < stepDefinitions.length - 1
                   ? `ขั้นถัดไป: ${stepDefinitions[currentStep + 1].title}`
-                  : "ผู้ยืมจะได้รับแจ้งเตือนเพื่อเข้ามายืนยันข้อตกลง"}
+                  : "พร้อมส่งให้ผู้ยืมยืนยัน"}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -1372,7 +1437,14 @@ export default function CreateAgreement() {
                   variant="outline"
                   onClick={() => (currentStep === 0 ? navigate(-1) : setCurrentStep((step) => step - 1))}
                 >
-                  {currentStep === 0 ? "ยกเลิก" : "ย้อนกลับ"}
+                  {currentStep === 0 ? (
+                    "ยกเลิก"
+                  ) : (
+                    <>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      ย้อนกลับ
+                    </>
+                  )}
                 </Button>
                 {currentStep < stepDefinitions.length - 1 ? (
                   <Button
@@ -1381,17 +1453,21 @@ export default function CreateAgreement() {
                     disabled={!canProceedByStep[currentStep]}
                   >
                     ถัดไป
+                    <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 ) : (
                   <Button
                     type="submit"
-                    disabled={
-                      isSubmitting ||
-                      (!formData.partnerName && !formData.partnerPhone) ||
-                      !formData.amount
-                    }
+                    disabled={isSubmitting || !canProceedByStep[currentStep]}
                   >
-                    {isSubmitting ? "กำลังส่งคำขอ..." : "ส่งให้ผู้ยืมยืนยัน"}
+                    {isSubmitting ? (
+                      "กำลังส่งคำขอ..."
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        ส่งให้ผู้ยืมยืนยัน
+                      </>
+                    )}
                   </Button>
                 )}
               </div>
@@ -1409,6 +1485,11 @@ export default function CreateAgreement() {
           description="กรุณาใส่รหัสผ่านเพื่อยืนยันการสร้างข้อตกลงในฐานะผู้ให้ยืม"
           confirmButtonText="ส่งให้ผู้ยืมยืนยัน"
           isLoading={isSubmitting}
+        />
+        <QRCodeScanner
+          open={showBorrowerScanner}
+          onClose={() => setShowBorrowerScanner(false)}
+          onScan={handleBorrowerQrScanned}
         />
       </div>
     </div>

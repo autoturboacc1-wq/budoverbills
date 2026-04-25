@@ -1,10 +1,9 @@
 import { motion } from "framer-motion";
-import { TrendingUp, TrendingDown, FileText, Clock } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { useDebtAgreements } from "@/hooks/useDebtAgreements";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMemo } from "react";
 import { SummaryCard } from "@/components/ux";
-import { AgreementRole } from "@/domains/debt";
 
 // Domain imports - SINGLE SOURCE OF TRUTH
 import { mapToUpcomingInstallments, UpcomingInstallmentData } from "@/domains/debt";
@@ -39,55 +38,25 @@ export function DashboardStats() {
 
   const filteredUpcomingInstallments = upcomingInstallments;
 
-  const roleSummary = useMemo(() => {
-    return {
-      label: "ข้อตกลงที่ใช้งาน",
-      value: stats.activeCount,
-      hint: "ทุกข้อตกลงที่ยังดำเนินอยู่",
-    };
-  }, [stats.activeCount]);
-
-  const showReceivable = true;
-  const showPayable = true;
-
   return (
     <motion.section
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="space-y-6"
+      className="space-y-4"
     >
       <div className="grid grid-cols-2 gap-3">
-        {showReceivable && (
-          <SummaryCard
-            label="ยอดรับ"
-            value={`฿${stats.totalToReceive.toLocaleString()}`}
-            hint="เงินที่ผู้ยืมยังต้องชำระคืนคุณ"
-            icon={TrendingUp}
-            priority="primary"
-          />
-        )}
-        {showPayable && (
-          <SummaryCard
-            label="ยอดจ่าย"
-            value={`฿${stats.totalToPay.toLocaleString()}`}
-            hint="เงินที่คุณยังต้องชำระให้ผู้ให้ยืม"
-            icon={TrendingDown}
-            priority="warning"
-          />
-        )}
         <SummaryCard
-          label={roleSummary.label}
-          value={roleSummary.value.toLocaleString()}
-          hint={roleSummary.hint}
-          icon={FileText}
+          label="ต้องรับ"
+          value={`฿${stats.totalToReceive.toLocaleString()}`}
+          icon={TrendingUp}
+          priority="primary"
         />
         <SummaryCard
-          label="รอยืนยัน"
-          value={stats.pendingCount.toLocaleString()}
-          hint="ข้อตกลงหรือการชำระที่ยังต้องมีคนกดต่อ"
-          icon={Clock}
-          priority={stats.pendingCount > 0 ? "warning" : "neutral"}
+          label="ต้องจ่าย"
+          value={`฿${stats.totalToPay.toLocaleString()}`}
+          icon={TrendingDown}
+          priority="warning"
         />
       </div>
 
@@ -98,8 +67,8 @@ export function DashboardStats() {
           transition={{ delay: 0.2 }}
         >
           <div className="mb-3 flex items-baseline justify-between">
-            <h3 className="label-eyebrow">งวดที่ใกล้ครบกำหนด</h3>
-            <span className="text-[11px] text-muted-foreground">ภายใน 7 วัน</span>
+            <h3 className="label-eyebrow">ใกล้ครบกำหนด</h3>
+            <span className="text-[11px] text-muted-foreground">7 วัน</span>
           </div>
           <ul className="divide-y divide-border border-y border-border">
             {filteredUpcomingInstallments.map((item, index) => (

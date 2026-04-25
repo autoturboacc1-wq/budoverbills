@@ -22,7 +22,6 @@ export function DebtCard({
   partnerName,
   partnerInitial,
   partnerAvatarUrl,
-  amount,
   remainingAmount,
   nextPaymentDate,
   installmentProgress,
@@ -43,11 +42,11 @@ export function DebtCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay, ease: [0.22, 1, 0.36, 1] }}
       onClick={() => navigate(`/debt/${id}`)}
-      className="group block w-full rounded-[1.1rem] border border-border/80 bg-card/90 p-4 text-left transition-colors hover:border-foreground/30"
+      className="group block w-full rounded-[1.1rem] border border-border/80 bg-card/90 p-3 text-left transition-colors hover:border-foreground/30"
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/80 bg-secondary text-[11px] font-medium text-muted-foreground">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/80 bg-secondary text-[11px] font-medium text-muted-foreground">
             {partnerAvatarUrl ? (
               <img
                 src={partnerAvatarUrl}
@@ -59,25 +58,24 @@ export function DebtCard({
             )}
           </div>
           <div className="min-w-0">
-            <p className="label-eyebrow">{isLender ? "Borrower" : "Lender"}</p>
             <p className="truncate text-sm font-medium text-foreground">{partnerName}</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              {isLender ? "ต้องรับ" : "ต้องจ่าย"} <span className="num">฿{remainingAmount.toLocaleString()}</span>
+            </p>
           </div>
         </div>
-        <StatusBadge status={status} />
+        <div className="flex shrink-0 items-center gap-2">
+          <StatusBadge status={status} />
+          <ArrowUpRight
+            className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground"
+            strokeWidth={1.5}
+          />
+        </div>
       </div>
 
-      <div className="mt-5">
-        <p className="font-serif-display text-[2rem] leading-none text-foreground">
-          ฿<span className="num">{remainingAmount.toLocaleString()}</span>
-        </p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          จากวงเงิน <span className="num">฿{amount.toLocaleString()}</span>
-        </p>
-      </div>
-
-      <div className="mt-5">
+      <div className="mt-3">
         <div className="mb-1.5 flex items-baseline justify-between text-[11px] text-muted-foreground">
-          <span className="label-eyebrow">Progress</span>
+          <span className="num">{nextPaymentDate}</span>
           <span className="num">
             {installmentProgress.current} / {installmentProgress.total}
           </span>
@@ -90,17 +88,6 @@ export function DebtCard({
             className="h-px bg-foreground"
           />
         </div>
-      </div>
-
-      <div className="mt-5 flex items-center justify-between border-t border-border/80 pt-4 text-xs">
-        <div className="text-muted-foreground">
-          <span className="label-eyebrow mr-2">Next</span>
-          <span className="num text-foreground">{nextPaymentDate}</span>
-        </div>
-        <ArrowUpRight
-          className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground"
-          strokeWidth={1.5}
-        />
       </div>
     </motion.button>
   );

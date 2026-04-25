@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useMemo } from "react";
 import { Header } from "@/components/Header";
 import { DashboardStats } from "@/components/DashboardStats";
-import { PaymentCalendar } from "@/components/PaymentCalendar";
 import { DebtCard } from "@/components/DebtCard";
 import { PendingAgreements } from "@/components/PendingAgreements";
 import { PendingActionsCard } from "@/components/home/PendingActionsCard";
@@ -11,8 +10,8 @@ import { useDebtAgreements } from "@/hooks/useDebtAgreements";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, ArrowDownLeft } from "lucide-react";
-import { EmptyState, PageSection } from "@/components/ux";
+import { Plus } from "lucide-react";
+import { PageSection } from "@/components/ux";
 import { PageTransition } from "@/components/ux/PageTransition";
 
 // Domain imports - SINGLE SOURCE OF TRUTH
@@ -42,23 +41,20 @@ const Index = () => {
         <div className="page-shell section-stack">
           <Header userName={displayName} />
 
-          <section className="space-y-5">
-            <div className="flex items-end justify-between gap-4 border-b border-border/80 pb-4">
-              <div className="max-w-sm">
-                <p className="label-eyebrow">ภาพรวมวันนี้</p>
-                <h2 className="mt-2 font-serif-display text-[2rem] leading-[1.02] text-foreground">
-                  เงินค้าง งานค้าง และสัญญาที่ยังเดินอยู่
-                </h2>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  ทุกอย่างที่ต้องเช็กถูกรวมไว้ในหน้าเดียวแบบสั้นและอ่านเร็ว
-                </p>
-              </div>
-              <Button onClick={() => navigate("/create")} size="sm">
-                <Plus className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
-                สร้างสัญญา
-              </Button>
+          <section className="flex items-center justify-between gap-3 border-b border-border/80 pb-4">
+            <div>
+              <p className="label-eyebrow">Dashboard</p>
+              <h2 className="mt-1 font-serif-display text-[1.55rem] leading-tight text-foreground">
+                ภาพรวมวันนี้
+              </h2>
             </div>
+            <Button onClick={() => navigate("/create")} size="sm">
+              <Plus className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
+              สร้าง
+            </Button>
           </section>
+
+          <DashboardStats />
 
           {!isLoading && !authLoading && <PendingActionsCard />}
 
@@ -66,18 +62,8 @@ const Index = () => {
             <PendingAgreements agreements={agreements} userId={user?.id} />
           )}
 
-          <DashboardStats />
-
           <PageSection
-            title="Payment Calendar"
-            description="มองเห็นกำหนดชำระถัดไปของคุณ"
-          >
-            <PaymentCalendar />
-          </PageSection>
-
-          <PageSection
-            title="ลูกหนี้ของคุณ"
-            description="คนที่ยังต้องชำระคืนให้คุณ"
+            title="ต้องรับ"
             action={
               lenderCards.length > 5 ? (
                 <button
@@ -85,34 +71,30 @@ const Index = () => {
                   onClick={() => navigate("/history")}
                   className="text-xs font-medium text-foreground underline-offset-4 hover:underline"
                 >
-                  ดูทั้งหมด
+                  ทั้งหมด
                 </button>
               ) : null
             }
           >
             {isLoading || authLoading ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {[0, 1].map((i) => (
-                  <div key={i} className="rounded-md border border-border bg-card p-5 space-y-3">
+                  <div key={i} className="rounded-md border border-border bg-card p-4 space-y-2">
                     <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-7 w-32" />
+                    <Skeleton className="h-5 w-24" />
                   </div>
                 ))}
               </div>
             ) : lenderCards.length === 0 ? (
-              <EmptyState
-                icon={<ArrowDownLeft className="h-6 w-6" strokeWidth={1.5} />}
-                title="ยังไม่มีคนติดหนี้คุณ"
-                description="เริ่มต้นด้วยการปล่อยยืมและสร้างข้อตกลงฝั่งผู้ให้ยืม"
-                action={
-                  <Button onClick={() => navigate("/create")} size="sm">
-                    <Plus className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
-                    ปล่อยยืมให้เพื่อน
-                  </Button>
-                }
-              />
+              <div className="rounded-[1.1rem] border border-dashed border-border bg-card p-5 text-center">
+                <p className="text-sm font-medium text-foreground">ยังไม่มีรายการ</p>
+                <Button onClick={() => navigate("/create")} size="sm" variant="outline" className="mt-3">
+                  <Plus className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
+                  ปล่อยยืม
+                </Button>
+              </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {lenderCards.slice(0, 5).map((debt) => (
                   <DebtCard key={debt.id} {...debt} id={debt.id} />
                 ))}
@@ -121,22 +103,21 @@ const Index = () => {
           </PageSection>
 
           <PageSection
-            title="เจ้าหนี้ของคุณ"
-            description="บุคคลที่คุณต้องจัดการชำระค่างวดให้"
+            title="ต้องจ่าย"
           >
             {isLoading || authLoading ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {[0, 1].map((i) => (
-                  <div key={i} className="rounded-md border border-border bg-card p-5 space-y-3">
+                  <div key={i} className="rounded-md border border-border bg-card p-4 space-y-2">
                     <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-7 w-32" />
+                    <Skeleton className="h-5 w-24" />
                   </div>
                 ))}
               </div>
             ) : borrowerCards.length === 0 ? (
-              <p className="w-full rounded-[1.1rem] border border-border/70 bg-secondary/30 py-4 text-center text-sm text-muted-foreground">คุณไม่มีภาระหนี้สินในระบบ</p>
+              <p className="w-full rounded-[1.1rem] border border-border/70 bg-secondary/30 py-4 text-center text-sm text-muted-foreground">ไม่มีรายการ</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {borrowerCards.slice(0, 5).map((debt) => (
                   <DebtCard key={debt.id} {...debt} id={debt.id} />
                 ))}

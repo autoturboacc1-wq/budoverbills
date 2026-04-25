@@ -10,6 +10,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { GlobalChatNotificationProvider } from "@/components/GlobalChatNotificationProvider";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppErrorBoundary } from "@/components/shared/AppErrorBoundary";
 import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
@@ -18,7 +19,9 @@ import { NotificationsProvider } from "@/hooks/useNotifications";
 const Index = lazy(() => import("./pages/Index"));
 const CreateAgreement = lazy(() => import("./pages/CreateAgreement"));
 const AgreementConfirm = lazy(() => import("./pages/AgreementConfirm"));
+const AgreementInvite = lazy(() => import("./pages/AgreementInvite"));
 const AgreementContract = lazy(() => import("./pages/AgreementContract"));
+const Chat = lazy(() => import("./pages/Chat"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -47,11 +50,12 @@ function RouteFallback() {
   );
 }
 
-const ROUTES_WITH_BOTTOM_NAV = ["/", "/create", "/notifications", "/profile", "/settings", "/history", "/debt", "/agreement", "/pdpa-consent", "/personal-info", "/admin"];
+const ROUTES_WITH_BOTTOM_NAV = ["/", "/create", "/chat", "/notifications", "/profile", "/settings", "/history", "/debt", "/agreement", "/pdpa-consent", "/personal-info", "/admin"];
 
 function AnimatedRoutes() {
   const location = useLocation();
-  const showBottomNav = ROUTES_WITH_BOTTOM_NAV.some(r =>
+  const isChatRoomRoute = location.pathname !== "/chat" && location.pathname.startsWith("/chat/");
+  const showBottomNav = !isChatRoomRoute && ROUTES_WITH_BOTTOM_NAV.some(r =>
     r === "/" ? location.pathname === "/" : location.pathname.startsWith(r)
   );
   return (
@@ -70,11 +74,12 @@ function AnimatedRoutes() {
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Index />} />
             <Route path="/create" element={<CreateAgreement />} />
+            <Route path="/agreement/invite/:token" element={<RouteErrorBoundary area="หน้าลิงก์เชิญข้อตกลง"><AgreementInvite /></RouteErrorBoundary>} />
             <Route path="/agreement/:id/confirm" element={<RouteErrorBoundary area="หน้ายืนยันข้อตกลง"><AgreementConfirm /></RouteErrorBoundary>} />
             <Route path="/agreement/:id/contract" element={<RouteErrorBoundary area="หน้าทำสัญญา"><AgreementContract /></RouteErrorBoundary>} />
             <Route path="/friends" element={<Navigate replace to="/create" />} />
-            <Route path="/chat" element={<Navigate replace to="/history" />} />
-            <Route path="/chat/:chatId" element={<Navigate replace to="/history" />} />
+            <Route path="/chat" element={<RouteErrorBoundary area="หน้าแชท"><Chat /></RouteErrorBoundary>} />
+            <Route path="/chat/:chatId" element={<RouteErrorBoundary area="หน้าแชท"><Chat /></RouteErrorBoundary>} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
@@ -129,7 +134,9 @@ const App = () => {
               <BrowserRouter>
                 <AppErrorBoundary>
                   <NotificationsProvider>
-                    <AnimatedRoutes />
+                    <GlobalChatNotificationProvider>
+                      <AnimatedRoutes />
+                    </GlobalChatNotificationProvider>
                   </NotificationsProvider>
                 </AppErrorBoundary>
               </BrowserRouter>
