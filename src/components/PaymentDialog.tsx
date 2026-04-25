@@ -351,62 +351,24 @@ export function PaymentDialog({
         return;
       }
 
-      const freshIsExtraPayment = numericAmount > freshAmount;
+      // Atomic server-side submit.  The RPC inserts slip_verifications,
+      // updates installments, and creates the lender notification under a
+      // single transaction with row locks — replacing the earlier 3-step
+      // client-side dance that left orphans on partial failure.
+      const { error: rpcError } = await supabase.rpc(
+        "submit_installment_slip" as never,
+        {
+          p_installment_id: installment.id,
+          p_slip_url: slipUrl,
+          p_submitted_amount: numericAmount,
+        } as never,
+      );
 
-      // Create slip verification record
-      const { data: verificationData, error: verificationError } = await supabase
-        .from('slip_verifications')
-        .insert({
-          installment_id: installment.id,
-          agreement_id: agreement.id,
-          submitted_by: user.id,
-          submitted_amount: numericAmount,
-          slip_url: slipUrl,
-          status: 'pending'
-        })
-        .select("id")
-        .single();
+      if (rpcError) throw rpcError;
 
-      if (verificationError) throw verificationError;
-      insertedSlipVerificationId = verificationData.id;
-
-      // Update installment with slip URL
-      const { error: updateError } = await supabase
-        .from('installments')
-        .update({
-          payment_proof_url: slipUrl,
-          status: 'pending'
-        })
-        .eq('id', installment.id);
-
-      if (updateError) {
-        // Roll back the verification record before propagating
-        await supabase
-          .from('slip_verifications')
-          .delete()
-          .eq('id', insertedSlipVerificationId);
-        insertedSlipVerificationId = null;
-        throw updateError;
-      }
-
-      // All DB operations succeeded — storage file is no longer orphaned
+      // RPC succeeded — file is owned by a verification row now, no orphan.
       uploadedSlipPath = null;
-
-      // Create notification for lender
-      const isFee = freshInstallment.principal_portion === 0 && freshAmount > 0;
-      const label = isFee ? 'ค่าเลื่อนงวด' : `งวดที่ ${freshInstallment.installment_number}`;
-      const notificationMessage = freshIsExtraPayment
-        ? `มีการชำระเงิน${label} ยอด ฿${numericAmount.toLocaleString()} (เกินค่างวด ฿${(numericAmount - freshAmount).toLocaleString()}) - รอตรวจสอบสลิป`
-        : `มีการชำระเงิน${label} ยอด ฿${numericAmount.toLocaleString()} - รอตรวจสอบสลิป`;
-
-      await supabase.from('notifications').insert({
-        user_id: agreement.lender_id,
-        type: 'payment_uploaded',
-        title: isFee ? 'มีการอัปโหลดสลิปค่าเลื่อนงวด' : 'มีการอัปโหลดสลิป',
-        message: notificationMessage,
-        related_type: 'installment',
-        related_id: installment.id
-      });
+      insertedSlipVerificationId = null;
 
       toast.success("ส่งสลิปสำเร็จ", {
         description: "รอเจ้าหนี้ตรวจสอบและยืนยัน"

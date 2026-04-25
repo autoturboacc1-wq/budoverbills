@@ -98,17 +98,35 @@ export function normalizeAndValidatePaymentSlipPath(path: string): string | null
   }
 
   const segments = normalizedPath.split("/");
-  if (segments.length !== 3) {
-    return null;
+
+  // New layout: {agreement_id}/{transfer|installment|reschedule}/{entityId-ts.ext}
+  if (segments.length === 3) {
+    const [agreementId, kind, fileName] = segments;
+
+    if (!isSafePathSegment(agreementId) || !isSafePaymentSlipKind(kind) || !isSafePaymentSlipFileName(fileName)) {
+      return null;
+    }
+
+    return `${agreementId}/${kind}/${fileName}`;
   }
 
-  const [agreementId, kind, fileName] = segments;
-
-  if (!isSafePathSegment(agreementId) || !isSafePaymentSlipKind(kind) || !isSafePaymentSlipFileName(fileName)) {
-    return null;
+  // Legacy layouts that the payment-slips storage policy still accepts:
+  //   transfers/transfer-{agreement_id}-{ts}.{ext}
+  //   slips/{installment_id}-{ts}.{ext}
+  //   slips/reschedule-{installment_id}-{ts}.{ext}
+  // Reject anything else.  Frontend used to be stricter than RLS here, which
+  // surfaced as "ไม่สามารถโหลดสลิปได้" for slips uploaded before April 2026.
+  if (segments.length === 2) {
+    const [folder, fileName] = segments;
+    if (folder === "transfers" && /^transfer-[0-9a-fA-F-]{36}-\d+\.[A-Za-z0-9]{1,8}$/.test(fileName)) {
+      return `${folder}/${fileName}`;
+    }
+    if (folder === "slips" && /^(?:reschedule-)?[0-9a-fA-F-]{36}-\d+\.[A-Za-z0-9]{1,8}$/.test(fileName)) {
+      return `${folder}/${fileName}`;
+    }
   }
 
-  return `${agreementId}/${kind}/${fileName}`;
+  return null;
 }
 
 async function validatePaymentSlipMagicBytes(file: File): Promise<string | null> {
