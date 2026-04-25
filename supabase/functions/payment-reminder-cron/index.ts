@@ -112,6 +112,10 @@ function buildReminderContent(installment: ReminderInstallment, offset: Reminder
   return { title, message };
 }
 
+function buildInstallmentActionUrl(installment: ReminderInstallment): string {
+  return `/debt/${installment.agreement_id}?pay=${installment.id}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
@@ -187,6 +191,8 @@ Deno.serve(async (req) => {
 
       const { title, message } = buildReminderContent(installment, reminderOffset);
       const relatedId = await buildReminderRelatedId(installment.id, reminderOffset);
+      const actionUrl = buildInstallmentActionUrl(installment);
+      const priority = reminderOffset === 0 ? "critical" : "important";
 
       const { data: existingReminder, error: dedupeError } = await supabase
         .from("notifications")
@@ -218,6 +224,8 @@ Deno.serve(async (req) => {
         message,
         related_id: relatedId,
         related_type: "installment",
+        action_url: actionUrl,
+        priority,
       });
 
       if (insertError) {

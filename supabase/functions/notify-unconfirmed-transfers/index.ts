@@ -120,6 +120,8 @@ Deno.serve(async (req) => {
           message: recipient.message,
           related_id: agreement.id,
           related_type: "debt_agreement",
+          action_url: `/debt/${agreement.id}`,
+          priority: "important",
         });
 
         if (insertError) {
