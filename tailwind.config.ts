@@ -30,20 +30,20 @@ export default {
     extend: {
       fontFamily: {
         sans: [
-          '-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"',
+          '"IBM Plex Sans Thai"', '-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"',
           '"Helvetica Neue"', '"Sukhumvit Set"', 'Thonburi', 'Arial', 'system-ui', 'sans-serif',
         ],
         heading: [
-          '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"',
+          '"IBM Plex Sans Thai"', '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"',
           '"Helvetica Neue"', '"Sukhumvit Set"', 'Thonburi', 'Arial', 'system-ui', 'sans-serif',
         ],
         serif: [
-          '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"',
+          '"IBM Plex Sans Thai"', '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"',
           '"Helvetica Neue"', '"Sukhumvit Set"', 'Thonburi', 'Arial', 'system-ui', 'sans-serif',
         ],
         mono: ['ui-monospace', '"SF Mono"', '"SFMono-Regular"', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
         cherry: [
-          '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"',
+          '"IBM Plex Sans Thai"', '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"',
           '"Helvetica Neue"', '"Sukhumvit Set"', 'Thonburi', 'Arial', 'system-ui', 'sans-serif',
         ],
       },

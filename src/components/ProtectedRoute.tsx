@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { clearAdminSession, getValidatedAdminSession } from '@/utils/adminSession';
+import { getRequiredOnboardingPath } from '@/utils/onboardingGuard';
 
 interface ProtectedRouteProps {
   requireAdminSession?: boolean;
@@ -14,9 +15,7 @@ export function ProtectedRoute({ requireAdminSession = false }: ProtectedRoutePr
   const { isAdmin, isModerator, loading: roleLoading } = useUserRole();
   const location = useLocation();
   const hasAdminAccess = isAdmin || isModerator;
-  const isOnPersonalInfoPage = location.pathname === '/personal-info';
-  const isOnPdpaPage = location.pathname === '/pdpa-consent';
-  const requiresPersonalInfo = location.pathname === '/create' || location.pathname.startsWith('/agreement/');
+  const requiredOnboardingPath = getRequiredOnboardingPath(profile, location.pathname);
   const [adminSessionValid, setAdminSessionValid] = useState<boolean | null>(requireAdminSession ? null : true);
 
   useEffect(() => {
@@ -63,12 +62,8 @@ export function ProtectedRoute({ requireAdminSession = false }: ProtectedRoutePr
     return <Navigate to="/auth" replace state={{ from: location }} />;
   }
 
-  if (!profile?.first_name && requiresPersonalInfo && !isOnPersonalInfoPage) {
-    return <Navigate to="/personal-info" replace />;
-  }
-
-  if (profile && !profile.pdpa_accepted_at && !isOnPdpaPage) {
-    return <Navigate to="/pdpa-consent" replace />;
+  if (requiredOnboardingPath) {
+    return <Navigate to={requiredOnboardingPath} replace />;
   }
 
   if (requireAdminSession) {

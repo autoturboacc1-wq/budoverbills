@@ -7,6 +7,7 @@ import {
   Shield, 
   Eye, 
   EyeOff, 
+  Languages,
   Moon, 
   Sun, 
   ChevronRight,
@@ -22,7 +23,7 @@ import {
 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { languages, type Language, useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import { PushNotificationToggle } from "@/components/PushNotificationToggle";
 import { featureFlags } from "@/config/featureFlags";
@@ -120,7 +121,7 @@ function sanitizeSettingsState(value: unknown): SettingsState | null {
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const { limits, isPremium, isLoading: subscriptionLoading, isTrial, trialDaysRemaining, hasUsedTrial, startTrial, isStartingTrial } = useSubscription();
@@ -242,6 +243,15 @@ export default function Settings() {
     const newTheme = theme === "dark" ? "light" : "dark";
     setTheme(newTheme);
     toast.success(newTheme === "dark" ? "เปิดโหมดมืดแล้ว" : "ปิดโหมดมืดแล้ว");
+  };
+
+  const handleLanguageChange = (nextLanguage: Language) => {
+    if (nextLanguage === language) {
+      return;
+    }
+
+    setLanguage(nextLanguage);
+    toast.success(nextLanguage === "th" ? "เปลี่ยนภาษาเป็นไทยแล้ว" : "Language changed to English");
   };
 
   const isDarkMode = mounted && theme === "dark";
@@ -391,6 +401,38 @@ export default function Settings() {
             description="โหมดมืดและธีมสีจะซิงก์ตามบัญชีเมื่อเป็นการตั้งค่าที่รองรับ"
           >
             <div className="divide-y divide-border rounded-2xl border border-border/70">
+            <div className="p-4">
+              <div className="mb-3 flex items-center gap-3">
+                <Languages className="w-5 h-5 text-muted-foreground" />
+                <div>
+                  <p className="text-foreground">{t("profile.language")}</p>
+                  <p className="text-xs text-muted-foreground">{t("profile.selectLanguage")}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label={t("profile.selectLanguage")}>
+                {languages.map((languageOption) => {
+                  const selected = languageOption.code === language;
+
+                  return (
+                    <Button
+                      key={languageOption.code}
+                      type="button"
+                      variant={selected ? "default" : "outline"}
+                      className="h-11 justify-between px-3"
+                      aria-pressed={selected}
+                      onClick={() => handleLanguageChange(languageOption.code)}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span aria-hidden="true">{languageOption.flag}</span>
+                        <span>{languageOption.nativeName}</span>
+                      </span>
+                      {selected ? <Check className="h-4 w-4" aria-hidden="true" /> : null}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">
                 {isDarkMode ? (

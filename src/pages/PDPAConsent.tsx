@@ -52,8 +52,8 @@ export default function PDPAConsent() {
 
   return (
     <PageTransition>
-    <div className="min-h-screen bg-gradient-hero flex flex-col">
-      <div className="flex-1 flex flex-col justify-center px-6 py-12">
+    <div className="min-h-dvh bg-gradient-hero flex flex-col">
+      <div className="flex-1 flex flex-col justify-start px-6 pb-12 pt-10 sm:justify-center sm:py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -240,13 +240,13 @@ export default function PDPAConsent() {
                 ) : (
                   <>
                     <Check className="w-4 h-4 mr-2" />
-                    ยอมรับและเริ่มใช้งาน
+                    ยืนยันและเริ่มใช้งาน
                   </>
                 )}
               </Button>
 
               <p className="text-center text-xs text-muted-foreground mt-4">
-                การกดยอมรับถือว่าคุณยินยอมตามข้อกำหนดและนโยบายของ BudOverBills
+                การกดยืนยันถือว่าคุณยินยอมตามข้อกำหนดและนโยบายของ BudOverBills
               </p>
             </>
           )}

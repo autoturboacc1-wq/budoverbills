@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { BobLogo } from "@/components/BobLogo";
 import { getSafeInternalPath } from "@/utils/navigation";
+import { getRequiredOnboardingPath } from "@/utils/onboardingGuard";
 import { PageTransition } from "@/components/ux/PageTransition";
 
 export default function Auth() {
@@ -26,14 +27,14 @@ export default function Auth() {
         if (isPasswordRecovery || isRecoveryCallback) {
           return;
         }
-        
-        // If user hasn't accepted PDPA yet, redirect to PDPA consent
-        if (profile && !profile.pdpa_accepted_at) {
-          navigate("/pdpa-consent", { replace: true });
+
+        const requiredOnboardingPath = getRequiredOnboardingPath(profile, from);
+        if (requiredOnboardingPath) {
+          navigate(requiredOnboardingPath, { replace: true });
           return;
         }
         
-        if (!profile || profile.pdpa_accepted_at) {
+        if (profile?.pdpa_accepted_at) {
           // Check if user is admin or moderator
           const { data: roles } = await supabase
             .from("user_roles")
