@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, forwardRef } from "react";
-import { Building, Pencil, Check, X, Copy } from "lucide-react";
+import { Building, Check, Copy, Loader2, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,70 +16,128 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { THAI_BANKS } from "@/constants/thaibanks";
 import { useAuth } from "@/contexts/AuthContext";
 import { getBankAccountError, normalizeBankAccountForStorage } from "@/lib/validation";
 
-interface BankAccountData {
-  bank_name: string | null;
-  account_number: string | null;
-  account_name: string | null;
+interface SavedBankAccount {
+  id: string;
+  user_id: string;
+  label: string | null;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-const OPEN_AGREEMENT_STATUSES = ["pending_confirmation", "active"] as const;
+const emptyForm = {
+  label: "",
+  bankName: "",
+  accountNumber: "",
+  accountName: "",
+  isDefault: true,
+};
 
-export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function ProfileBankAccount(props, ref) {
-  const { user } = useAuth();
-  const [isEditing, setIsEditing] = useState(false);
+function getProfileAccountName(profile: ReturnType<typeof useAuth>["profile"]): string {
+  return [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim();
+}
+
+export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function ProfileBankAccount(_props, ref) {
+  const { user, profile } = useAuth();
+  const [accounts, setAccounts] = useState<SavedBankAccount[]>([]);
+  const [editingAccount, setEditingAccount] = useState<SavedBankAccount | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [bankData, setBankData] = useState<BankAccountData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [formData, setFormData] = useState({
-    bankName: "",
-    accountNumber: "",
-    accountName: "",
-  });
+  const [formData, setFormData] = useState(emptyForm);
   const [accountError, setAccountError] = useState<string | null>(null);
+  const profileAccountName = getProfileAccountName(profile);
 
-  // Fetch bank account from the most recent agreement where user is lender
-  const fetchBankAccount = useCallback(async () => {
-    if (!user?.id) return;
-    
+  const fetchBankAccounts = useCallback(async () => {
+    if (!user?.id) {
+      setAccounts([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      const { data: agreement, error: agrError } = await supabase
-        .from("debt_agreements")
-        .select("bank_name, account_number, account_name")
-        .eq("lender_id", user.id)
-        .in("status", OPEN_AGREEMENT_STATUSES)
-        .not("bank_name", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const { data, error } = await supabase
+        .from("user_bank_accounts")
+        .select("id, user_id, label, bank_name, account_number, account_name, is_default, created_at, updated_at")
+        .eq("user_id", user.id)
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: false });
 
-      if (agrError) {
-        throw agrError;
-      }
-
-      if (agreement) {
-        setBankData(agreement);
-        setFormData({
-          bankName: agreement.bank_name || "",
-          accountNumber: agreement.account_number || "",
-          accountName: agreement.account_name || "",
-        });
-      }
+      if (error) throw error;
+      setAccounts(data || []);
     } catch (error) {
-      console.error("Error fetching bank account:", error);
+      console.error("Error fetching bank accounts:", error);
+      toast.error("โหลดบัญชีรับเงินไม่สำเร็จ");
     } finally {
       setIsLoading(false);
     }
   }, [user?.id]);
 
   useEffect(() => {
-    fetchBankAccount();
-  }, [fetchBankAccount]);
+    fetchBankAccounts();
+  }, [fetchBankAccounts]);
+
+  const getBankLabel = (value: string) => {
+    return THAI_BANKS.find((bank) => bank.value === value)?.label || value;
+  };
+
+  const copyToClipboard = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    toast.success("คัดลอกแล้ว");
+  };
+
+  const resetDialog = () => {
+    setEditingAccount(null);
+    setFormData(emptyForm);
+    setAccountError(null);
+  };
+
+  const openCreate = () => {
+    setEditingAccount(null);
+    setFormData({
+      ...emptyForm,
+      accountName: profileAccountName,
+      isDefault: accounts.length === 0,
+    });
+    setAccountError(null);
+    setIsDialogOpen(true);
+  };
+
+  const openEdit = (account: SavedBankAccount) => {
+    setEditingAccount(account);
+    setFormData({
+      label: account.label || "",
+      bankName: account.bank_name,
+      accountNumber: account.account_number,
+      accountName: profileAccountName,
+      isDefault: account.is_default,
+    });
+    setAccountError(null);
+    setIsDialogOpen(true);
+  };
+
+  const clearDefaultAccounts = async () => {
+    if (!user?.id) return;
+
+    const { error } = await supabase
+      .from("user_bank_accounts")
+      .update({ is_default: false })
+      .eq("user_id", user.id);
+
+    if (error) throw error;
+  };
 
   const handleSave = async () => {
     if (!user?.id) {
@@ -87,8 +145,15 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
       return;
     }
 
-    if (!formData.bankName || !formData.accountNumber || !formData.accountName) {
-      const message = "กรุณากรอกข้อมูลให้ครบ";
+    if (!profileAccountName) {
+      const message = "กรุณากรอกชื่อจริงและนามสกุลในโปรไฟล์ก่อนเพิ่มบัญชีรับเงิน";
+      setAccountError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (!formData.bankName || !formData.accountNumber) {
+      const message = "กรุณากรอกข้อมูลบัญชีให้ครบ";
       setAccountError(message);
       toast.error(message);
       return;
@@ -101,150 +166,274 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
       return;
     }
 
+    const normalizedAccountNumber = normalizeBankAccountForStorage(formData.bankName, formData.accountNumber);
+
     setIsSubmitting(true);
     try {
-      // Update all active agreements where user is lender
-      const { data, error } = await supabase
-        .from("debt_agreements")
-        .update({
-          bank_name: formData.bankName,
-          account_number: normalizeBankAccountForStorage(formData.bankName, formData.accountNumber),
-          account_name: formData.accountName,
-        })
-        .eq("lender_id", user.id)
-        .in("status", OPEN_AGREEMENT_STATUSES)
-        .select("id");
-
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error("ไม่พบรายการที่คุณมีสิทธิ์อัปเดต");
+      if (formData.isDefault || accounts.length === 0) {
+        await clearDefaultAccounts();
       }
 
-      setBankData({
-        bank_name: formData.bankName,
-        account_number: normalizeBankAccountForStorage(formData.bankName, formData.accountNumber),
-        account_name: formData.accountName,
-      });
+      if (editingAccount) {
+        const { error } = await supabase
+          .from("user_bank_accounts")
+          .update({
+            label: formData.label.trim() || null,
+            bank_name: formData.bankName,
+            account_number: normalizedAccountNumber,
+            account_name: profileAccountName,
+            is_default: formData.isDefault || accounts.length === 1,
+          })
+          .eq("id", editingAccount.id)
+          .eq("user_id", user.id);
 
-      toast.success("อัปเดตบัญชีรับเงินแล้ว");
-      setAccountError(null);
-      setIsEditing(false);
+        if (error) throw error;
+        toast.success("อัปเดตบัญชีรับเงินแล้ว");
+      } else {
+        const { error } = await supabase
+          .from("user_bank_accounts")
+          .insert({
+            user_id: user.id,
+            label: formData.label.trim() || null,
+            bank_name: formData.bankName,
+            account_number: normalizedAccountNumber,
+            account_name: profileAccountName,
+            is_default: formData.isDefault || accounts.length === 0,
+          });
+
+        if (error) throw error;
+        toast.success("เพิ่มบัญชีรับเงินแล้ว");
+      }
+
+      await fetchBankAccounts();
+      setIsDialogOpen(false);
+      resetDialog();
     } catch (error) {
-      console.error("Error updating bank account:", error);
-      toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่");
+      console.error("Error saving bank account:", error);
+      toast.error("บันทึกบัญชีรับเงินไม่สำเร็จ");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const getBankLabel = (value: string) => {
-    return THAI_BANKS.find((b) => b.value === value)?.label || value;
+  const handleSetDefault = async (account: SavedBankAccount) => {
+    if (!user?.id || account.is_default) return;
+
+    setIsSubmitting(true);
+    try {
+      await clearDefaultAccounts();
+
+      const { error } = await supabase
+        .from("user_bank_accounts")
+        .update({ is_default: true })
+        .eq("id", account.id)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      await fetchBankAccounts();
+      toast.success("ตั้งเป็นบัญชีหลักแล้ว");
+    } catch (error) {
+      console.error("Error setting default bank account:", error);
+      toast.error("ตั้งบัญชีหลักไม่สำเร็จ");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("คัดลอกแล้ว");
-  };
+  const handleDelete = async (account: SavedBankAccount) => {
+    if (!user?.id) return;
+    if (!window.confirm("ลบบัญชีรับเงินนี้หรือไม่?")) return;
 
-  const hasBankAccount = bankData?.bank_name && bankData?.account_number && bankData?.account_name;
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from("user_bank_accounts")
+        .delete()
+        .eq("id", account.id)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      const remainingAccounts = accounts.filter((item) => item.id !== account.id);
+      if (account.is_default && remainingAccounts.length > 0) {
+        const nextDefault = remainingAccounts[0];
+        const { error: defaultError } = await supabase
+          .from("user_bank_accounts")
+          .update({ is_default: true })
+          .eq("id", nextDefault.id)
+          .eq("user_id", user.id);
+
+        if (defaultError) throw defaultError;
+      }
+
+      await fetchBankAccounts();
+      toast.success("ลบบัญชีรับเงินแล้ว");
+    } catch (error) {
+      console.error("Error deleting bank account:", error);
+      toast.error("ลบบัญชีรับเงินไม่สำเร็จ");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (isLoading) {
     return (
       <div className="bg-card rounded-2xl p-5 shadow-card mb-6 animate-pulse">
-        <div className="h-4 bg-muted rounded w-1/3 mb-4"></div>
-        <div className="h-20 bg-muted rounded"></div>
+        <div className="h-4 bg-muted rounded w-1/3 mb-4" />
+        <div className="h-24 bg-muted rounded" />
       </div>
     );
   }
 
-  const openEdit = () => {
-    setFormData({
-      bankName: bankData?.bank_name || "",
-      accountNumber: bankData?.account_number || "",
-      accountName: bankData?.account_name || "",
-    });
-    setAccountError(null);
-    setIsEditing(true);
-  };
-
   return (
     <div ref={ref}>
-      <div 
-        className="bg-card rounded-2xl p-5 shadow-card mb-6 cursor-pointer hover:bg-secondary/30 transition-colors"
-        onClick={openEdit}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2 text-foreground font-medium">
-            <Building className="w-5 h-5 text-primary" />
-            <span>บัญชีรับเงิน</span>
+      <div className="bg-card rounded-2xl p-5 shadow-card mb-6">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-start gap-2">
+            <Building className="w-5 h-5 text-primary mt-0.5" />
+            <div>
+              <h3 className="font-medium text-foreground">ตั้งค่าบัญชีรับเงิน</h3>
+              <p className="text-xs text-muted-foreground">
+                ใช้เมื่อคุณสร้างข้อตกลงในฐานะผู้ให้ยืม
+              </p>
+            </div>
           </div>
-          <Pencil className="w-4 h-4 text-muted-foreground" />
+          <Button type="button" size="sm" className="gap-1" onClick={openCreate}>
+            <Plus className="w-4 h-4" aria-hidden="true" />
+            เพิ่มบัญชี
+          </Button>
         </div>
 
-        {hasBankAccount ? (
-          <div className="space-y-2 text-sm bg-primary/5 border border-primary/20 rounded-xl p-4">
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">ธนาคาร</span>
-              <span className="font-medium text-foreground">
-                {getBankLabel(bankData.bank_name!)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">
-                {bankData.bank_name === "promptpay" ? "พร้อมเพย์" : "เลขบัญชี"}
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-foreground font-mono">
-                  {bankData.account_number}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    copyToClipboard(bankData.account_number!);
-                  }}
-                  className="p-1 hover:bg-primary/10 rounded"
-                >
-                  <Copy className="w-3 h-3 text-primary" />
-                </button>
+        {accounts.length > 0 ? (
+          <div className="space-y-3">
+            {accounts.map((account) => (
+              <div
+                key={account.id}
+                className="rounded-xl border border-border/80 bg-background/70 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-foreground">
+                        {account.label || getBankLabel(account.bank_name)}
+                      </p>
+                      {account.is_default ? (
+                        <Badge variant="secondary" className="gap-1">
+                          <Star className="h-3 w-3" aria-hidden="true" />
+                          บัญชีหลัก
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {getBankLabel(account.bank_name)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEdit(account)}
+                      aria-label="แก้ไขบัญชีรับเงิน"
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(account)}
+                      disabled={isSubmitting}
+                      aria-label="ลบบัญชีรับเงิน"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                  <div className="rounded-lg bg-secondary/40 p-3">
+                    <p className="text-xs text-muted-foreground">
+                      {account.bank_name === "promptpay" ? "พร้อมเพย์" : "เลขบัญชี"}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-medium text-foreground">
+                        {account.account_number}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(account.account_number)}
+                        className="rounded p-1 text-primary hover:bg-primary/10"
+                        aria-label="คัดลอกเลขบัญชี"
+                      >
+                        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-secondary/40 p-3">
+                    <p className="text-xs text-muted-foreground">ชื่อบัญชี</p>
+                    <p className="font-medium text-foreground">{account.account_name}</p>
+                  </div>
+                </div>
+
+                {!account.is_default ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 gap-1"
+                    onClick={() => handleSetDefault(account)}
+                    disabled={isSubmitting}
+                  >
+                    <Star className="h-4 w-4" aria-hidden="true" />
+                    ตั้งเป็นบัญชีหลัก
+                  </Button>
+                ) : null}
               </div>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">ชื่อบัญชี</span>
-              <span className="font-medium text-foreground">{bankData.account_name}</span>
-            </div>
-            <p className="text-xs text-muted-foreground pt-2 border-t border-border mt-2">
-              ข้อมูลนี้จะใช้ตอนสร้างข้อตกลงใหม่
-            </p>
+            ))}
           </div>
         ) : (
-          <div className="p-4 bg-secondary/50 rounded-xl text-center">
-            <p className="text-sm text-muted-foreground mb-2">
-              ยังไม่ได้ตั้งค่าบัญชีรับเงิน
+          <div className="rounded-xl bg-secondary/50 p-4 text-center">
+            <p className="text-sm text-muted-foreground mb-3">
+              ยังไม่มีบัญชีรับเงิน เพิ่มไว้ก่อนสร้างข้อตกลง
             </p>
-            <p className="text-xs text-muted-foreground">
-              แตะที่นี่เพื่อตั้งค่าบัญชีสำหรับรับชำระเงิน
-            </p>
+            <Button type="button" onClick={openCreate} className="gap-1">
+              <Plus className="w-4 h-4" aria-hidden="true" />
+              เพิ่มบัญชีรับเงิน
+            </Button>
           </div>
         )}
       </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditing} onOpenChange={setIsEditing}>
+      <Dialog
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) resetDialog();
+        }}
+      >
         <DialogContent className="max-w-md mx-4">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building className="w-5 h-5 text-primary" />
-              ตั้งค่าบัญชีรับเงิน
+              {editingAccount ? "แก้ไขบัญชีรับเงิน" : "เพิ่มบัญชีรับเงิน"}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              ข้อมูลนี้จะใช้เมื่อคุณสร้างข้อตกลงในฐานะผู้ให้ยืม
-            </p>
-            
             <div className="space-y-2">
-              <Label>ธนาคาร</Label>
+              <Label htmlFor="bankLabel">ชื่อเรียกบัญชี</Label>
+              <Input
+                id="bankLabel"
+                value={formData.label}
+                onChange={(event) => setFormData({ ...formData, label: event.target.value })}
+                placeholder="เช่น บัญชีหลัก, พร้อมเพย์ส่วนตัว"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>ธนาคารหรือช่องทางรับเงิน</Label>
               <Select
                 value={formData.bankName}
                 onValueChange={(value) => {
@@ -266,22 +455,17 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
             </div>
 
             <div className="space-y-2">
-              <Label>
-                {formData.bankName === "promptpay"
-                  ? "หมายเลขพร้อมเพย์"
-                  : "เลขบัญชี"}
+              <Label htmlFor="accountNumber">
+                {formData.bankName === "promptpay" ? "หมายเลขพร้อมเพย์" : "เลขบัญชี"}
               </Label>
               <Input
+                id="accountNumber"
                 value={formData.accountNumber}
-                onChange={(e) => {
-                  setFormData({ ...formData, accountNumber: e.target.value });
+                onChange={(event) => {
+                  setFormData({ ...formData, accountNumber: event.target.value });
                   setAccountError(null);
                 }}
-                placeholder={
-                  formData.bankName === "promptpay"
-                    ? "0812345678"
-                    : "123-4-56789-0"
-                }
+                placeholder={formData.bankName === "promptpay" ? "0812345678" : "123-4-56789-0"}
                 inputMode="numeric"
               />
             </div>
@@ -290,37 +474,53 @@ export const ProfileBankAccount = forwardRef<HTMLDivElement, object>(function Pr
             ) : null}
 
             <div className="space-y-2">
-              <Label>ชื่อบัญชี</Label>
+              <Label htmlFor="accountName">ชื่อบัญชี</Label>
               <Input
-                value={formData.accountName}
-                onChange={(e) => {
-                  setFormData({ ...formData, accountName: e.target.value });
-                  setAccountError(null);
-                }}
-                placeholder="ชื่อ-นามสกุล ตามบัญชี"
+                id="accountName"
+                value={profileAccountName}
+                readOnly
+                placeholder="ชื่อจริงจากข้อมูลสมัคร"
               />
+              <p className="text-xs text-muted-foreground">
+                ดึงจากชื่อจริงและนามสกุลที่บันทึกตอนสมัคร
+              </p>
+              {!profileAccountName ? (
+                <p className="text-xs text-destructive">
+                  กรุณากรอกชื่อจริงและนามสกุลในโปรไฟล์ก่อนเพิ่มบัญชีรับเงิน
+                </p>
+              ) : null}
             </div>
+
+            <label className="flex items-center gap-2 rounded-xl border border-border/80 p-3 text-sm">
+              <Checkbox
+                checked={formData.isDefault}
+                onCheckedChange={(checked) => setFormData({ ...formData, isDefault: checked === true })}
+              />
+              <span>ตั้งเป็นบัญชีหลัก</span>
+            </label>
 
             <div className="flex gap-2 pt-2">
               <Button
+                type="button"
                 variant="outline"
                 className="flex-1"
-                onClick={() => {
-                  setAccountError(null);
-                  setIsEditing(false);
-                }}
+                onClick={() => setIsDialogOpen(false)}
                 disabled={isSubmitting}
               >
                 <X className="w-4 h-4 mr-1" />
                 ยกเลิก
               </Button>
               <Button
+                type="button"
                 className="flex-1"
                 onClick={handleSave}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !profileAccountName}
               >
                 {isSubmitting ? (
-                  "กำลังบันทึก..."
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    กำลังบันทึก
+                  </>
                 ) : (
                   <>
                     <Check className="w-4 h-4 mr-1" />

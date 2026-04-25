@@ -32,6 +32,10 @@ interface BankAccountSectionProps {
   onUpdate: () => void;
 }
 
+function getProfileAccountName(profile: ReturnType<typeof useAuth>["profile"]): string {
+  return [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim();
+}
+
 export function BankAccountSection({
   agreementId,
   lenderId,
@@ -41,7 +45,7 @@ export function BankAccountSection({
   isLender,
   onUpdate,
 }: BankAccountSectionProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -51,6 +55,7 @@ export function BankAccountSection({
   });
   const [accountError, setAccountError] = useState<string | null>(null);
   const canEditBankAccount = isLender && user?.id === lenderId;
+  const profileAccountName = getProfileAccountName(profile);
 
   const handleSave = async () => {
     if (!canEditBankAccount) {
@@ -58,7 +63,14 @@ export function BankAccountSection({
       return;
     }
 
-    if (!formData.bankName || !formData.accountNumber || !formData.accountName) {
+    if (!profileAccountName) {
+      const message = "กรุณากรอกชื่อจริงและนามสกุลในโปรไฟล์ก่อนแก้ไขบัญชีรับเงิน";
+      setAccountError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (!formData.bankName || !formData.accountNumber) {
       const message = "กรุณากรอกข้อมูลให้ครบ";
       setAccountError(message);
       toast.error(message);
@@ -79,7 +91,7 @@ export function BankAccountSection({
         .update({
           bank_name: formData.bankName,
           account_number: normalizeBankAccountForStorage(formData.bankName, formData.accountNumber),
-          account_name: formData.accountName,
+          account_name: profileAccountName,
         })
         .eq("id", agreementId)
         .eq("lender_id", lenderId)
@@ -126,7 +138,7 @@ export function BankAccountSection({
                 setFormData({
                   bankName: bankName || "",
                   accountNumber: accountNumber || "",
-                  accountName: accountName || "",
+                  accountName: profileAccountName,
                 });
                 setAccountError(null);
                 setIsEditing(true);
@@ -228,13 +240,18 @@ export function BankAccountSection({
             <div className="space-y-2">
               <Label>ชื่อบัญชี</Label>
               <Input
-                value={formData.accountName}
-                onChange={(e) => {
-                  setFormData({ ...formData, accountName: e.target.value });
-                  setAccountError(null);
-                }}
-                placeholder="ชื่อ-นามสกุล ตามบัญชี"
+                value={profileAccountName}
+                readOnly
+                placeholder="ชื่อจริงจากข้อมูลสมัคร"
               />
+              <p className="text-xs text-muted-foreground">
+                ดึงจากชื่อจริงและนามสกุลที่บันทึกตอนสมัคร
+              </p>
+              {!profileAccountName ? (
+                <p className="text-xs text-destructive">
+                  กรุณากรอกชื่อจริงและนามสกุลในโปรไฟล์ก่อนแก้ไขบัญชีรับเงิน
+                </p>
+              ) : null}
             </div>
 
             <div className="flex gap-2 pt-2">
@@ -253,7 +270,7 @@ export function BankAccountSection({
               <Button
                 className="flex-1"
                 onClick={handleSave}
-                disabled={isSubmitting || !canEditBankAccount}
+                disabled={isSubmitting || !canEditBankAccount || !profileAccountName}
               >
                 {isSubmitting ? (
                   "กำลังบันทึก..."
