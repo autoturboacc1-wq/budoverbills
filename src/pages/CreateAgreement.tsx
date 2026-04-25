@@ -16,7 +16,7 @@ import { PasswordConfirmDialog } from "@/components/PasswordConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { THAI_BANKS } from "@/constants/thaibanks";
 import { buildEffectiveRateSchedule, getPeriodsPerYear } from "@/domains/debt/recalculateEffectiveRateSchedule";
-import { divideMoney, roundMoney, sumMoney, toMoney } from "@/utils/money";
+import { divideMoney, roundMoney, subtractMoney, sumMoney, toMoney } from "@/utils/money";
 import {
   Select,
   SelectContent,
@@ -39,6 +39,7 @@ import {
 } from "@/components/ux";
 
 type InterestType = "none" | "flat" | "effective";
+const FINAL_CREATE_AGREEMENT_STEP = 3;
 
 interface CalculationResult {
   perInstallment: number;
@@ -69,6 +70,20 @@ interface SavedBankAccount {
 interface CreateAgreementLocationState {
   selectedFriend?: SelectedBorrowerFriend;
 }
+
+const splitMoneyAcrossInstallments = (total: number, installments: number): number[] => {
+  const equalAmount = divideMoney(total, installments);
+  let allocatedAmount = 0;
+
+  return Array.from({ length: installments }, (_, index) => {
+    if (index === installments - 1) {
+      return subtractMoney(total, allocatedAmount);
+    }
+
+    allocatedAmount = sumMoney(allocatedAmount, equalAmount);
+    return equalAmount;
+  });
+};
 
 const BANGKOK_TIME_ZONE = "Asia/Bangkok";
 const bangkokDateFormatter = new Intl.DateTimeFormat("en-CA", {
@@ -259,6 +274,13 @@ export default function CreateAgreement() {
   // Validate form before showing password dialog
   const handleSubmitClick = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (currentStep < FINAL_CREATE_AGREEMENT_STEP) {
+      if (canProceedByStep[currentStep]) {
+        setCurrentStep((step) => step + 1);
+      }
+      return;
+    }
     
     if (!user) {
       toast.error("กรุณาเข้าสู่ระบบก่อน");
@@ -271,6 +293,11 @@ export default function CreateAgreement() {
 
     if (!formData.amount || principalAmount <= 0) {
       toast.error("กรุณาใส่จำนวนเงิน");
+      return;
+    }
+
+    if (!hasValidRequiredInterestRate) {
+      toast.error("กรุณากรอกอัตราดอกเบี้ยต่อปี");
       return;
     }
 
@@ -371,37 +398,42 @@ export default function CreateAgreement() {
     // Calculate period rate based on frequency
     const periodsPerYear = getPeriodsPerYear(formData.frequency as 'daily' | 'weekly' | 'monthly');
 
-    const periodRate = annualRate / periodsPerYear;
-
     // No interest calculation
-    const noInterestPerInstallment = divideMoney(principal, numInstallments);
+    const noInterestPrincipalParts = splitMoneyAcrossInstallments(principal, numInstallments);
+    const noInterestSchedule = noInterestPrincipalParts.map((principalPortion, index) => ({
+      installment: index + 1,
+      principal: principalPortion,
+      interest: 0,
+      total: principalPortion,
+    }));
     const noInterest: CalculationResult = {
-      perInstallment: noInterestPerInstallment,
+      perInstallment: noInterestSchedule[0]?.total || divideMoney(principal, numInstallments),
       totalInterest: 0,
       totalAmount: principal,
-      schedule: [],
+      schedule: noInterestSchedule,
     };
 
     // Flat Rate: Fixed interest on original principal
     const totalFlatInterest = roundMoney(principal * annualRate * (numInstallments / periodsPerYear));
     const flatTotal = sumMoney(principal, totalFlatInterest);
-    const flatPerInstallment = divideMoney(flatTotal, numInstallments);
-    const flatInterestPerInstallment = divideMoney(totalFlatInterest, numInstallments);
-    const flatPrincipalPerInstallment = divideMoney(principal, numInstallments);
+    const flatPrincipalParts = splitMoneyAcrossInstallments(principal, numInstallments);
+    const flatInterestParts = splitMoneyAcrossInstallments(totalFlatInterest, numInstallments);
     
     // Generate flat rate schedule
     const flatSchedule: CalculationResult["schedule"] = [];
-    for (let i = 1; i <= numInstallments; i++) {
+    for (let i = 0; i < numInstallments; i++) {
+      const principalPortion = flatPrincipalParts[i];
+      const interestPortion = flatInterestParts[i];
       flatSchedule.push({
-        installment: i,
-        principal: flatPrincipalPerInstallment,
-        interest: flatInterestPerInstallment,
-        total: sumMoney(flatPrincipalPerInstallment, flatInterestPerInstallment),
+        installment: i + 1,
+        principal: principalPortion,
+        interest: interestPortion,
+        total: sumMoney(principalPortion, interestPortion),
       });
     }
     
     const flat: CalculationResult = {
-      perInstallment: flatPerInstallment,
+      perInstallment: flatSchedule[0]?.total || divideMoney(flatTotal, numInstallments),
       totalInterest: totalFlatInterest,
       totalAmount: flatTotal,
       schedule: flatSchedule,
@@ -432,6 +464,12 @@ export default function CreateAgreement() {
   }, [annualInterestRate, formData.frequency, installmentCount, principalAmount]);
 
   const selectedCalculation = calculations[formData.interestType];
+  const requiresInterestRate = formData.interestType !== "none";
+  const hasValidRequiredInterestRate =
+    !requiresInterestRate || (formData.interest.trim() !== "" && annualInterestRate > 0 && annualInterestRate <= 15);
+  const interestRateError = requiresInterestRate && !hasValidRequiredInterestRate
+    ? "กรุณากรอกอัตราดอกเบี้ย 0.1-15% ต่อปี"
+    : null;
 
   // Calculate annual reschedule fee rate and check against 15% ceiling
   const rescheduleFeeAnalysis = useMemo(() => {
@@ -571,9 +609,9 @@ export default function CreateAgreement() {
 
   const canProceedByStep = [
     hasSelectedFriend,
-    !!formData.amount && principalAmount > 0 && installmentCount > 0 && !!selectedCalculation,
+    !!formData.amount && principalAmount > 0 && installmentCount > 0 && !!selectedCalculation && hasValidRequiredInterestRate,
     hasSelectedBankAccount,
-    !!selectedCalculation && hasSelectedFriend && !!formData.amount && hasSelectedBankAccount,
+    !!selectedCalculation && hasSelectedFriend && !!formData.amount && hasSelectedBankAccount && hasValidRequiredInterestRate,
   ];
 
   const getBankLabel = (value: string) => {
@@ -853,7 +891,7 @@ export default function CreateAgreement() {
           <div className="space-y-4 rounded-[1.25rem] border border-border/80 bg-card/90 p-5">
             <div className="flex items-center gap-2 text-foreground font-medium">
               <Percent className="w-5 h-5 text-primary" />
-              <span>ดอกเบี้ย (ไม่บังคับ)</span>
+              <span>ดอกเบี้ย</span>
             </div>
 
             {/* Interest Type Selection */}
@@ -881,23 +919,33 @@ export default function CreateAgreement() {
             {/* Interest Rate Input (only if interest type is selected) */}
             {formData.interestType !== "none" && (
               <div className="space-y-2">
-                <Label htmlFor="interest">อัตราดอกเบี้ย (% ต่อปี)</Label>
+                <Label htmlFor="interest">
+                  อัตราดอกเบี้ย (% ต่อปี) <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="interest"
                   type="number"
+                  min="0.1"
                   max="15"
                   step="0.1"
                   placeholder="สูงสุด 15%"
                   value={formData.interest}
+                  required
+                  aria-invalid={Boolean(interestRateError)}
+                  className={interestRateError ? "border-destructive" : undefined}
                   onChange={(e) => {
                     const value = Math.min(Number(e.target.value), 15);
                     setFormData({ ...formData, interest: value > 0 ? String(value) : e.target.value });
                   }}
                 />
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Info className="w-3 h-3" />
-                  สูงสุด 15% ต่อปี
-                </p>
+                {interestRateError ? (
+                  <p className="text-xs text-destructive">{interestRateError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Info className="w-3 h-3" />
+                    สูงสุด 15% ต่อปี
+                  </p>
+                )}
               </div>
             )}
 
