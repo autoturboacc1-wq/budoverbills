@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { featureFlags } from "@/config/featureFlags";
 
 export interface AgreementQuota {
   can_create_free: boolean;
@@ -108,7 +109,7 @@ function parseFutureDate(value: string | null | undefined): Date | null {
 export function useSubscription() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const paymentGatewayEnabled = false;
+  const paymentGatewayEnabled = featureFlags.paymentGatewayEnabled;
   const cachedSubscriptionState = user?.id ? readCachedSubscriptionState(user.id) : null;
 
   // Fetch agreement quota (2 free, then pay per agreement)

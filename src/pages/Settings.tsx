@@ -25,6 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import { PushNotificationToggle } from "@/components/PushNotificationToggle";
+import { featureFlags } from "@/config/featureFlags";
 import { useTheme } from "next-themes";
 import {
   Dialog,
@@ -273,9 +274,11 @@ export default function Settings() {
             description="การแจ้งเตือนบางรายการบันทึกบนอุปกรณ์นี้ ขณะที่ push notification ผูกกับสิทธิ์ของเบราว์เซอร์"
           >
             <div className="divide-y divide-border rounded-2xl border border-border/70">
-            <div className="p-4">
-              <PushNotificationToggle />
-            </div>
+            {featureFlags.pushNotificationsEnabled && (
+              <div className="p-4">
+                <PushNotificationToggle />
+              </div>
+            )}
 
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-3">

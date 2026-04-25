@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { featureFlags } from "@/config/featureFlags";
 
 // Coffee tiers with credits
 const COFFEE_TIERS = [
@@ -63,7 +64,7 @@ const COFFEE_TIERS = [
 export default function Subscription() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const paymentGatewayEnabled = false;
+  const paymentGatewayEnabled = featureFlags.paymentGatewayEnabled;
   const [expandedSection, setExpandedSection] = useState<string | null>("coffee");
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [selectedWhyTier, setSelectedWhyTier] = useState<string>("luxury"); // Default to popular tier
@@ -224,7 +225,29 @@ export default function Subscription() {
           </div>
         </motion.section>
 
-        {/* Coffee Selection */}
+        {/* Coffee Selection — only visible when payment gateway is wired up.
+            Otherwise show a clear "coming soon" notice rather than letting
+            users click a button that returns "ยังไม่เปิดใช้งาน". */}
+        {!paymentGatewayEnabled ? (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="bg-card rounded-2xl shadow-card overflow-hidden mb-6"
+          >
+            <div className="p-5 flex items-start gap-3">
+              <Coffee className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <h2 className="font-medium text-foreground mb-1">
+                  เลี้ยงกาแฟทีมงาน — เร็ว ๆ นี้
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  ระบบรับชำระเงินยังไม่เปิดใช้งาน ตอนนี้ทุกคนใช้สิทธิ์ฟรี {freeLimit} ครั้ง/เดือนได้ปกติ ทีมงานจะเปิดให้ซื้อ Credit เพิ่มในเร็ว ๆ นี้
+                </p>
+              </div>
+            </div>
+          </motion.section>
+        ) : (
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -401,10 +424,6 @@ export default function Subscription() {
                           </span>
                         )}
                       </Button>
-
-                      <p className="text-xs text-center text-muted-foreground mt-2">
-                        ระบบชำระเงินจริงยังไม่เปิดใช้งาน
-                      </p>
                     </motion.div>
                   )}
                 </div>
@@ -412,6 +431,7 @@ export default function Subscription() {
             )}
           </AnimatePresence>
         </motion.section>
+        )}
 
         {/* Why Support Section */}
         <motion.section
