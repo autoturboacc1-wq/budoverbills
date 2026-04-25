@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -45,7 +45,7 @@ export default function AdminSecurityPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     if (!isAdmin) return;
     
     setLoading(true);
@@ -82,13 +82,13 @@ export default function AdminSecurityPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin]);
 
   useEffect(() => {
     if (isAdmin) {
       fetchLogs();
     }
-  }, [isAdmin]);
+  }, [fetchLogs, isAdmin]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

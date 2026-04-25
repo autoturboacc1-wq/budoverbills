@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, Clock, CheckCircle2, AlertCircle, Loader2, FileText, ReceiptText, History, Check, X, CreditCard, XCircle, CalendarClock, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -306,7 +306,7 @@ export default function DebtDetail() {
   };
 
   // Use domain layer for installment status - no direct date comparisons
-  const getInstallmentStatus = (inst: Installment) => {
+  const getInstallmentStatus = useCallback((inst: Installment) => {
     if (inst.status === 'paid') return 'paid';
     
     // Check if this installment has rejected slip (and not paid)
@@ -322,7 +322,7 @@ export default function DebtDetail() {
       return 'pending'; // Has slip, waiting for confirmation
     }
     return 'upcoming';
-  };
+  }, [rejectedInstallments]);
 
   const formatDueDate = (dateStr: string) => {
     try {
@@ -378,7 +378,7 @@ export default function DebtDetail() {
                   : "due_soon",
       };
     });
-  }, [sortedInstallments]);
+  }, [getInstallmentStatus, sortedInstallments]);
 
   if (isLoading) {
     return (

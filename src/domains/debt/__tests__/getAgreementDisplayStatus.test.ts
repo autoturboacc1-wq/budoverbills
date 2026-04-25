@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAgreementDisplayStatus, needsUserConfirmation } from '@/domains/debt/getAgreementDisplayStatus';
 import { createAgreement } from '@/test/fixtures/debt';
 
 describe('getAgreementDisplayStatus', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-01T00:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns completed for completed agreements', () => {
     expect(getAgreementDisplayStatus(createAgreement({ status: 'completed' }))).toBe('completed');
   });

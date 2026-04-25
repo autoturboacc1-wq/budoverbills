@@ -136,9 +136,10 @@ export function useDebtAgreements() {
   const [agreements, setAgreements] = useState<DebtAgreement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
+  const userId = user?.id ?? null;
 
   const fetchAgreements = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setAgreements([]);
       setIsLoading(false);
       return;
@@ -206,14 +207,14 @@ export function useDebtAgreements() {
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [userId]);
 
   useEffect(() => {
     void fetchAgreements();
   }, [fetchAgreements]);
 
   useEffect(() => {
-    if (!user?.id) {
+    if (!userId) {
       return;
     }
 
@@ -223,14 +224,14 @@ export function useDebtAgreements() {
     };
 
     const agreementsChannel = supabase
-      .channel(`debt-agreements-${user.id}`)
+      .channel(`debt-agreements-${userId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'debt_agreements',
-          filter: `lender_id=eq.${user.id}`,
+          filter: `lender_id=eq.${userId}`,
         },
         refresh
       )
@@ -240,7 +241,7 @@ export function useDebtAgreements() {
           event: '*',
           schema: 'public',
           table: 'debt_agreements',
-          filter: `borrower_id=eq.${user.id}`,
+          filter: `borrower_id=eq.${userId}`,
         },
         refresh
       )
@@ -250,7 +251,7 @@ export function useDebtAgreements() {
 
     agreements.forEach((agreement) => {
       const installmentsChannel = supabase
-        .channel(`debt-installments-${user.id}-${agreement.id}`)
+        .channel(`debt-installments-${userId}-${agreement.id}`)
         .on(
           'postgres_changes',
           {
@@ -271,7 +272,7 @@ export function useDebtAgreements() {
         void supabase.removeChannel(channel);
       });
     };
-  }, [agreements, fetchAgreements, user?.id]);
+  }, [agreements, fetchAgreements, userId]);
 
   const createAgreement = async (input: CreateAgreementInput) => {
     if (!user) {

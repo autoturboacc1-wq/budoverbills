@@ -244,5 +244,5 @@ export const useGlobalChatNotification = () => {
         void supabase.removeChannel(channel);
       });
     };
-  }, [chatTargets.agreementIds, chatTargets.directChatIds, playNotificationSound, userId]);
+  }, [chatTargets.agreementIds, chatTargets.directChatIds, playNotificationSound, refreshChatTargets, userId]);
 };

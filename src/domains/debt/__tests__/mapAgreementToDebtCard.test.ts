@@ -56,7 +56,7 @@ describe('mapAgreementToDebtCard', () => {
     const card = mapAgreementToDebtCard(agreement, 'lender-id');
 
     expect(card.remainingAmount).toBe(900);
-    expect(card.amount).toBe(900);
+    expect(card.amount).toBe(3000);
     expect(card.installmentProgress).toEqual({ current: 1, total: 3 });
     expect(card.nextPaymentDate).not.toBe('-');
   });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Send, Square, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -69,7 +69,7 @@ export function VoiceRecorder({
     };
   }, []);
 
-  const resetDraft = () => {
+  const resetDraft = useCallback(() => {
     if (timerRef.current) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
@@ -103,9 +103,9 @@ export function VoiceRecorder({
         setPreviewUrl(null);
       }
     }
-  };
+  }, []);
 
-  const stopRecording = () => {
+  const stopRecording = useCallback(() => {
     if (!isRecording) return;
 
     if (timerRef.current) {
@@ -114,7 +114,7 @@ export function VoiceRecorder({
     }
 
     mediaRecorderRef.current?.stop();
-  };
+  }, [isRecording]);
 
   useEffect(() => {
     stopRecordingRef.current = stopRecording;
