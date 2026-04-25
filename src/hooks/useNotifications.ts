@@ -1,8 +1,9 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { isSafeInternalPath } from "@/utils/navigation";
+import { getSafeNotificationTarget, isSafeInternalPath } from "@/utils/navigation";
 
 export type NotificationPriority = "critical" | "important" | "info";
 
@@ -50,6 +51,7 @@ export function dedupeNotificationsById(items: Notification[]): Notification[] {
 
 function useNotificationsState(): NotificationsContextValue {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const requestIdRef = useRef(0);
@@ -243,8 +245,15 @@ function useNotificationsState(): NotificationsContextValue {
           notificationIdSetRef.current.add(newNotification.id);
           upsertNotification(newNotification);
 
+          const safeTarget = getSafeNotificationTarget(newNotification);
           toast(newNotification.title, {
             description: newNotification.message,
+            action: safeTarget
+              ? {
+                  label: "เปิด",
+                  onClick: () => navigate(safeTarget),
+                }
+              : undefined,
           });
         }
       )
@@ -289,7 +298,7 @@ function useNotificationsState(): NotificationsContextValue {
       }
       teardownChannel(channel);
     };
-  }, [fetchNotifications, normalizeNotification, removeNotificationById, syncNotificationIds, teardownChannel, upsertNotification, userId]);
+  }, [fetchNotifications, navigate, normalizeNotification, removeNotificationById, syncNotificationIds, teardownChannel, upsertNotification, userId]);
 
   return {
     notifications,

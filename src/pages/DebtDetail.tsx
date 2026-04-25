@@ -75,15 +75,20 @@ export default function DebtDetail() {
     
     const payInstallmentId = searchParams.get('pay');
     const rescheduleInstallmentId = searchParams.get('reschedule');
+    const nextSearchParams = new URLSearchParams(searchParams);
+    let shouldReplaceSearchParams = false;
     
     if (payInstallmentId) {
       const installment = agreement.installments.find(i => i.id === payInstallmentId);
       if (installment && installment.status !== 'paid') {
         setSelectedPaymentInstallment(installment);
         setPaymentDialogOpen(true);
-        // Clear the query param
-        setSearchParams({}, { replace: true });
+      } else {
+        setSelectedPaymentInstallment(null);
+        setPaymentDialogOpen(false);
       }
+      nextSearchParams.delete('pay');
+      shouldReplaceSearchParams = true;
     }
     
     if (rescheduleInstallmentId) {
@@ -95,9 +100,13 @@ export default function DebtDetail() {
           interest: installment.interest_portion || 0
         });
         setRescheduleDialogOpen(true);
-        // Clear the query param
-        setSearchParams({}, { replace: true });
       }
+      nextSearchParams.delete('reschedule');
+      shouldReplaceSearchParams = true;
+    }
+
+    if (shouldReplaceSearchParams) {
+      setSearchParams(nextSearchParams, { replace: true });
     }
   }, [agreement?.installments, searchParams, setSearchParams]);
   

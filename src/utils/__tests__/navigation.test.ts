@@ -33,4 +33,32 @@ describe("navigation utils", () => {
       }),
     ).toBe("/debt/550e8400-e29b-41d4-a716-446655440000");
   });
+
+  it("prefers safe notification action URLs", () => {
+    expect(
+      getSafeNotificationTarget({
+        action_url: "/debt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa?pay=11111111-1111-4111-8111-111111111111",
+        related_id: "550e8400-e29b-41d4-a716-446655440000",
+        related_type: "agreement",
+      }),
+    ).toBe("/debt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa?pay=11111111-1111-4111-8111-111111111111");
+  });
+
+  it("rejects unsafe notification action URLs and falls back to related routes", () => {
+    expect(
+      getSafeNotificationTarget({
+        action_url: "/%5Cevil.com",
+        related_id: "550e8400-e29b-41d4-a716-446655440000",
+        related_type: "agreement",
+      }),
+    ).toBe("/debt/550e8400-e29b-41d4-a716-446655440000");
+
+    expect(
+      getSafeNotificationTarget({
+        action_url: "//evil.com",
+        related_id: null,
+        related_type: null,
+      }),
+    ).toBeNull();
+  });
 });
