@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { renderToStaticMarkup } from "react-dom/server";
 import { motion } from "framer-motion";
-import { ArrowLeft, FileSignature, Printer, ShieldCheck, Loader2, AlertCircle, Eye } from "lucide-react";
+import { ArrowLeft, FileSignature, Printer, ShieldCheck, Loader2, AlertCircle, Eye, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -121,10 +121,17 @@ export default function AgreementContract() {
   const [loanPurpose, setLoanPurpose] = useState("");
   const [typedName, setTypedName] = useState("");
   const [accepted, setAccepted] = useState(false);
+  const [pdpaConsented, setPdpaConsented] = useState(false);
+  const [pdpaCheckbox, setPdpaCheckbox] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
+  const [isGrantingPdpa, setIsGrantingPdpa] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [snapshotVerification, setSnapshotVerification] =
+    useState<"unknown" | "verified" | "mismatch">("unknown");
+
+  const PDPA_PURPOSE = "loan_contract_identity";
 
   const role = useMemo(() => getUserRoleInAgreement(agreement, user?.id), [agreement, user?.id]);
   const isLender = role === "lender";
@@ -149,7 +156,7 @@ export default function AgreementContract() {
     const load = async () => {
       setLoading(true);
       try {
-        const [agreementResp, signaturesResp] = await Promise.all([
+        const [agreementResp, signaturesResp, consentResp] = await Promise.all([
           supabase
             .from("debt_agreements")
             .select(
@@ -162,6 +169,15 @@ export default function AgreementContract() {
             .select("id, agreement_id, signer_role, typed_name, signed_at, ip_address, device_id, user_agent, contract_hash_at_sign")
             .eq("agreement_id", id)
             .order("signed_at", { ascending: true }),
+          user?.id
+            ? supabase
+                .from("agreement_pdpa_consents" as never)
+                .select("id")
+                .eq("agreement_id", id)
+                .eq("user_id", user.id)
+                .eq("purpose", PDPA_PURPOSE)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
         ]);
 
         if (cancelled) return;
@@ -175,6 +191,7 @@ export default function AgreementContract() {
           if (data.loan_purpose) setLoanPurpose(data.loan_purpose);
         }
         if (signaturesResp.data) setSignatures(signaturesResp.data as unknown as SignatureRow[]);
+        if (consentResp && (consentResp as { data: unknown }).data) setPdpaConsented(true);
       } catch (err) {
         console.error("Failed to load contract data", err);
       } finally {
@@ -187,6 +204,31 @@ export default function AgreementContract() {
       cancelled = true;
     };
   }, [id]);
+
+  // Re-hash the stored snapshot and compare against the stored hash so we
+  // can show a "verified" badge once both parties have signed.  Mismatch
+  // indicates someone tampered with the snapshot bytes after signing.
+  useEffect(() => {
+    let cancelled = false;
+    const verify = async () => {
+      if (!extras?.contract_html_snapshot || !extras.contract_hash) {
+        setSnapshotVerification("unknown");
+        return;
+      }
+      try {
+        const recomputed = await computeContractHash(extras.contract_html_snapshot);
+        if (cancelled) return;
+        setSnapshotVerification(recomputed === extras.contract_hash ? "verified" : "mismatch");
+      } catch (err) {
+        console.error("Snapshot verification failed", err);
+        if (!cancelled) setSnapshotVerification("unknown");
+      }
+    };
+    void verify();
+    return () => {
+      cancelled = true;
+    };
+  }, [extras?.contract_html_snapshot, extras?.contract_hash]);
 
   // Prefill lender's full name from their profile, borrower from agreement
   useEffect(() => {
@@ -248,6 +290,38 @@ export default function AgreementContract() {
       borrowerSignature: signatureFromRow(borrowerSignatureRow),
     });
   }, [agreement, lenderParty, borrowerParty, placeOfSigning, loanPurpose, lenderSignatureRow, borrowerSignatureRow]);
+
+  // ---------- PDPA consent ----------
+  const handleGrantPdpa = async () => {
+    if (!agreement || !user) return;
+    if (!pdpaCheckbox) {
+      toast.error("กรุณาทำเครื่องหมายยอมรับ PDPA");
+      return;
+    }
+    setIsGrantingPdpa(true);
+    try {
+      const [ip] = await Promise.all([getClientIP()]);
+      const { error } = await supabase
+        .from("agreement_pdpa_consents" as never)
+        .insert({
+          agreement_id: agreement.id,
+          user_id: user.id,
+          purpose: PDPA_PURPOSE,
+          ip_address: ip,
+          user_agent: navigator.userAgent,
+        } as never);
+      if (error && !String(error.message ?? "").includes("duplicate")) throw error;
+      setPdpaConsented(true);
+      toast.success("บันทึกความยินยอม PDPA แล้ว");
+    } catch (err) {
+      console.error("PDPA consent error", err);
+      toast.error("ไม่สามารถบันทึกความยินยอมได้", {
+        description: (err as { message?: string })?.message,
+      });
+    } finally {
+      setIsGrantingPdpa(false);
+    }
+  };
 
   // ---------- Signing ----------
   const handleSignClick = () => {
@@ -433,14 +507,33 @@ export default function AgreementContract() {
           )}
 
           {fullySigned && (
-            <div className="bg-status-paid/10 border border-status-paid/20 rounded-2xl p-4 mb-6 print:hidden">
+            <div
+              className={`rounded-2xl p-4 mb-6 border print:hidden ${
+                snapshotVerification === "mismatch"
+                  ? "bg-status-overdue/10 border-status-overdue/30"
+                  : "bg-status-paid/10 border-status-paid/20"
+              }`}
+            >
               <div className="flex items-start gap-3">
-                <ShieldCheck className="w-5 h-5 text-status-paid mt-0.5" />
+                {snapshotVerification === "mismatch" ? (
+                  <ShieldAlert className="w-5 h-5 text-status-overdue mt-0.5" />
+                ) : (
+                  <ShieldCheck className="w-5 h-5 text-status-paid mt-0.5" />
+                )}
                 <div>
-                  <p className="font-medium text-foreground">สัญญาลงนามครบทั้งสองฝ่ายแล้ว</p>
+                  <p className="font-medium text-foreground">
+                    {snapshotVerification === "verified" && "สัญญาลงนามครบ — ตรวจสอบ hash ตรงต้นฉบับ"}
+                    {snapshotVerification === "mismatch" && "⚠️ Hash ของสัญญาไม่ตรงกับต้นฉบับที่บันทึกไว้"}
+                    {snapshotVerification === "unknown" && "สัญญาลงนามครบทั้งสองฝ่ายแล้ว"}
+                  </p>
                   <p className="text-sm text-muted-foreground break-all">
                     เลขกำกับเอกสาร (hash): {extras?.contract_hash || "—"}
                   </p>
+                  {snapshotVerification === "mismatch" && (
+                    <p className="text-xs text-status-overdue mt-1">
+                      อย่าใช้เป็นหลักฐานก่อนตรวจสอบเพิ่มเติม กรุณาติดต่อทีมสนับสนุน
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -462,6 +555,50 @@ export default function AgreementContract() {
                   borrowerSignature: signatureFromRow(borrowerSignatureRow),
                 })}
               />
+            </div>
+          ) : !pdpaConsented && !mySignatureRow ? (
+            /* PDPA consent gate — required before collecting ID/address */
+            <div className="bg-card rounded-2xl p-5 shadow-card mb-6 space-y-4 print:hidden">
+              <h2 className="font-medium text-foreground flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-primary" />
+                ความยินยอมในการเก็บข้อมูลส่วนบุคคล (PDPA)
+              </h2>
+              <div className="text-sm text-foreground space-y-2">
+                <p>เพื่อจัดทำหนังสือสัญญากู้ยืมเงินให้สามารถใช้เป็นหลักฐานในชั้นศาลได้ Budoverbills จำเป็นต้องเก็บข้อมูลส่วนบุคคลของคุณดังนี้:</p>
+                <ul className="list-disc list-inside text-muted-foreground ml-2 space-y-1">
+                  <li>ชื่อ-นามสกุลเต็ม</li>
+                  <li>เลขประจำตัวประชาชน 4 หลักท้าย</li>
+                  <li>ที่อยู่ตามทะเบียนบ้านหรือที่อยู่ปัจจุบัน</li>
+                  <li>ลายมือชื่ออิเล็กทรอนิกส์ (พิมพ์ชื่อ + IP + อุปกรณ์ + เวลาลงนาม)</li>
+                </ul>
+                <p className="mt-2">ข้อมูลข้างต้นจะถูกใช้เฉพาะการจัดทำสัญญากู้ยืมฉบับนี้เพื่อใช้เป็นหลักฐานทางกฎหมาย และจะถูกเก็บตลอดอายุสัญญาตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562</p>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-secondary/40 border border-border">
+                <Checkbox
+                  id="pdpa-checkbox"
+                  checked={pdpaCheckbox}
+                  onCheckedChange={(c) => setPdpaCheckbox(c === true)}
+                  className="mt-0.5"
+                />
+                <label htmlFor="pdpa-checkbox" className="text-sm text-foreground cursor-pointer leading-relaxed">
+                  ข้าพเจ้ายินยอมให้ Budoverbills เก็บและใช้ข้อมูลส่วนบุคคลข้างต้น
+                  เพื่อจัดทำสัญญากู้ยืมเงินฉบับนี้
+                </label>
+              </div>
+
+              <Button
+                className="w-full h-11"
+                onClick={handleGrantPdpa}
+                disabled={!pdpaCheckbox || isGrantingPdpa}
+              >
+                {isGrantingPdpa ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4 mr-2" />
+                )}
+                ยินยอมและดำเนินการต่อ
+              </Button>
             </div>
           ) : (
             <>

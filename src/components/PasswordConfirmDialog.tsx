@@ -117,14 +117,32 @@ export function PasswordConfirmDialog({
     setError("");
 
     try {
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email: userEmail,
-        password: password,
-      });
+      // Verify the current user's password without rotating the session.
+      // The RPC compares against auth.users.encrypted_password directly so
+      // there's no JWT churn (signInWithPassword would issue a new session).
+      const { data, error: rpcError } = await supabase.rpc(
+        "verify_user_password" as never,
+        { p_password: password } as never,
+      );
 
-      if (verifyError) {
+      if (rpcError) {
         passwordVerifyLimiter.recordAttempt(false);
-        setError("รหัสผ่านไม่ถูกต้อง");
+        if (String(rpcError.message ?? "").includes("locked")) {
+          setError("ใส่รหัสผ่านผิดเกินจำนวน กรุณารอสักครู่ก่อนลองใหม่");
+        } else {
+          setError("เกิดข้อผิดพลาด กรุณาลองใหม่");
+        }
+        return;
+      }
+
+      const result = data as { success?: boolean; reason?: string } | null;
+      if (!result?.success) {
+        passwordVerifyLimiter.recordAttempt(false);
+        if (result?.reason === "no_password_set") {
+          setError("บัญชีนี้ไม่ได้ตั้งรหัสผ่าน กรุณาเข้าสู่ระบบด้วย Google แล้วยืนยันด้วยข้อความ");
+        } else {
+          setError("รหัสผ่านไม่ถูกต้อง");
+        }
         return;
       }
 

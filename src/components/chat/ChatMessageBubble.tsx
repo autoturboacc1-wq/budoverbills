@@ -15,6 +15,7 @@ export interface Message {
   text: string;
   sender_id: string;
   created_at: string;
+  read_at?: string | null;
   voice_url?: string | null;
   voice_duration?: number | null;
 }
@@ -25,20 +26,17 @@ interface ChatMessageBubbleProps {
 }
 
 export const ChatMessageBubble = ({ message, isMe }: ChatMessageBubbleProps) => {
-  if (message.voice_url) {
-    return (
-      <VoiceMessagePlayer
-        duration={message.voice_duration ?? 0}
-        isSender={isMe}
-        voicePath={message.voice_url}
-      />
-    );
-  }
-
-  return (
+  const readStatus = isMe ? (message.read_at ? "อ่านแล้ว" : "ยังไม่อ่าน") : null;
+  const bubble = message.voice_url ? (
+    <VoiceMessagePlayer
+      duration={message.voice_duration ?? 0}
+      isSender={isMe}
+      voicePath={message.voice_url}
+    />
+  ) : (
     <div
       className={`
-        max-w-[70%]
+        max-w-full
         px-3 py-2
         rounded-2xl text-sm
         ${isMe
@@ -48,6 +46,17 @@ export const ChatMessageBubble = ({ message, isMe }: ChatMessageBubbleProps) => 
       `}
     >
       {message.text}
+    </div>
+  );
+
+  return (
+    <div className={`flex max-w-[80%] flex-col ${isMe ? "items-end" : "items-start"}`}>
+      {bubble}
+      {readStatus ? (
+        <span className="mt-1 px-1 text-[11px] leading-none text-muted-foreground">
+          {readStatus}
+        </span>
+      ) : null}
     </div>
   );
 };

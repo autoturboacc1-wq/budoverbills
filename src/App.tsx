@@ -14,6 +14,7 @@ import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { GlobalChatNotificationProvider } from "@/components/GlobalChatNotificationProvider";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppErrorBoundary } from "@/components/shared/AppErrorBoundary";
+import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 import { NotificationsProvider } from "@/hooks/useNotifications";
 import { FriendRequestsProvider } from "@/hooks/useFriendRequests";
 
@@ -78,11 +79,11 @@ function AnimatedRoutes() {
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Index />} />
             <Route path="/create" element={<CreateAgreement />} />
-            <Route path="/agreement/:id/confirm" element={<AgreementConfirm />} />
-            <Route path="/agreement/:id/contract" element={<AgreementContract />} />
+            <Route path="/agreement/:id/confirm" element={<RouteErrorBoundary area="หน้ายืนยันข้อตกลง"><AgreementConfirm /></RouteErrorBoundary>} />
+            <Route path="/agreement/:id/contract" element={<RouteErrorBoundary area="หน้าทำสัญญา"><AgreementContract /></RouteErrorBoundary>} />
             <Route path="/friends" element={<Friends />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/chat/:chatId" element={<Chat />} />
+            <Route path="/chat" element={<RouteErrorBoundary area="หน้าแชท"><Chat /></RouteErrorBoundary>} />
+            <Route path="/chat/:chatId" element={<RouteErrorBoundary area="หน้าแชท"><Chat /></RouteErrorBoundary>} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />

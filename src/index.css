@@ -6,76 +6,77 @@
 
 @layer base {
   :root {
-    --background: 38 28% 97%;
-    --foreground: 28 16% 18%;
+    /* Quiet White — Claude-inspired minimal palette */
+    --background: 40 14% 98%;          /* near-white paper */
+    --foreground: 30 8% 14%;            /* warm charcoal */
 
-    --card: 38 24% 96%;
-    --card-foreground: 28 16% 18%;
+    --card: 0 0% 100%;                  /* pure white surfaces */
+    --card-foreground: 30 8% 14%;
 
-    --popover: 40 33% 99%;
-    --popover-foreground: 28 16% 18%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 30 8% 14%;
 
-    --primary: 33 82% 52%;
-    --primary-foreground: 40 33% 99%;
+    --primary: 16 38% 42%;              /* muted clay — Anthropic-ish */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 35 18% 91%;
-    --secondary-foreground: 28 12% 24%;
+    --secondary: 30 10% 96%;            /* off-white surface */
+    --secondary-foreground: 30 8% 22%;
 
-    --muted: 34 13% 93%;
-    --muted-foreground: 28 10% 42%;
+    --muted: 30 8% 95%;
+    --muted-foreground: 30 6% 46%;      /* mid gray */
 
-    --accent: 152 21% 88%;
-    --accent-foreground: 150 26% 24%;
+    --accent: 30 10% 94%;
+    --accent-foreground: 30 8% 18%;
 
-    --destructive: 25 70% 55%;
-    --destructive-foreground: 40 33% 99%;
+    --destructive: 358 55% 48%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 32 18% 84%;
-    --input: 35 18% 90%;
-    --ring: 33 82% 52%;
+    --border: 30 6% 90%;                /* hairline */
+    --input: 30 6% 92%;
+    --ring: 16 38% 42%;
 
-    --radius: 1.125rem;
+    --radius: 0.75rem;                  /* tighter, more refined */
 
-    --status-success: 150 45% 42%;
-    --status-warning: 39 92% 48%;
-    --status-danger: 14 70% 52%;
-    --status-info: 204 70% 48%;
-    --status-neutral: 30 7% 48%;
+    --status-success: 150 35% 38%;
+    --status-warning: 38 75% 46%;
+    --status-danger: 358 55% 48%;
+    --status-info: 210 50% 44%;
+    --status-neutral: 30 6% 46%;
 
-    /* Status Colors - Warm & Friendly */
-    --status-paid: 150 45% 50%;
-    --status-pending: 45 90% 55%;
-    --status-overdue: 25 75% 55%;
-    --status-negotiating: 200 60% 55%;
+    /* Status Colors — quiet, paper-friendly */
+    --status-paid: 150 32% 42%;
+    --status-pending: 38 70% 48%;
+    --status-overdue: 358 55% 50%;
+    --status-negotiating: 210 45% 48%;
 
-    /* Chat Bubble Colors */
-    --chat-bubble-me: 35 85% 55%;
-    --chat-bubble-me-foreground: 40 33% 99%;
-    --chat-bubble-other: 35 20% 92%;
-    --chat-bubble-other-foreground: 30 10% 20%;
-    --chat-bubble-money: 150 50% 45%;
-    --chat-bubble-money-foreground: 40 33% 99%;
+    /* Chat Bubble Colors — iMessage-quiet */
+    --chat-bubble-me: 30 8% 14%;        /* charcoal "me" bubble */
+    --chat-bubble-me-foreground: 0 0% 100%;
+    --chat-bubble-other: 30 8% 95%;     /* light gray "other" */
+    --chat-bubble-other-foreground: 30 8% 16%;
+    --chat-bubble-money: 150 32% 38%;
+    --chat-bubble-money-foreground: 0 0% 100%;
 
-    /* Gradients */
-    --gradient-warm: linear-gradient(135deg, hsl(38 28% 97%) 0%, hsl(35 24% 94%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(38 26% 98%) 0%, hsl(34 22% 95%) 100%);
-    --gradient-primary: linear-gradient(135deg, hsl(33 82% 52%) 0%, hsl(25 74% 47%) 100%);
-    --gradient-hero: radial-gradient(circle at top, hsl(35 38% 93%) 0%, hsl(38 28% 97%) 40%, hsl(35 22% 93%) 100%);
+    /* Gradients — flattened, mostly unused now */
+    --gradient-warm: linear-gradient(135deg, hsl(40 14% 98%) 0%, hsl(30 10% 96%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(40 14% 98%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(16 38% 42%) 0%, hsl(14 36% 36%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(40 14% 98%) 0%, hsl(40 14% 98%) 100%);
 
-    /* Shadows */
-    --shadow-soft: 0 10px 30px -22px hsl(30 18% 16% / 0.22);
-    --shadow-card: 0 16px 38px -28px hsl(30 18% 16% / 0.22);
-    --shadow-elevated: 0 22px 55px -30px hsl(30 18% 16% / 0.28);
+    /* Shadows — barely-there */
+    --shadow-soft: 0 1px 2px hsl(30 8% 14% / 0.04);
+    --shadow-card: 0 1px 3px hsl(30 8% 14% / 0.05), 0 1px 2px hsl(30 8% 14% / 0.03);
+    --shadow-elevated: 0 8px 24px -12px hsl(30 8% 14% / 0.12);
 
     /* Sidebar */
-    --sidebar-background: 40 30% 97%;
-    --sidebar-foreground: 30 10% 30%;
-    --sidebar-primary: 35 85% 55%;
-    --sidebar-primary-foreground: 40 33% 99%;
-    --sidebar-accent: 35 25% 92%;
-    --sidebar-accent-foreground: 30 10% 25%;
-    --sidebar-border: 35 20% 88%;
-    --sidebar-ring: 35 85% 55%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 30 8% 24%;
+    --sidebar-primary: 16 38% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 30 8% 96%;
+    --sidebar-accent-foreground: 30 8% 18%;
+    --sidebar-border: 30 6% 90%;
+    --sidebar-ring: 16 38% 42%;
   }
 
   .dark {

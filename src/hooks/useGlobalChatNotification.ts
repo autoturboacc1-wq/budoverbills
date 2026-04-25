@@ -50,12 +50,74 @@ function getUnreadChatMessageSnapshot() {
   return unreadChatMessageCount;
 }
 
+async function fetchChatTargetsAndUnreadCount(userId: string): Promise<{
+  chatTargets: ChatTargets;
+  unreadCount: number;
+}> {
+  const [agreementsResult, directChatsResult] = await Promise.all([
+    supabase
+      .from("debt_agreements")
+      .select("id")
+      .or(`lender_id.eq.${userId},borrower_id.eq.${userId}`)
+      .in("status", ["active", "pending", "pending_transfer", "pending_confirmation"]),
+    supabase
+      .from("direct_chats")
+      .select("id")
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
+  ]);
+
+  const agreementIds = uniqueStrings(agreementsResult.data?.map((agreement) => agreement.id));
+  const directChatIds = uniqueStrings(directChatsResult.data?.map((chat) => chat.id));
+
+  const [agreementCountResult, directCountResult] = await Promise.all([
+    agreementIds.length > 0
+      ? supabase
+          .from("messages")
+          .select("id", { count: "exact" })
+          .in("agreement_id", agreementIds)
+          .neq("sender_id", userId)
+          .is("read_at", null)
+      : Promise.resolve({ count: 0 }),
+    directChatIds.length > 0
+      ? supabase
+          .from("messages")
+          .select("id", { count: "exact" })
+          .in("direct_chat_id", directChatIds)
+          .neq("sender_id", userId)
+          .is("read_at", null)
+      : Promise.resolve({ count: 0 }),
+  ]);
+
+  return {
+    chatTargets: {
+      agreementIds,
+      directChatIds,
+    },
+    unreadCount: (agreementCountResult.count || 0) + (directCountResult.count || 0),
+  };
+}
+
+async function refreshUnreadChatMessageCount(userId?: string | null): Promise<number> {
+  if (!userId) {
+    setUnreadChatMessageCount(0);
+    return 0;
+  }
+
+  const { unreadCount } = await fetchChatTargetsAndUnreadCount(userId);
+  setUnreadChatMessageCount(unreadCount);
+  return unreadCount;
+}
+
 export function useUnreadChatMessageCount(): number {
   return useSyncExternalStore(
     subscribeUnreadChatMessageCount,
     getUnreadChatMessageSnapshot,
     () => 0
   );
+}
+
+export function useRefreshUnreadChatMessageCount() {
+  return useCallback((userId?: string | null) => refreshUnreadChatMessageCount(userId), []);
 }
 
 /**
@@ -86,46 +148,10 @@ export const useGlobalChatNotification = () => {
       return;
     }
 
-    const [agreementsResult, directChatsResult] = await Promise.all([
-      supabase
-        .from("debt_agreements")
-        .select("id")
-        .or(`lender_id.eq.${userId},borrower_id.eq.${userId}`)
-        .in("status", ["active", "pending", "pending_transfer", "pending_confirmation"]),
-      supabase
-        .from("direct_chats")
-        .select("id")
-        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
-    ]);
+    const { chatTargets: nextChatTargets, unreadCount } = await fetchChatTargetsAndUnreadCount(userId);
 
-    const agreementIds = uniqueStrings(agreementsResult.data?.map((agreement) => agreement.id));
-    const directChatIds = uniqueStrings(directChatsResult.data?.map((chat) => chat.id));
-
-    setChatTargets({
-      agreementIds,
-      directChatIds,
-    });
-
-    const [agreementCountResult, directCountResult] = await Promise.all([
-      agreementIds.length > 0
-        ? supabase
-            .from("messages")
-            .select("id", { count: "exact" })
-            .in("agreement_id", agreementIds)
-            .neq("sender_id", userId)
-            .is("read_at", null)
-        : Promise.resolve({ count: 0 }),
-      directChatIds.length > 0
-        ? supabase
-            .from("messages")
-            .select("id", { count: "exact" })
-            .in("direct_chat_id", directChatIds)
-            .neq("sender_id", userId)
-            .is("read_at", null)
-        : Promise.resolve({ count: 0 }),
-    ]);
-
-    setUnreadChatMessageCount((agreementCountResult.count || 0) + (directCountResult.count || 0));
+    setChatTargets(nextChatTargets);
+    setUnreadChatMessageCount(unreadCount);
   }, [userId]);
 
   useEffect(() => {

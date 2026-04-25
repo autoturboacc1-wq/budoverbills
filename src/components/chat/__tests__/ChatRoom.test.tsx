@@ -12,8 +12,10 @@ const chatRoomMocks = vi.hoisted(() => ({
   removeChannel: vi.fn(),
   insert: vi.fn(),
   messageInsertCallback: undefined as undefined | ((payload: { new: unknown }) => void),
+  messageUpdateCallback: undefined as undefined | ((payload: { new: unknown }) => void),
   startTyping: vi.fn(),
   stopTyping: vi.fn(),
+  refreshUnreadChatMessageCount: vi.fn(),
   toastError: vi.fn(),
 }));
 
@@ -27,6 +29,10 @@ vi.mock("@/hooks/useTypingIndicator", () => ({
     startTyping: chatRoomMocks.startTyping,
     stopTyping: chatRoomMocks.stopTyping,
   }),
+}));
+
+vi.mock("@/hooks/useGlobalChatNotification", () => ({
+  useRefreshUnreadChatMessageCount: () => chatRoomMocks.refreshUnreadChatMessageCount,
 }));
 
 vi.mock("sonner", () => ({
@@ -74,8 +80,15 @@ function setupSupabaseMessages(messages: unknown[]) {
 
 function setupRealtimeChannel() {
   const channel = {
-    on: vi.fn((_event: string, _config: unknown, callback: (payload: { new: unknown }) => void) => {
-      chatRoomMocks.messageInsertCallback = callback;
+    on: vi.fn((_event: string, config: { event?: string }, callback: (payload: { new: unknown }) => void) => {
+      if (config.event === "INSERT") {
+        chatRoomMocks.messageInsertCallback = callback;
+      }
+
+      if (config.event === "UPDATE") {
+        chatRoomMocks.messageUpdateCallback = callback;
+      }
+
       return channel;
     }),
     subscribe: vi.fn(() => channel),
@@ -118,12 +131,15 @@ describe("ChatRoom", () => {
     chatRoomMocks.removeChannel.mockReset();
     chatRoomMocks.insert.mockReset();
     chatRoomMocks.messageInsertCallback = undefined;
+    chatRoomMocks.messageUpdateCallback = undefined;
     chatRoomMocks.startTyping.mockReset();
     chatRoomMocks.stopTyping.mockReset();
+    chatRoomMocks.refreshUnreadChatMessageCount.mockReset();
     chatRoomMocks.toastError.mockReset();
 
     chatRoomMocks.rpc.mockResolvedValue({ data: { success: true, updated_count: 1 }, error: null });
     chatRoomMocks.insert.mockResolvedValue({ error: null });
+    chatRoomMocks.refreshUnreadChatMessageCount.mockResolvedValue(0);
     setupRealtimeChannel();
   });
 
@@ -139,7 +155,10 @@ describe("ChatRoom", () => {
       },
     ]);
 
-    const { container, unmount } = await renderReact(<ChatRoom thread={agreementThread} onBack={vi.fn()} />);
+    const onMessagesRead = vi.fn();
+    const { container, unmount } = await renderReact(
+      <ChatRoom thread={agreementThread} onBack={vi.fn()} onMessagesRead={onMessagesRead} />
+    );
     await flushEffects();
 
     expect(container.textContent).toContain("สวัสดี");
@@ -147,6 +166,8 @@ describe("ChatRoom", () => {
       p_agreement_id: "agreement-1",
       p_direct_chat_id: null,
     });
+    expect(onMessagesRead).toHaveBeenCalledWith("agreement-1");
+    expect(chatRoomMocks.refreshUnreadChatMessageCount).toHaveBeenCalledWith("user-1");
 
     await unmount();
   });
@@ -219,6 +240,40 @@ describe("ChatRoom", () => {
       p_agreement_id: "agreement-1",
       p_direct_chat_id: null,
     });
+
+    await unmount();
+  });
+
+  it("updates sender read receipts from realtime message updates", async () => {
+    setupSupabaseMessages([
+      {
+        id: "message-1",
+        content: "รออ่าน",
+        sender_id: "user-1",
+        created_at: "2026-04-25T10:00:00.000Z",
+        read_at: null,
+        voice_url: null,
+        voice_duration: null,
+      },
+    ]);
+
+    const { container, unmount } = await renderReact(<ChatRoom thread={agreementThread} onBack={vi.fn()} />);
+    await flushEffects();
+
+    expect(container.textContent).toContain("ยังไม่อ่าน");
+
+    await act(async () => {
+      chatRoomMocks.messageUpdateCallback?.({
+        new: {
+          id: "message-1",
+          read_at: "2026-04-25T10:05:00.000Z",
+        },
+      });
+      await Promise.resolve();
+    });
+    await flushEffects();
+
+    expect(container.textContent).toContain("อ่านแล้ว");
 
     await unmount();
   });

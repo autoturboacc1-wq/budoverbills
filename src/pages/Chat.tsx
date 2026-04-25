@@ -215,6 +215,30 @@ const Chat = () => {
     navigate(`/chat/${thread.chat_id}`, { replace: true });
   };
 
+  const handleMessagesRead = useCallback((readChatId: string) => {
+    setThreads((currentThreads) => {
+      let changed = false;
+      const nextThreads = currentThreads.map((thread) => {
+        if (thread.chat_id !== readChatId || thread.unread_count === 0) {
+          return thread;
+        }
+
+        changed = true;
+        return { ...thread, unread_count: 0 };
+      });
+
+      return changed ? nextThreads : currentThreads;
+    });
+
+    setSelectedThread((currentThread) => {
+      if (!currentThread || currentThread.chat_id !== readChatId || currentThread.unread_count === 0) {
+        return currentThread;
+      }
+
+      return { ...currentThread, unread_count: 0 };
+    });
+  }, []);
+
   const handleBack = () => {
     setSelectedThread(null);
     navigate("/chat", { replace: true });
@@ -222,7 +246,7 @@ const Chat = () => {
 
   // If a thread is selected, show the chat room
   if (selectedThread) {
-    return <ChatRoom thread={selectedThread} onBack={handleBack} />;
+    return <ChatRoom thread={selectedThread} onBack={handleBack} onMessagesRead={handleMessagesRead} />;
   }
 
   // Thread list view with tabs

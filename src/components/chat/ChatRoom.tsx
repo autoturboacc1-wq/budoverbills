@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { VoiceRecorder } from "./VoiceRecorder";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import { useRefreshUnreadChatMessageCount } from "@/hooks/useGlobalChatNotification";
 import { toast } from "sonner";
 
 /**
@@ -43,6 +44,7 @@ export interface ChatThread {
 interface ChatRoomProps {
   thread: ChatThread;
   onBack: () => void;
+  onMessagesRead?: (chatId: string) => void;
 }
 
 type MarkMessagesReadRpcResult = {
@@ -50,9 +52,10 @@ type MarkMessagesReadRpcResult = {
   error: { message: string } | null;
 };
 
-export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
+export const ChatRoom = ({ thread, onBack, onMessagesRead }: ChatRoomProps) => {
   const PAGE_SIZE = 50;
   const { user } = useAuth();
+  const refreshUnreadChatMessageCount = useRefreshUnreadChatMessageCount();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -87,7 +90,10 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
     if (data?.success === false) {
       throw new Error(data.error || "Unable to mark chat messages as read");
     }
-  }, [activeChatId, currentUserId, isDirectChat]);
+
+    onMessagesRead?.(thread.chat_id);
+    await refreshUnreadChatMessageCount(currentUserId);
+  }, [activeChatId, currentUserId, isDirectChat, onMessagesRead, refreshUnreadChatMessageCount, thread.chat_id]);
 
   // Fetch messages from database
   const fetchMessages = useCallback(async () => {
@@ -99,7 +105,7 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
       const isDirectChat = thread.chat_type === "direct";
       let query = supabase
         .from("messages")
-        .select("id, content, sender_id, created_at, voice_url, voice_duration")
+        .select("id, content, sender_id, created_at, read_at, voice_url, voice_duration")
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
 
@@ -121,6 +127,7 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
         text: m.content,
         sender_id: m.sender_id,
         created_at: m.created_at,
+        read_at: (m as { read_at?: string | null }).read_at ?? null,
         voice_url: (m as { voice_url?: string | null }).voice_url ?? null,
         voice_duration: (m as { voice_duration?: number | null }).voice_duration ?? null,
       }));
@@ -149,7 +156,7 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
       const isDirectChat = thread.chat_type === "direct";
       let query = supabase
         .from("messages")
-        .select("id, content, sender_id, created_at, voice_url, voice_duration")
+        .select("id, content, sender_id, created_at, read_at, voice_url, voice_duration")
         .lt("created_at", oldestMessage.created_at)
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE);
@@ -170,6 +177,7 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
         text: m.content,
         sender_id: m.sender_id,
         created_at: m.created_at,
+        read_at: (m as { read_at?: string | null }).read_at ?? null,
         voice_url: (m as { voice_url?: string | null }).voice_url ?? null,
         voice_duration: (m as { voice_duration?: number | null }).voice_duration ?? null,
       }));
@@ -224,6 +232,7 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
             content: string;
             sender_id: string;
             created_at: string;
+            read_at?: string | null;
             voice_url?: string | null;
             voice_duration?: number | null;
           };
@@ -232,6 +241,7 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
             text: newMsg.content,
             sender_id: newMsg.sender_id,
             created_at: newMsg.created_at,
+            read_at: newMsg.read_at ?? null,
             voice_url: newMsg.voice_url ?? null,
             voice_duration: newMsg.voice_duration ?? null,
           };
@@ -245,6 +255,29 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
             });
           }
           scrollToBottom();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `${filterColumn}=eq.${filterId}`,
+        },
+        (payload) => {
+          const updatedMsg = payload.new as {
+            id: string;
+            read_at?: string | null;
+          };
+
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === updatedMsg.id
+                ? { ...message, read_at: updatedMsg.read_at ?? null }
+                : message
+            )
+          );
         }
       )
       .subscribe();
