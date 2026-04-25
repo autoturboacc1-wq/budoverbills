@@ -606,6 +606,10 @@ import { VoiceMessagePlayer } from '@/components/chat/VoiceMessagePlayer';
 
 ## Feature 15: Bank Statement Import (OCR)
 
+> **Note:** A scoped-down version — **per-slip OCR verification** — already exists in the codebase but is **dormant by default**.
+> See [supabase/functions/verify-payment-slip/index.ts](../supabase/functions/verify-payment-slip/index.ts) for activation criteria (~50+ slips/day, fraud signal, or sustained lender-confirm latency complaints).
+> Migration `20260425270000_slip_ocr_verification.sql` already added the `slip_verifications.ocr_*` columns. Don't re-design those when building Feature 15 — extend, don't replace.
+
 ### Why
 ขั้นตอน upload payment slip ทีละใบเป็นเรื่องที่ users complain มาก — ถ้า import statement ทั้งหมดได้ครั้งเดียวและ auto-match กับ installments จะลด friction ได้มาก
 
