@@ -20,13 +20,19 @@ export function PageSection({
   contentClassName,
 }: PageSectionProps) {
   return (
-    <section className={cn("surface-panel", className)}>
+    <section className={cn("space-y-4", className)}>
       {title || description || action ? (
-        <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex items-end justify-between gap-3 border-b border-border pb-3">
           <div>
-            {title ? <h2 className="text-base font-semibold text-foreground">{title}</h2> : null}
+            {title ? (
+              <h2 className="font-serif-display text-xl leading-none text-foreground">
+                {title}
+              </h2>
+            ) : null}
             {description ? (
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                {description}
+              </p>
             ) : null}
           </div>
           {action ? <div className="shrink-0">{action}</div> : null}

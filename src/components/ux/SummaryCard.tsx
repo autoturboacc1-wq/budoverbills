@@ -12,11 +12,11 @@ interface SummaryCardProps {
   className?: string;
 }
 
-const priorityClasses: Record<ActionPriority, string> = {
-  primary: "bg-primary/8 border-primary/15 text-primary",
-  warning: "bg-amber-500/10 border-amber-500/15 text-amber-700 dark:text-amber-400",
-  danger: "bg-destructive/10 border-destructive/15 text-destructive",
-  neutral: "bg-secondary/55 border-border text-foreground",
+const accentClass: Record<ActionPriority, string> = {
+  primary: "text-foreground",
+  warning: "text-status-pending",
+  danger: "text-destructive",
+  neutral: "text-muted-foreground",
 };
 
 export function SummaryCard({
@@ -28,19 +28,22 @@ export function SummaryCard({
   className,
 }: SummaryCardProps) {
   return (
-    <div className={cn("rounded-3xl border p-4 shadow-card", className)}>
-      <div className="mb-3 flex items-center gap-2">
+    <div className={cn("rounded-md border border-border bg-card p-4", className)}>
+      <div className="mb-3 flex items-center justify-between">
+        <span className="label-eyebrow">{label}</span>
         {Icon ? (
-          <span className={cn("inline-flex h-9 w-9 items-center justify-center rounded-2xl border", priorityClasses[priority])}>
-            <Icon className="h-4 w-4" />
-          </span>
+          <Icon
+            className={cn("h-3.5 w-3.5", accentClass[priority])}
+            strokeWidth={1.5}
+          />
         ) : null}
-        <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-          {label}
-        </span>
       </div>
-      <p className="text-2xl font-heading font-semibold tracking-tight text-foreground">{value}</p>
-      {hint ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p> : null}
+      <p className="font-serif-display text-2xl leading-none text-foreground num">
+        {value}
+      </p>
+      {hint ? (
+        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { StatusBadge, Status } from "./ui/StatusBadge";
-import { Calendar, ArrowRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface DebtCardProps {
@@ -31,73 +31,77 @@ export function DebtCard({
   delay = 0,
 }: DebtCardProps) {
   const navigate = useNavigate();
-  const progressPercent = (installmentProgress.current / installmentProgress.total) * 100;
+  const progressPercent = Math.min(
+    100,
+    (installmentProgress.current / Math.max(installmentProgress.total, 1)) * 100,
+  );
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
+    <motion.button
+      type="button"
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay }}
+      transition={{ duration: 0.4, delay, ease: [0.22, 1, 0.36, 1] }}
       onClick={() => navigate(`/debt/${id}`)}
-      className="surface-panel cursor-pointer transition-shadow duration-300 group hover:shadow-elevated"
+      className="group block w-full rounded-md border border-border bg-card p-5 text-left transition-colors hover:border-foreground/40"
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="h-11 w-11 overflow-hidden rounded-full bg-secondary text-sm font-semibold text-secondary-foreground">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary text-[11px] font-medium text-muted-foreground">
             {partnerAvatarUrl ? (
-              <img 
-                src={partnerAvatarUrl} 
+              <img
+                src={partnerAvatarUrl}
                 alt={partnerName}
-                className="w-full h-full object-cover"
+                className="h-full w-full object-cover"
               />
             ) : (
               partnerInitial
             )}
           </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-              {isLender ? "Borrower" : "Lender"}
-            </p>
-            <p className="font-medium text-foreground">{partnerName}</p>
+          <div className="min-w-0">
+            <p className="label-eyebrow">{isLender ? "Borrower" : "Lender"}</p>
+            <p className="truncate text-sm font-medium text-foreground">{partnerName}</p>
           </div>
         </div>
         <StatusBadge status={status} />
       </div>
 
-      <div className="mb-4">
-        <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">ยอดคงเหลือ</p>
-        <p className="text-2xl font-heading font-semibold text-foreground">
-          ฿{remainingAmount.toLocaleString()}
+      <div className="mt-6">
+        <p className="font-serif-display text-[2.25rem] leading-none text-foreground">
+          ฿<span className="num">{remainingAmount.toLocaleString()}</span>
         </p>
-        <p className="text-sm text-muted-foreground">
-          จากวงเงินทั้งหมด ฿{amount.toLocaleString()}
+        <p className="mt-2 text-xs text-muted-foreground">
+          จากวงเงิน <span className="num">฿{amount.toLocaleString()}</span>
         </p>
       </div>
 
-      <div className="mb-4">
-        <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-          <span>ความคืบหน้า</span>
-          <span>
-            งวด {installmentProgress.current} / {installmentProgress.total}
+      <div className="mt-6">
+        <div className="mb-1.5 flex items-baseline justify-between text-[11px] text-muted-foreground">
+          <span className="label-eyebrow">Progress</span>
+          <span className="num">
+            {installmentProgress.current} / {installmentProgress.total}
           </span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-secondary">
+        <div className="h-px w-full bg-border">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${progressPercent}%` }}
-            transition={{ duration: 0.8, delay: delay + 0.3 }}
-            className="h-full bg-primary rounded-full"
+            transition={{ duration: 0.7, delay: delay + 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="h-px bg-foreground"
           />
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-border pt-3">
-        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Calendar className="w-4 h-4" />
-          <span>งวดถัดไป {nextPaymentDate}</span>
+      <div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-xs">
+        <div className="text-muted-foreground">
+          <span className="label-eyebrow mr-2">Next</span>
+          <span className="num text-foreground">{nextPaymentDate}</span>
         </div>
-        <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+        <ArrowUpRight
+          className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground"
+          strokeWidth={1.5}
+        />
       </div>
-    </motion.div>
+    </motion.button>
   );
 }
