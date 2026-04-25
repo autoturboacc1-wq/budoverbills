@@ -53,6 +53,7 @@ interface PaymentDialogProps {
 
 interface SlipVerification {
   id: string;
+  submitted_by: string;
   submitted_amount: number;
   verified_amount: number | null;
   slip_url: string;
@@ -268,15 +269,18 @@ export function PaymentDialog({
 
       if (
         freshInstallment.confirmed_by_lender ||
-        freshInstallment.status === "paid" ||
-        freshInstallment.payment_proof_url
+        freshInstallment.status === "paid"
       ) {
         toast.error("งวดนี้ถูกยืนยันแล้ว ไม่สามารถอัปโหลดสลิปใหม่ได้");
         return;
       }
 
-      if (freshPending) {
-        toast.error("มีสลิปที่รอตรวจสอบอยู่แล้ว");
+      // A pending verification owned by someone else (theoretically impossible
+      // under RLS) would still be rejected by the RPC. Pending verifications
+      // belonging to this borrower are allowed — submit_installment_slip will
+      // mark the previous one as 'superseded' inside the same transaction.
+      if (freshPending && freshPending.submitted_by !== user.id) {
+        toast.error("มีสลิปอื่นรอตรวจสอบอยู่ ไม่สามารถอัปโหลดทับได้");
         return;
       }
 
@@ -340,8 +344,11 @@ export function PaymentDialog({
         return;
       }
 
-      if (freshPending) {
-        toast.error("มีสลิปที่รอตรวจสอบอยู่แล้ว");
+      // Pending verification by someone else should never happen (RLS), but
+      // we guard defensively. The borrower's own pending is fine — the RPC
+      // will supersede it atomically.
+      if (freshPending && freshPending.submitted_by !== user.id) {
+        toast.error("มีสลิปอื่นรอตรวจสอบอยู่");
         return;
       }
 
@@ -882,7 +889,7 @@ export function PaymentDialog({
                       </div>
                     ) : null}
 
-                    {!installment.confirmed_by_lender && !pendingVerification && (
+                    {!isLender && !installment.confirmed_by_lender && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -970,7 +977,7 @@ export function PaymentDialog({
                   ) : null}
 
                   {/* Re-upload button (Borrower only, before confirmation) */}
-                  {!isLender && !installment.confirmed_by_lender && !pendingVerification && (
+                  {!isLender && !installment.confirmed_by_lender && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1052,8 +1059,12 @@ export function PaymentDialog({
             <>
               <AsyncResultState
                 tone="warning"
-                title="รอผู้ให้ยืมตรวจสอบ"
-                description={`ส่งยอด ฿${pendingVerification.submitted_amount.toLocaleString()} เมื่อ ${format(parseISO(pendingVerification.created_at), 'd MMM HH:mm', { locale: th })}`}
+                title={slipUrl ? "พร้อมส่งสลิปใหม่แทนที่ของเดิม" : "รอผู้ให้ยืมตรวจสอบ"}
+                description={
+                  slipUrl
+                    ? `เมื่อกดส่ง สลิปเดิม (฿${pendingVerification.submitted_amount.toLocaleString()}) จะถูกยกเลิกและแทนที่ด้วยสลิปใหม่`
+                    : `ส่งยอด ฿${pendingVerification.submitted_amount.toLocaleString()} เมื่อ ${format(parseISO(pendingVerification.created_at), 'd MMM HH:mm', { locale: th })} — กดไอคอนกล้องเพื่ออัปโหลดสลิปใหม่ทับได้`
+                }
               />
               <SlipOcrBadge
                 ocrStatus={pendingVerification.ocr_status ?? null}
@@ -1073,12 +1084,18 @@ export function PaymentDialog({
             >
               {isLender && pendingVerification ? 'ปิด' : 'ยกเลิก'}
             </Button>
-            
-            {/* Borrower: Submit slip (only if no pending verification) */}
-            {!isLender && !pendingVerification && (
+
+            {/* Borrower: Submit (always available before lender confirmation).
+                When there is a pending of theirs, the RPC supersedes it and
+                the button only enables once a fresh slip has been picked. */}
+            {!isLender && !installment.confirmed_by_lender && (
               <Button
                 className="flex-1"
-                disabled={!(hasSlip || slipUrl) || numericAmount <= 0 || isSubmitting}
+                disabled={
+                  (pendingVerification ? !slipUrl : !(hasSlip || slipUrl)) ||
+                  numericAmount <= 0 ||
+                  isSubmitting
+                }
                 onClick={handleSubmitPayment}
               >
                 {isSubmitting ? (
@@ -1086,7 +1103,7 @@ export function PaymentDialog({
                 ) : (
                   <Send className="w-4 h-4 mr-2" />
                 )}
-                ส่งสลิป
+                {pendingVerification ? 'ส่งสลิปใหม่' : 'ส่งสลิป'}
               </Button>
             )}
           </div>

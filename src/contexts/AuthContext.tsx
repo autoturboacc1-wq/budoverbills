@@ -136,9 +136,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (!error) {
-        setProfile(data ?? null);
+      if (error) {
+        return;
       }
+
+      if (data === null) {
+        // Profile row missing. Could be a brand-new signup whose trigger
+        // has not run yet, OR a stale JWT in localStorage for a user that
+        // was deleted server-side. supabase.auth.getUser() hits the auth
+        // server and distinguishes the two — if the user no longer exists
+        // it errors, and we sign out so the app drops to /auth instead of
+        // looping at /personal-info forever.
+        const { error: userErr } = await supabase.auth.getUser();
+        if (currentUserIdRef.current !== userId) {
+          return;
+        }
+        if (userErr) {
+          await supabase.auth.signOut();
+          return;
+        }
+      }
+
+      setProfile(data);
     } finally {
       if (currentUserIdRef.current === userId) {
         setLoadingFlag(false);
