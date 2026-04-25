@@ -1,6 +1,6 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import { Header } from "@/components/Header";
 import { DashboardStats } from "@/components/DashboardStats";
 import { PaymentCalendar } from "@/components/PaymentCalendar";
@@ -11,12 +11,12 @@ import { useDebtAgreements } from "@/hooks/useDebtAgreements";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Plus, ArrowDownLeft } from "lucide-react";
 import { EmptyState, PageSection } from "@/components/ux";
 import { PageTransition } from "@/components/ux/PageTransition";
 
 // Domain imports - SINGLE SOURCE OF TRUTH
-import { mapAgreementsToDebtCards, AgreementRole, isAgreementEffectivelyCompleted } from "@/domains/debt";
+import { mapAgreementsToDebtCards, isAgreementEffectivelyCompleted } from "@/domains/debt";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -42,28 +42,22 @@ const Index = () => {
         <div className="page-shell section-stack">
           <Header userName={displayName} />
 
-          {/* Mission control — editorial, no card chrome */}
           <section className="space-y-5">
-            <div className="flex items-end justify-between gap-4 border-b border-border pb-4">
+            <div className="flex items-end justify-between gap-4 border-b border-border/80 pb-4">
               <div className="max-w-sm">
-                <p className="label-eyebrow">Today</p>
-                <h2 className="mt-2 font-serif-display text-3xl leading-[1.05] text-foreground">
-                  วันนี้คุณต้องจัดการอะไรบ้าง
+                <p className="label-eyebrow">ภาพรวมวันนี้</p>
+                <h2 className="mt-2 font-serif-display text-[2rem] leading-[1.02] text-foreground">
+                  เงินค้าง งานค้าง และสัญญาที่ยังเดินอยู่
                 </h2>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  ดูงานค้าง ภาพรวมยอดเงิน และสัญญาที่กำลังเดินอยู่ในหน้าเดียว
+                  ทุกอย่างที่ต้องเช็กถูกรวมไว้ในหน้าเดียวแบบสั้นและอ่านเร็ว
                 </p>
               </div>
-              <Button
-                onClick={() => navigate("/create")}
-                size="sm"
-                className="rounded-md"
-              >
+              <Button onClick={() => navigate("/create")} size="sm">
                 <Plus className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
-                สร้างใหม่
+                สร้างสัญญา
               </Button>
             </div>
-
           </section>
 
           {!isLoading && !authLoading && <PendingActionsCard />}
@@ -83,7 +77,7 @@ const Index = () => {
 
           <PageSection
             title="ลูกหนี้ของคุณ"
-            description="บุคคคที่ติดหนี้และต้องชำระเงินให้คุณ"
+            description="คนที่ยังต้องชำระคืนให้คุณ"
             action={
               lenderCards.length > 5 ? (
                 <button
@@ -109,11 +103,11 @@ const Index = () => {
               <EmptyState
                 icon={<ArrowDownLeft className="h-6 w-6" strokeWidth={1.5} />}
                 title="ยังไม่มีคนติดหนี้คุณ"
-                description="เริ่มต้นด้วยการสร้างข้อตกลงใหม่เพื่อบันทึกยอดเงิน"
+                description="เริ่มต้นด้วยการปล่อยยืมและสร้างข้อตกลงฝั่งผู้ให้ยืม"
                 action={
-                  <Button onClick={() => navigate("/create")} size="sm" className="rounded-md">
+                  <Button onClick={() => navigate("/create")} size="sm">
                     <Plus className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
-                    สร้างข้อตกลงใหม่
+                    ปล่อยยืมให้เพื่อน
                   </Button>
                 }
               />
@@ -140,7 +134,7 @@ const Index = () => {
                 ))}
               </div>
             ) : borrowerCards.length === 0 ? (
-              <p className="text-sm text-muted-foreground w-full text-center py-4 rounded-xl border border-border/50 bg-secondary/30">คุณไม่มีภาระหนี้สินในระบบ</p>
+              <p className="w-full rounded-[1.1rem] border border-border/70 bg-secondary/30 py-4 text-center text-sm text-muted-foreground">คุณไม่มีภาระหนี้สินในระบบ</p>
             ) : (
               <div className="space-y-3">
                 {borrowerCards.slice(0, 5).map((debt) => (

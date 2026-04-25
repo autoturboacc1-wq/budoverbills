@@ -3,6 +3,9 @@ import { thaiBahtText } from "@/utils/thaiNumber";
 
 export const CONTRACT_TEMPLATE_VERSION = "v1.0";
 
+const APPLE_SYSTEM_FONT =
+  '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Sukhumvit Set", Thonburi, Arial, system-ui, sans-serif';
+
 export interface ContractParty {
   fullName: string;
   idCardLast4: string;
@@ -88,7 +91,7 @@ export const LoanContractTemplate = forwardRef<HTMLDivElement, { data: LoanContr
           width: "210mm",
           minHeight: "297mm",
           padding: "20mm 18mm",
-          fontFamily: '"Sarabun", "TH Sarabun New", serif',
+          fontFamily: APPLE_SYSTEM_FONT,
           fontSize: "16px",
           lineHeight: 1.7,
           color: "#000",
@@ -215,7 +218,7 @@ function SignatureBlock({
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "center",
-          fontFamily: '"Caveat", "Sarabun", cursive',
+          fontFamily: APPLE_SYSTEM_FONT,
           fontSize: "22px",
           paddingBottom: "4px",
         }}

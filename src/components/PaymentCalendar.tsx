@@ -589,7 +589,7 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      className="bg-card rounded-2xl p-5 shadow-card relative"
+      className="relative rounded-[1.25rem] border border-border/80 bg-card/90 p-5"
     >
       {/* Role filter removed for simpler UX */}
 

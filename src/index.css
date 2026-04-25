@@ -6,36 +6,45 @@
 
 @layer base {
   :root {
+    --font-apple-system: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+      "SF Pro Display", "Helvetica Neue", "Sukhumvit Set", Thonburi, Arial,
+      system-ui, sans-serif;
+    --font-apple-display: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+      "SF Pro Text", "Helvetica Neue", "Sukhumvit Set", Thonburi, Arial,
+      system-ui, sans-serif;
+    --font-apple-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo,
+      Monaco, Consolas, monospace;
+
     /* Apple Native Mode — White/Gray & High End Minimal */
-    --background: 240 5% 96%;           /* #F2F2F7 system grouped background */
-    --foreground: 0 0% 0%;
+    --background: 0 0% 99%;
+    --foreground: 0 0% 6%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
+    --card-foreground: 0 0% 6%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 0%;
 
-    --primary: 0 0% 9%;              /* slate black action */
+    --primary: 0 0% 8%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 96%;
+    --secondary: 0 0% 97%;
     --secondary-foreground: 0 0% 9%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
+    --muted: 0 0% 97%;
+    --muted-foreground: 0 0% 42%;
 
-    --accent: 0 0% 96%;
+    --accent: 0 0% 97%;
     --accent-foreground: 0 0% 9%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 11% 91%;              /* subtle hairline #E5E5EA */
-    --input: 240 11% 91%;
+    --border: 0 0% 89%;
+    --input: 0 0% 89%;
     --ring: 0 0% 9%;
 
-    --radius: 1rem;                 /* smoother, larger radius */
+    --radius: 0.875rem;
 
     --status-success: 135 65% 42%;
     --status-warning: 32 100% 50%;
@@ -57,15 +66,15 @@
     --chat-bubble-money-foreground: 0 0% 100%;
 
     /* Gradients */
-    --gradient-warm: linear-gradient(180deg, hsl(240 5% 96%) 0%, hsl(240 5% 96%) 100%);
+    --gradient-warm: linear-gradient(180deg, hsl(0 0% 99%) 0%, hsl(0 0% 98%) 100%);
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 100%) 100%);
-    --gradient-primary: linear-gradient(180deg, hsl(0 0% 9%) 0%, hsl(0 0% 9%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(240 5% 96%) 0%, hsl(240 5% 96%) 100%);
+    --gradient-primary: linear-gradient(180deg, hsl(0 0% 8%) 0%, hsl(0 0% 8%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(0 0% 99%) 0%, hsl(0 0% 98%) 100%);
 
     /* Shadows — soft, elegant drops */
-    --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.04);
-    --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.06);
-    --shadow-elevated: 0 12px 40px rgba(0, 0, 0, 0.12);
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.02);
+    --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.03);
+    --shadow-elevated: 0 16px 40px rgba(0, 0, 0, 0.05);
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 20 10% 22%;
@@ -157,9 +166,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    /* Apple-first sans stack — SF Pro on Apple, Inter on others, Noto Sans Thai for ภาษาไทย */
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-      "Inter", "Noto Sans Thai", "Helvetica Neue", system-ui, sans-serif;
+    font-family: var(--font-apple-system);
     font-feature-settings: "ss01", "cv11", "tnum";
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
@@ -167,32 +174,38 @@
     overscroll-behavior-y: none;
   }
 
+  #root {
+    min-height: 100vh;
+  }
+
   h1, h2, h3, h4, h5, h6 {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter",
-      "Noto Sans Thai", system-ui, sans-serif;
-    @apply tracking-tight;
-    letter-spacing: -0.018em;
+    font-family: var(--font-apple-display);
+    letter-spacing: 0;
   }
 
   /* Numerals everywhere align to a tabular grid — SF Mono on Apple */
   [data-numeral], .num {
-    font-family: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "JetBrains Mono", monospace;
+    font-family: var(--font-apple-mono);
     font-feature-settings: "tnum", "ss01";
-    letter-spacing: -0.005em;
+    letter-spacing: 0;
   }
 }
 
 @layer utilities {
-  /* Apple "New York" serif on Apple devices, Newsreader fallback on others */
+  /* Keep legacy class names mapped to Apple-native fonts. */
   .font-serif-display {
-    font-family: ui-serif, "New York", "Newsreader", "Iowan Old Style", "Times New Roman", Georgia, serif;
+    font-family: var(--font-apple-display);
     font-weight: 400;
-    letter-spacing: -0.018em;
+    letter-spacing: 0;
   }
 
   .font-mono-tabular {
-    font-family: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "JetBrains Mono", monospace;
+    font-family: var(--font-apple-mono);
     font-feature-settings: "tnum";
+  }
+
+  [class*="tracking-"] {
+    letter-spacing: 0;
   }
 
   .text-gradient-primary {
@@ -213,8 +226,8 @@
 
   /* The new surface — flat paper with a hairline border. No drop shadow. */
   .surface-panel {
-    background: hsl(var(--card));
-    @apply rounded-md border border-border p-5;
+    background: hsl(var(--card) / 0.88);
+    @apply rounded-[1.25rem] border border-border/80 p-5 backdrop-blur-sm;
   }
 
   .surface-subtle {
@@ -222,7 +235,7 @@
   }
 
   .surface-flat {
-    @apply rounded-md border border-border bg-card p-5;
+    @apply rounded-[1.25rem] border border-border/80 bg-card p-5;
   }
 
   /* Editorial section divider — a single hairline */
@@ -232,13 +245,13 @@
 
   /* PWA mobile frame — every page renders inside a phone-width column */
   .page-shell {
-    @apply mx-auto w-full max-w-md px-5;
+    @apply mx-auto w-full max-w-md px-4 sm:px-5;
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6.5rem);
   }
 
   .section-stack {
-    @apply space-y-7;
+    @apply space-y-8;
   }
 
   /* Optional: render the app as a centered phone-shaped surface on desktop  */
@@ -260,7 +273,7 @@
 
   /* Subtle uppercase metadata label */
   .label-eyebrow {
-    @apply text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground;
+    @apply text-[11px] font-medium tracking-[0.12em] text-muted-foreground;
   }
 
   .animate-fade-up {

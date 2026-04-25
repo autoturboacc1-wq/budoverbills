@@ -18,19 +18,34 @@ export default {
         "2xl": "1400px",
       },
     },
+    letterSpacing: {
+      tighter: "0",
+      tight: "0",
+      normal: "0",
+      wide: "0",
+      wider: "0",
+      widest: "0",
+      editorial: "0",
+    },
     extend: {
       fontFamily: {
         sans: [
           '-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"',
-          'Inter', '"Noto Sans Thai"', '"Helvetica Neue"', 'system-ui', 'sans-serif',
+          '"Helvetica Neue"', '"Sukhumvit Set"', 'Thonburi', 'Arial', 'system-ui', 'sans-serif',
         ],
         heading: [
-          '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'Inter',
-          '"Noto Sans Thai"', 'system-ui', 'sans-serif',
+          '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"',
+          '"Helvetica Neue"', '"Sukhumvit Set"', 'Thonburi', 'Arial', 'system-ui', 'sans-serif',
         ],
-        serif: ['ui-serif', '"New York"', 'Newsreader', '"Iowan Old Style"', '"Times New Roman"', 'serif'],
-        mono: ['ui-monospace', '"SF Mono"', '"SFMono-Regular"', 'Menlo', '"JetBrains Mono"', 'monospace'],
-        cherry: ['"Cherry Bomb One"', 'cursive'],
+        serif: [
+          '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"',
+          '"Helvetica Neue"', '"Sukhumvit Set"', 'Thonburi', 'Arial', 'system-ui', 'sans-serif',
+        ],
+        mono: ['ui-monospace', '"SF Mono"', '"SFMono-Regular"', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+        cherry: [
+          '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"',
+          '"Helvetica Neue"', '"Sukhumvit Set"', 'Thonburi', 'Arial', 'system-ui', 'sans-serif',
+        ],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -97,9 +112,6 @@ export default {
         sm: "calc(var(--radius) - 4px)",
         xl: "calc(var(--radius) + 4px)",
         "2xl": "calc(var(--radius) + 8px)",
-      },
-      letterSpacing: {
-        editorial: "-0.018em",
       },
       boxShadow: {
         soft: "var(--shadow-soft)",

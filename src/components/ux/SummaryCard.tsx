@@ -28,8 +28,8 @@ export function SummaryCard({
   className,
 }: SummaryCardProps) {
   return (
-    <div className={cn("rounded-md border border-border bg-card p-4", className)}>
-      <div className="mb-3 flex items-center justify-between">
+    <div className={cn("rounded-[1.1rem] border border-border/80 bg-card/90 p-4", className)}>
+      <div className="mb-4 flex items-center justify-between">
         <span className="label-eyebrow">{label}</span>
         {Icon ? (
           <Icon
@@ -38,11 +38,11 @@ export function SummaryCard({
           />
         ) : null}
       </div>
-      <p className="font-serif-display text-2xl leading-none text-foreground num">
+      <p className="font-serif-display text-[1.85rem] leading-none text-foreground num">
         {value}
       </p>
       {hint ? (
-        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{hint}</p>
+        <p className="mt-2 max-w-[16rem] text-[11px] leading-snug text-muted-foreground">{hint}</p>
       ) : null}
     </div>
   );

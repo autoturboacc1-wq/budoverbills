@@ -30,7 +30,7 @@ export function PendingAgreements({ agreements, userId }: PendingAgreementsProps
       title="รอการยืนยัน"
       description="ข้อตกลงที่ต้องมีอีกฝ่ายกดยืนยันก่อนเริ่มใช้งาน"
       action={
-        <span className="rounded-full bg-status-pending/10 px-2.5 py-1 text-xs font-semibold text-status-pending">
+        <span className="rounded-full border border-status-pending/20 bg-status-pending/10 px-2.5 py-1 text-xs font-medium text-status-pending">
           {pendingAgreements.length} รายการ
         </span>
       }
@@ -49,16 +49,16 @@ export function PendingAgreements({ agreements, userId }: PendingAgreementsProps
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
               onClick={() => navigate(`/agreement/${agreement.id}/confirm`)}
-              className={`rounded-xl p-4 cursor-pointer transition-all ${
+              className={`cursor-pointer rounded-[1.1rem] border p-4 text-left transition-colors ${
                 needsMyConfirmation 
-                  ? "bg-status-pending/10 border-2 border-status-pending/30 hover:border-status-pending/50" 
-                  : "bg-secondary/35 border border-border hover:shadow-card"
+                  ? "border-status-pending/30 bg-status-pending/10 hover:border-status-pending/50"
+                  : "border-border/80 bg-card/90 hover:border-foreground/20"
               }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    needsMyConfirmation ? "bg-status-pending/20" : "bg-secondary"
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-full border ${
+                    needsMyConfirmation ? "border-status-pending/20 bg-status-pending/10" : "border-border/80 bg-secondary/60"
                   }`}>
                     <Clock className={`w-5 h-5 ${
                       needsMyConfirmation ? "text-status-pending" : "text-muted-foreground"
@@ -73,7 +73,7 @@ export function PendingAgreements({ agreements, userId }: PendingAgreementsProps
                 </div>
                 <div className="flex items-center gap-2">
                   {needsMyConfirmation && (
-                    <span className="text-xs font-medium text-status-pending bg-status-pending/20 px-2 py-1 rounded-full">
+                    <span className="rounded-full border border-status-pending/20 bg-status-pending/10 px-2 py-1 text-xs font-medium text-status-pending">
                       รอคุณยืนยัน
                     </span>
                   )}

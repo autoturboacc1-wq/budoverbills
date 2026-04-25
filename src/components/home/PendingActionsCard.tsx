@@ -292,7 +292,7 @@ export const PendingActionsCard = () => {
       title="Primary Action Queue"
       description="จัดลำดับงานที่ต้องกดทำตอนนี้ก่อนงานข้อมูลภาพรวม"
       action={
-        <span className="rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-semibold text-destructive">
+        <span className="rounded-full border border-destructive/15 bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
           {pendingActions.length} รายการ
         </span>
       }
@@ -309,20 +309,20 @@ export const PendingActionsCard = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
               onClick={() => navigate(`/debt/${action.agreementId}`)}
-              className={`w-full p-4 rounded-xl border text-left transition-all hover:scale-[1.01] ${config.bgClass}`}
+              className={`w-full rounded-[1.1rem] border p-4 text-left transition-colors ${config.bgClass}`}
             >
               <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${config.iconBg}`}>
+                <div className={`flex h-11 w-11 items-center justify-center rounded-full ${config.iconBg}`}>
                   <Icon className={`w-6 h-6 ${config.iconColor}`} />
                 </div>
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`font-semibold ${config.iconColor}`}>
+                    <span className={`font-medium ${config.iconColor}`}>
                       {action.title}
                     </span>
                     {action.priority === "critical" && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full animate-pulse">
+                      <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                         ด่วน!
                       </span>
                     )}

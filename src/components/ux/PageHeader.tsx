@@ -27,7 +27,7 @@ export function PageHeader({
           <button
             type="button"
             onClick={onBack}
-            className="surface-subtle mt-0.5 inline-flex h-11 w-11 items-center justify-center rounded-2xl transition-colors hover:bg-secondary/80"
+            className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/80 bg-card/80 transition-colors hover:bg-accent"
             aria-label="ย้อนกลับ"
           >
             <ArrowLeft className="h-5 w-5 text-secondary-foreground" />
@@ -36,11 +36,11 @@ export function PageHeader({
 
         <div className="min-w-0">
           {eyebrow ? (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="text-[11px] font-medium tracking-[0.12em] text-muted-foreground">
               {eyebrow}
             </p>
           ) : null}
-          <h1 className="text-2xl font-heading font-semibold tracking-tight text-foreground sm:text-[1.85rem]">
+          <h1 className="font-serif-display text-[1.9rem] tracking-tight text-foreground sm:text-[2.05rem]">
             {title}
           </h1>
           {description ? (

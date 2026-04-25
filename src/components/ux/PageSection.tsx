@@ -22,10 +22,10 @@ export function PageSection({
   return (
     <section className={cn("space-y-4", className)}>
       {title || description || action ? (
-        <div className="flex items-end justify-between gap-3 border-b border-border pb-3">
+        <div className="flex items-end justify-between gap-3 border-b border-border/80 pb-3">
           <div>
             {title ? (
-              <h2 className="font-serif-display text-xl leading-none text-foreground">
+              <h2 className="font-serif-display text-[1.35rem] leading-none text-foreground">
                 {title}
               </h2>
             ) : null}
