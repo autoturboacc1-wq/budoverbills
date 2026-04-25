@@ -89,10 +89,11 @@ export function FriendRequestsSection() {
                   </div>
                   <div>
                     <p className="font-medium text-foreground text-sm">
-                      {request.from_profile?.display_name || `User ${request.from_profile?.user_code}`}
+                      {request.from_profile?.display_name
+                        || (request.from_profile?.user_code ? `User ${request.from_profile.user_code}` : 'ผู้ใช้ที่ไม่ทราบชื่อ')}
                     </p>
                     <p className="text-xs text-muted-foreground font-mono">
-                      {request.from_profile?.user_code}
+                      {request.from_profile?.user_code ?? ''}
                     </p>
                   </div>
                 </div>
@@ -104,7 +105,7 @@ export function FriendRequestsSection() {
                     className="h-8 w-8 p-0 text-status-overdue hover:bg-status-overdue/10"
                     onClick={() => handleReject(request.id)}
                     disabled={processingIds.has(request.id)}
-                    aria-label={`ปฏิเสธคำขอจาก ${request.from_profile?.display_name || `User ${request.from_profile?.user_code}`}`}
+                    aria-label={`ปฏิเสธคำขอจาก ${request.from_profile?.display_name || (request.from_profile?.user_code ? `User ${request.from_profile.user_code}` : 'ผู้ใช้ที่ไม่ทราบชื่อ')}`}
                   >
                     {processingIds.has(request.id) ? (
                       <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -118,7 +119,7 @@ export function FriendRequestsSection() {
                     className="h-8 px-3"
                     onClick={() => handleAccept(request.id)}
                     disabled={processingIds.has(request.id)}
-                    aria-label={`ยอมรับคำขอจาก ${request.from_profile?.display_name || `User ${request.from_profile?.user_code}`}`}
+                    aria-label={`ยอมรับคำขอจาก ${request.from_profile?.display_name || (request.from_profile?.user_code ? `User ${request.from_profile.user_code}` : 'ผู้ใช้ที่ไม่ทราบชื่อ')}`}
                   >
                     {processingIds.has(request.id) ? (
                       <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
