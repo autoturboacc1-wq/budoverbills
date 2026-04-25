@@ -1,30 +1,21 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { PageTransition } from "@/components/ux/PageTransition";
-import { ArrowLeft, User, Calendar, Percent, Calculator, Info, UserPlus, Check, X, AlertTriangle, ShieldCheck, Coins, Building } from "lucide-react";
+import { User, Calendar, Percent, Calculator, Info, AlertTriangle, ShieldCheck, Coins, Building, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useDebtAgreements, CreateAgreementInput } from "@/hooks/useDebtAgreements";
-import { useDbFriends, DbFriend } from "@/hooks/useDbFriends";
 import { useAuth } from "@/contexts/AuthContext";
-import { useSubscription } from "@/hooks/useSubscription";
 import { PasswordConfirmDialog } from "@/components/PasswordConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
-import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { THAI_BANKS } from "@/constants/thaibanks";
 import { buildEffectiveRateSchedule, getPeriodsPerYear } from "@/domains/debt/recalculateEffectiveRateSchedule";
 import { divideMoney, roundMoney, sumMoney, toMoney } from "@/utils/money";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -33,14 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  EmptyState,
   InlineValidationMessage,
   PageHeader,
-  PageSection,
   PrimaryActionBar,
-  ReviewPanel,
   StepFlowLayout,
-  SummaryCard,
 } from "@/components/ux";
 
 type InterestType = "none" | "flat" | "effective";
@@ -104,15 +91,8 @@ export default function CreateAgreement() {
   const location = useLocation();
   const { user } = useAuth();
   const { createAgreement } = useDebtAgreements();
-  const { friends } = useDbFriends();
-  const {
-    quota,
-    refetch: refetchLimits,
-  } = useSubscription();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showFriendPicker, setShowFriendPicker] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
-  const [selectedFriend, setSelectedFriend] = useState<DbFriend | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   
   const [formData, setFormData] = useState({
@@ -132,56 +112,16 @@ export default function CreateAgreement() {
     accountName: "",
   });
 
-  const handleSelectFriend = useCallback((friend: DbFriend) => {
-    setSelectedFriend(friend);
-    setFormData((prev) => ({
-      ...prev,
-      partnerPhone: friend.friend_phone || "",
-      partnerName: friend.friend_name,
-    }));
-    setShowFriendPicker(false);
-  }, []);
-
-  const handleClearFriend = useCallback(() => {
-    setSelectedFriend(null);
-    setFormData((prev) => ({
-      ...prev,
-      partnerPhone: "",
-      partnerName: "",
-    }));
-  }, []);
-
   useEffect(() => {
-    const state = location.state as { selectedFriend?: Partial<DbFriend> } | null;
-    const locationFriend = state?.selectedFriend;
-    if (!locationFriend?.friend_name || selectedFriend) return;
+    const state = location.state as { partnerName?: string; partnerPhone?: string } | null;
+    if (!state?.partnerName && !state?.partnerPhone) return;
 
-    const preselected = friends.find((friend) => friend.id === locationFriend.id) ?? null;
-    if (preselected) {
-      setSelectedFriend(preselected);
-      setFormData((prev) => ({
-        ...prev,
-        partnerPhone: preselected.friend_phone || "",
-        partnerName: preselected.friend_name,
-      }));
-      return;
-    }
-
-    setSelectedFriend({
-      id: locationFriend.id ?? crypto.randomUUID(),
-      friend_user_id: locationFriend.friend_user_id ?? null,
-      friend_name: locationFriend.friend_name,
-      friend_phone: locationFriend.friend_phone ?? null,
-      nickname: null,
-      created_at: new Date().toISOString(),
-      user_id: user?.id ?? "",
-    });
     setFormData((prev) => ({
       ...prev,
-      partnerPhone: locationFriend.friend_phone || "",
-      partnerName: locationFriend.friend_name || "",
+      partnerName: prev.partnerName || state.partnerName || "",
+      partnerPhone: prev.partnerPhone || state.partnerPhone || "",
     }));
-  }, [friends, location.state, selectedFriend, user?.id]);
+  }, [location.state]);
 
   // Fetch bank account from previous agreements
   useEffect(() => {
@@ -255,14 +195,8 @@ export default function CreateAgreement() {
       return;
     }
 
-    if (!selectedFriend) {
-      toast.error("กรุณาเลือกผู้ยืมจากรายชื่อเพื่อน");
-      return;
-    }
-
-    // VALIDATION: Lender cannot be the same as borrower
-    if (selectedFriend.friend_user_id === user.id) {
-      toast.error("ไม่สามารถสร้างข้อตกลงกับตัวเองได้");
+    if (!formData.partnerName.trim()) {
+      toast.error("กรุณาระบุชื่อผู้ยืม");
       return;
     }
 
@@ -276,9 +210,9 @@ export default function CreateAgreement() {
 
     try {
       const input: CreateAgreementInput = {
-        borrower_id: selectedFriend?.friend_user_id || undefined,
+        borrower_id: undefined,
         borrower_phone: formData.partnerPhone || undefined,
-        borrower_name: formData.partnerName || undefined,
+        borrower_name: formData.partnerName.trim() || undefined,
         principal_amount: principalAmount,
         interest_rate: annualInterestRate,
         interest_type: formData.interestType,
@@ -305,22 +239,14 @@ export default function CreateAgreement() {
       const result = await createAgreement(input);
 
       if (result) {
-        await refetchLimits(); // Refresh limits after the RPC atomically consumes quota
-        toast.success("ส่งคำขอข้อตกลงสำเร็จ!");
+        toast.success("ส่งคำขอให้ผู้ยืมยืนยันสำเร็จ");
         navigate("/");
       }
     } catch (err: unknown) {
-      // The RPC raises 'Agreement quota exceeded' when the user has no remaining
-      // free slots and no purchased credits.  Catch it here so we can show a
-      // localised, actionable message instead of the generic error toast that
-      // createAgreement would produce.
       const message = err instanceof Error ? err.message : String(err);
       if (message.toLowerCase().includes('quota exceeded')) {
-        toast.error(
-          `สิทธิ์สร้างข้อตกลงไม่เพียงพอ กรุณาไปหน้าเลี้ยงกาแฟเพื่อซื้อสิทธิ์เพิ่ม`,
-        );
+        toast.error("ไม่สามารถสร้างข้อตกลงได้ในขณะนี้");
       }
-      // Non-quota errors are already surfaced by createAgreement via handleSupabaseError.
     } finally {
       setIsSubmitting(false);
     }
@@ -526,42 +452,18 @@ export default function CreateAgreement() {
   };
 
   const stepDefinitions = [
-    { title: "เลือกผู้ยืม", description: "ระบุคนที่จะมายืมเงินจากคุณ" },
+    { title: "ข้อมูลผู้ยืม", description: "ระบุชื่อและเบอร์ของผู้ยืม" },
     { title: "กำหนดวงเงิน", description: "ตั้งเงินต้น งวด และดอกเบี้ย" },
     { title: "บัญชีรับชำระคืน", description: "บัญชีของคุณสำหรับให้ผู้ยืมโอนคืน" },
     { title: "ตรวจสอบก่อนส่ง", description: "สรุปเงื่อนไขและยืนยัน" },
   ];
 
   const canProceedByStep = [
-    !!selectedFriend,
+    !!formData.partnerName.trim(),
     !!formData.amount && principalAmount > 0 && installmentCount > 0,
     !!selectedCalculation && paymentSchedule.length > 0 && !!formData.bankName && !!formData.accountNumber,
-    !!selectedCalculation && !!selectedFriend,
+    !!selectedCalculation && !!formData.partnerName.trim(),
   ];
-
-  const selectedBankLabel =
-    THAI_BANKS.find((bank) => bank.value === formData.bankName)?.label || formData.bankName || "ยังไม่ได้เลือก";
-
-  const reviewRows = selectedCalculation
-    ? [
-        { label: "ผู้ยืม", value: selectedFriend?.friend_name || "-" },
-        { label: "เงินต้น", value: `฿${principalAmount.toLocaleString()}` },
-        {
-          label: "โครงสร้างดอกเบี้ย",
-          value:
-            formData.interestType === "none"
-              ? "ไม่คิดดอกเบี้ย"
-              : `${interestTypeLabels[formData.interestType].title} ${annualInterestRate.toLocaleString()}% ต่อปี`,
-        },
-        {
-          label: "แผนการชำระ",
-          value: `${installmentCount} งวด / ${frequencyLabels[formData.frequency]}`,
-        },
-        { label: "ชำระต่องวด", value: `฿${selectedCalculation.perInstallment.toLocaleString()}` },
-        { label: "ยอดรวมทั้งหมด", value: `฿${selectedCalculation.totalAmount.toLocaleString()}` },
-        { label: "บัญชีรับเงิน", value: selectedBankLabel },
-      ]
-    : [];
 
   useEffect(() => {
     const sectionIds = ["agreement-step-0", "agreement-step-1", "agreement-step-2", "agreement-step-3"];
@@ -574,8 +476,9 @@ export default function CreateAgreement() {
     <div className="min-h-screen">
       <div className="page-shell">
         <PageHeader
-          title="สร้างข้อตกลงใหม่"
-          description="คุณคือผู้ให้ยืม — เลือกผู้ยืม กำหนดวงเงิน เงื่อนไข และบัญชีของคุณสำหรับรับชำระคืน"
+          eyebrow="สำหรับผู้ให้ยืม"
+          title="ปล่อยยืมและสร้างข้อตกลง"
+          description="หน้านี้ใช้เมื่อคุณเป็นฝ่ายปล่อยเงินให้เพื่อนยืม ผู้ยืมไม่ต้องเข้ามาสร้างเอง แต่จะได้รับคำขอให้เข้ามายืนยันภายหลัง"
           onBack={() => navigate(-1)}
         />
 
@@ -583,40 +486,60 @@ export default function CreateAgreement() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="mb-4 flex items-start gap-3 rounded-2xl border border-primary/30 bg-primary/10 p-4"
+          className="mb-4 grid gap-3 md:grid-cols-2"
         >
-          <ShieldCheck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-foreground space-y-1">
-            <p>
-              <span className="font-medium">คุณ = ผู้ให้ยืม</span> (ปล่อยเงิน) •{" "}
-              <span className="font-medium">คู่สัญญาที่เลือก = ผู้ยืม</span> (รับเงินไป)
-            </p>
-            <p className="text-xs text-muted-foreground">
-              ผู้ยืมจะได้รับแจ้งเตือนให้เข้ามายืนยันข้อตกลงก่อนเริ่มสัญญา
-            </p>
+          <div className="rounded-[1.25rem] border border-primary/15 bg-primary/5 p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary/15 bg-primary/5 text-primary">
+                <ArrowUpRight className="h-5 w-5" />
+              </span>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">ฉันเป็นคนปล่อยยืม</p>
+                <p className="text-sm text-foreground">
+                  flow นี้ถูกต้องสำหรับกรณีที่ <span className="font-medium">คุณเป็นผู้ให้ยืม</span> และกำลังเลือกคนที่จะรับเงินไป
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  คุณจะเป็นคนตั้งวงเงิน งวด ดอกเบี้ย และบัญชีรับชำระคืน
+                </p>
+                {formData.partnerName ? (
+                  <p className="inline-flex rounded-full border border-primary/15 bg-background/80 px-2.5 py-1 text-xs font-medium text-primary">
+                    กำลังเตรียมปล่อยให้ {formData.partnerName} ยืม
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[1.25rem] border border-border/80 bg-card/80 p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/80 bg-secondary/60 text-muted-foreground">
+                <ArrowDownLeft className="h-5 w-5" />
+              </span>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">ฉันเป็นคนยืม</p>
+                <p className="text-sm text-foreground">
+                  คุณ <span className="font-medium">ไม่ต้องสร้างข้อตกลงเองในหน้านี้</span> ให้รออีกฝ่ายส่งคำขอมา แล้วค่อยเข้ามายืนยัน
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  เมื่อมีคำขอใหม่ ระบบจะพาไปยืนยันผ่านหน้าแจ้งเตือนและรายละเอียดสัญญา
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="px-0 text-xs"
+                  onClick={() => navigate("/notifications")}
+                >
+                  ไปดูหน้าแจ้งเตือน
+                </Button>
+              </div>
+            </div>
           </div>
         </motion.div>
 
-        {/* Subscription Banner */}
-        {quota && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="mb-4"
-          >
-            <SubscriptionBanner
-              type="agreement"
-              used={quota.free_used}
-              limit={quota.free_limit}
-              credits={quota.credits ?? 0}
-            />
-          </motion.div>
-        )}
-
         <StepFlowLayout
-          title="Guided Agreement Builder"
-          description="ใช้ปุ่มด้านล่างเพื่อเดินทีละขั้น ระบบจะเลื่อนไปยังส่วนที่เกี่ยวข้องให้อัตโนมัติ"
+          title="สร้างข้อตกลงฝั่งผู้ให้ยืม"
+          description="เดินทีละขั้นเพื่อกรอกข้อมูลผู้ยืม กำหนดเงื่อนไข และส่งคำขอให้ผู้ยืมเข้ามายืนยัน"
           currentStep={currentStep}
           steps={stepDefinitions}
         >
@@ -630,59 +553,47 @@ export default function CreateAgreement() {
           {/* Partner */}
           <div
             id="agreement-step-0"
-            className={`bg-card rounded-2xl p-5 shadow-card space-y-4 transition-all ${
-              currentStep === 0 ? "ring-2 ring-primary/30 shadow-elevated" : ""
+            className={`space-y-4 rounded-[1.25rem] border border-border/80 bg-card/90 p-5 transition-all ${
+              currentStep === 0 ? "border-primary/25 bg-primary/[0.03]" : ""
             }`}
           >
             <div className="flex items-center gap-2 text-foreground font-medium">
               <User className="w-5 h-5 text-primary" />
               <span>ผู้ยืม (ผู้รับเงินไป)</span>
             </div>
-            
-            {/* Selected Friend Display */}
-            {selectedFriend ? (
-              <div className="flex items-center gap-3 p-3 bg-primary/10 rounded-xl border border-primary/20">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                  <span className="text-sm font-medium text-primary">
-                    {selectedFriend.friend_name.charAt(0)}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-foreground">{selectedFriend.friend_name}</p>
-                  {selectedFriend.friend_phone && (
-                    <p className="text-xs text-muted-foreground">{selectedFriend.friend_phone}</p>
-                  )}
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={handleClearFriend}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="partnerName">ชื่อผู้ยืม</Label>
+                <Input
+                  id="partnerName"
+                  placeholder="เช่น สมชาย ใจดี"
+                  value={formData.partnerName}
+                  onChange={(e) => setFormData({ ...formData, partnerName: e.target.value })}
+                />
               </div>
-            ) : (
-              <div className="space-y-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setShowFriendPicker(true)}
-                >
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  เลือกจากรายชื่อเพื่อน
-                </Button>
+              <div className="space-y-2">
+                <Label htmlFor="partnerPhone">เบอร์โทรผู้ยืม (ไม่บังคับ)</Label>
+                <Input
+                  id="partnerPhone"
+                  inputMode="tel"
+                  placeholder="0812345678"
+                  value={formData.partnerPhone}
+                  onChange={(e) => setFormData({ ...formData, partnerPhone: e.target.value })}
+                />
               </div>
-            )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              ใช้กรอกข้อมูลพื้นฐานเพื่อส่งคำขอได้ทันที ไม่จำเป็นต้องเพิ่มเพื่อนก่อน
+            </p>
           </div>
 
           {/* Amount */}
           <div
             id="agreement-step-1"
-            className={`bg-card rounded-2xl p-5 shadow-card space-y-4 transition-all ${
-              currentStep === 1 ? "ring-2 ring-primary/30 shadow-elevated" : ""
+            className={`space-y-4 rounded-[1.25rem] border border-border/80 bg-card/90 p-5 transition-all ${
+              currentStep === 1 ? "border-primary/25 bg-primary/[0.03]" : ""
             }`}
           >
             <div className="flex items-center gap-2 text-foreground font-medium">
@@ -704,8 +615,8 @@ export default function CreateAgreement() {
 
           {/* Installments */}
           <div
-            className={`bg-card rounded-2xl p-5 shadow-card space-y-4 transition-all ${
-              currentStep === 1 ? "ring-2 ring-primary/30 shadow-elevated" : ""
+            className={`space-y-4 rounded-[1.25rem] border border-border/80 bg-card/90 p-5 transition-all ${
+              currentStep === 1 ? "border-primary/25 bg-primary/[0.03]" : ""
             }`}
           >
             <div className="flex items-center gap-2 text-foreground font-medium">
@@ -815,7 +726,7 @@ export default function CreateAgreement() {
           </div>
 
           {/* Interest */}
-          <div className="bg-card rounded-2xl p-5 shadow-card space-y-4">
+          <div className="space-y-4 rounded-[1.25rem] border border-border/80 bg-card/90 p-5">
             <div className="flex items-center gap-2 text-foreground font-medium">
               <Percent className="w-5 h-5 text-primary" />
               <span>ดอกเบี้ย (ไม่บังคับ)</span>
@@ -1159,8 +1070,8 @@ export default function CreateAgreement() {
           </div>
 
           <div
-            className={`bg-card rounded-2xl p-5 shadow-card space-y-4 transition-all ${
-              currentStep === 2 ? "ring-2 ring-primary/30 shadow-elevated" : ""
+            className={`space-y-4 rounded-[1.25rem] border border-border/80 bg-card/90 p-5 transition-all ${
+              currentStep === 2 ? "border-primary/25 bg-primary/[0.03]" : ""
             }`}
           >
             <div className="flex items-center gap-2 text-foreground font-medium">
@@ -1225,8 +1136,8 @@ export default function CreateAgreement() {
               id="agreement-step-2"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`bg-card rounded-2xl p-5 shadow-card space-y-4 border-2 border-primary/20 transition-all ${
-                currentStep === 2 ? "ring-2 ring-primary/30 shadow-elevated" : ""
+              className={`space-y-4 rounded-[1.25rem] border border-primary/20 bg-card/90 p-5 transition-all ${
+                currentStep === 2 ? "bg-primary/[0.03]" : ""
               }`}
             >
               <div className="flex items-center gap-2 text-foreground font-medium">
@@ -1399,8 +1310,8 @@ export default function CreateAgreement() {
               id="agreement-step-3"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`bg-card rounded-2xl p-5 shadow-card space-y-3 transition-all ${
-                currentStep === 3 ? "ring-2 ring-primary/30 shadow-elevated" : ""
+              className={`space-y-3 rounded-[1.25rem] border border-border/80 bg-card/90 p-5 transition-all ${
+                currentStep === 3 ? "border-primary/25 bg-primary/[0.03]" : ""
               }`}
             >
               <p className="text-sm font-medium text-foreground text-center">สรุปการชำระเงิน</p>
@@ -1480,7 +1391,7 @@ export default function CreateAgreement() {
                       !formData.amount
                     }
                   >
-                    {isSubmitting ? "กำลังสร้าง..." : "ส่งคำขอข้อตกลง"}
+                    {isSubmitting ? "กำลังส่งคำขอ..." : "ส่งให้ผู้ยืมยืนยัน"}
                   </Button>
                 )}
               </div>
@@ -1489,65 +1400,14 @@ export default function CreateAgreement() {
         </motion.form>
         </StepFlowLayout>
 
-        {/* Friend Picker Dialog */}
-        <Dialog open={showFriendPicker} onOpenChange={setShowFriendPicker}>
-          <DialogContent className="max-w-md mx-4 max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="font-heading">เลือกผู้ยืม</DialogTitle>
-            </DialogHeader>
-            
-            <div className="space-y-2 mt-4">
-              {friends.length === 0 ? (
-                <div className="text-center py-8">
-                  <User className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-muted-foreground">ยังไม่มีเพื่อนในลิสต์</p>
-                  <Button 
-                    variant="outline" 
-                    className="mt-4"
-                    onClick={() => {
-                      setShowFriendPicker(false);
-                      navigate("/profile");
-                    }}
-                  >
-                    เพิ่มเพื่อนในโปรไฟล์
-                  </Button>
-                </div>
-              ) : (
-                friends.map((friend) => (
-                  <motion.div
-                    key={friend.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    onClick={() => handleSelectFriend(friend)}
-                    className="flex items-center gap-3 p-3 rounded-xl cursor-pointer bg-secondary hover:bg-secondary/80 transition-colors"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary">
-                        {friend.friend_name.charAt(0)}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-foreground">{friend.friend_name}</p>
-                      {friend.friend_phone && (
-                        <p className="text-xs text-muted-foreground">{friend.friend_phone}</p>
-                      )}
-                    </div>
-                    <Check className="w-4 h-4 text-transparent" />
-                  </motion.div>
-                ))
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-
         {/* Password Confirmation Dialog */}
         <PasswordConfirmDialog
           open={showPasswordConfirm}
           onOpenChange={setShowPasswordConfirm}
           onConfirm={handleConfirmedSubmit}
-          title="ยืนยันการส่งข้อตกลง"
-          description="กรุณาใส่รหัสผ่านเพื่อยืนยันการสร้างข้อตกลง"
-          confirmButtonText="ส่งคำขอข้อตกลง"
+          title="ยืนยันการส่งคำขอให้ผู้ยืม"
+          description="กรุณาใส่รหัสผ่านเพื่อยืนยันการสร้างข้อตกลงในฐานะผู้ให้ยืม"
+          confirmButtonText="ส่งให้ผู้ยืมยืนยัน"
           isLoading={isSubmitting}
         />
       </div>

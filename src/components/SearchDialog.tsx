@@ -21,11 +21,16 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const navigate = useNavigate();
   const { results, loading } = useSearch(query);
 
-  const handleSelect = (result: { id: string; type: string }) => {
+  const handleSelect = (result: { id: string; type: string; name: string; subtitle: string }) => {
     if (result.type === "agreement") {
       navigate(`/debt/${result.id}`);
     } else if (result.type === "friend") {
-      navigate("/friends");
+      navigate("/create", {
+        state: {
+          partnerName: result.name,
+          partnerPhone: result.subtitle === "ไม่มีเบอร์โทร" ? "" : result.subtitle,
+        },
+      });
     }
     onOpenChange(false);
     setQuery("");
