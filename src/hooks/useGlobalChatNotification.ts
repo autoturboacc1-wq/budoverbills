@@ -50,10 +50,7 @@ function getUnreadChatMessageSnapshot() {
   return unreadChatMessageCount;
 }
 
-async function fetchChatTargetsAndUnreadCount(userId: string): Promise<{
-  chatTargets: ChatTargets;
-  unreadCount: number;
-}> {
+async function fetchChatTargets(userId: string): Promise<ChatTargets> {
   const [agreementsResult, directChatsResult] = await Promise.all([
     supabase
       .from("debt_agreements")
@@ -66,35 +63,42 @@ async function fetchChatTargetsAndUnreadCount(userId: string): Promise<{
       .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
   ]);
 
-  const agreementIds = uniqueStrings(agreementsResult.data?.map((agreement) => agreement.id));
-  const directChatIds = uniqueStrings(directChatsResult.data?.map((chat) => chat.id));
+  return {
+    agreementIds: uniqueStrings(agreementsResult.data?.map((agreement) => agreement.id)),
+    directChatIds: uniqueStrings(directChatsResult.data?.map((chat) => chat.id)),
+  };
+}
 
+async function fetchUnreadCount(userId: string, targets: ChatTargets): Promise<number> {
   const [agreementCountResult, directCountResult] = await Promise.all([
-    agreementIds.length > 0
+    targets.agreementIds.length > 0
       ? supabase
           .from("messages")
-          .select("id", { count: "exact" })
-          .in("agreement_id", agreementIds)
+          .select("id", { count: "exact", head: true })
+          .in("agreement_id", targets.agreementIds)
           .neq("sender_id", userId)
           .is("read_at", null)
       : Promise.resolve({ count: 0 }),
-    directChatIds.length > 0
+    targets.directChatIds.length > 0
       ? supabase
           .from("messages")
-          .select("id", { count: "exact" })
-          .in("direct_chat_id", directChatIds)
+          .select("id", { count: "exact", head: true })
+          .in("direct_chat_id", targets.directChatIds)
           .neq("sender_id", userId)
           .is("read_at", null)
       : Promise.resolve({ count: 0 }),
   ]);
 
-  return {
-    chatTargets: {
-      agreementIds,
-      directChatIds,
-    },
-    unreadCount: (agreementCountResult.count || 0) + (directCountResult.count || 0),
-  };
+  return (agreementCountResult.count || 0) + (directCountResult.count || 0);
+}
+
+async function fetchChatTargetsAndUnreadCount(userId: string): Promise<{
+  chatTargets: ChatTargets;
+  unreadCount: number;
+}> {
+  const chatTargets = await fetchChatTargets(userId);
+  const unreadCount = await fetchUnreadCount(userId, chatTargets);
+  return { chatTargets, unreadCount };
 }
 
 async function refreshUnreadChatMessageCount(userId?: string | null): Promise<number> {
@@ -141,6 +145,8 @@ export const useGlobalChatNotification = () => {
     isInChatPageRef.current = isInChatPage;
   }, [isInChatPage]);
 
+  // Refresh the full target list AND the unread count. Used on mount and when
+  // a room/agreement membership row changes (rare).
   const refreshChatTargets = useCallback(async () => {
     if (!userId) {
       setChatTargets({ agreementIds: [], directChatIds: [] });
@@ -154,8 +160,51 @@ export const useGlobalChatNotification = () => {
     setUnreadChatMessageCount(unreadCount);
   }, [userId]);
 
+  // Refresh only the unread count using the cached target list. Used when a
+  // message INSERT/UPDATE/DELETE arrives (frequent). Avoids re-fetching the
+  // agreement/direct_chat ID lists on every message.
+  const chatTargetsRef = useRef(chatTargets);
+  useEffect(() => {
+    chatTargetsRef.current = chatTargets;
+  }, [chatTargets]);
+
+  const refreshUnreadOnly = useCallback(async () => {
+    if (!userId) {
+      setUnreadChatMessageCount(0);
+      return;
+    }
+    const unread = await fetchUnreadCount(userId, chatTargetsRef.current);
+    setUnreadChatMessageCount(unread);
+  }, [userId]);
+
+  // Debounce timers — coalesce bursts of realtime events into one DB query.
+  const targetsRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unreadRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleTargetsRefresh = useCallback(() => {
+    if (targetsRefreshTimerRef.current) {
+      clearTimeout(targetsRefreshTimerRef.current);
+    }
+    targetsRefreshTimerRef.current = setTimeout(() => {
+      void refreshChatTargets();
+    }, 500);
+  }, [refreshChatTargets]);
+
+  const scheduleUnreadRefresh = useCallback(() => {
+    if (unreadRefreshTimerRef.current) {
+      clearTimeout(unreadRefreshTimerRef.current);
+    }
+    unreadRefreshTimerRef.current = setTimeout(() => {
+      void refreshUnreadOnly();
+    }, 300);
+  }, [refreshUnreadOnly]);
+
   useEffect(() => {
     void refreshChatTargets();
+    return () => {
+      if (targetsRefreshTimerRef.current) clearTimeout(targetsRefreshTimerRef.current);
+      if (unreadRefreshTimerRef.current) clearTimeout(unreadRefreshTimerRef.current);
+    };
   }, [refreshChatTargets]);
 
   useEffect(() => {
@@ -171,9 +220,7 @@ export const useGlobalChatNotification = () => {
           table: "debt_agreements",
           filter: `lender_id=eq.${userId}`,
         },
-        () => {
-          void refreshChatTargets();
-        }
+        scheduleTargetsRefresh
       )
       .on(
         "postgres_changes",
@@ -183,9 +230,7 @@ export const useGlobalChatNotification = () => {
           table: "debt_agreements",
           filter: `borrower_id=eq.${userId}`,
         },
-        () => {
-          void refreshChatTargets();
-        }
+        scheduleTargetsRefresh
       )
       .on(
         "postgres_changes",
@@ -195,9 +240,7 @@ export const useGlobalChatNotification = () => {
           table: "direct_chats",
           filter: `user1_id=eq.${userId}`,
         },
-        () => {
-          void refreshChatTargets();
-        }
+        scheduleTargetsRefresh
       )
       .on(
         "postgres_changes",
@@ -207,16 +250,14 @@ export const useGlobalChatNotification = () => {
           table: "direct_chats",
           filter: `user2_id=eq.${userId}`,
         },
-        () => {
-          void refreshChatTargets();
-        }
+        scheduleTargetsRefresh
       )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(roomUpdatesChannel);
     };
-  }, [refreshChatTargets, userId]);
+  }, [scheduleTargetsRefresh, userId]);
 
   useEffect(() => {
     if (!userId || (chatTargets.agreementIds.length === 0 && chatTargets.directChatIds.length === 0)) {
@@ -227,7 +268,10 @@ export const useGlobalChatNotification = () => {
     const channels: Array<ReturnType<typeof supabase.channel>> = [];
 
     const handleMessageChange = (payload: MessageRealtimePayload) => {
-      void refreshChatTargets();
+      // Only the unread count needs refreshing on every message — the
+      // target list (agreement/direct chat IDs) hasn't changed. Debounced
+      // so a burst of messages collapses into one DB query.
+      scheduleUnreadRefresh();
 
       if (payload.eventType !== "INSERT") return;
 
@@ -279,5 +323,5 @@ export const useGlobalChatNotification = () => {
         void supabase.removeChannel(channel);
       });
     };
-  }, [chatTargets.agreementIds, chatTargets.directChatIds, playNotificationSound, refreshChatTargets, userId]);
+  }, [chatTargets.agreementIds, chatTargets.directChatIds, playNotificationSound, scheduleUnreadRefresh, userId]);
 };

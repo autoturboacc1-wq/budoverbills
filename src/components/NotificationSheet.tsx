@@ -5,91 +5,46 @@ import {
   SheetDescription,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Bell, Check, Clock, AlertCircle, FileText, CheckCircle2, Loader2, AlertTriangle, ChevronRight } from "lucide-react";
-import { motion } from "framer-motion";
-import { useNotifications, Notification, NotificationPriority } from "@/hooks/useNotifications";
+import { Bell, Check, Loader2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useMemo } from "react";
+import { useNotifications, type Notification } from "@/hooks/useNotifications";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { formatDistanceToNow } from "date-fns";
-import { th } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { getSafeNotificationTarget } from "@/utils/navigation";
+import { NotificationListItem } from "@/components/notifications/NotificationListItem";
 
 interface NotificationSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  payment_due: Clock,
-  payment_uploaded: AlertCircle,
-  payment_confirmed: Check,
-  payment_rejected: AlertCircle,
-  agreement_created: FileText,
-  agreement_confirmed: CheckCircle2,
-  agreement_completed: CheckCircle2,
-  reschedule_request: Clock,
-  reschedule_approved: CheckCircle2,
-  reschedule_rejected: AlertCircle,
-  post_published: CheckCircle2,
-  friend_request: Bell,
-  friend_accepted: CheckCircle2,
-  security_alert: AlertCircle,
-  default: Bell,
-};
-
-// Priority-based styling (replaces type-based)
-const priorityConfig: Record<NotificationPriority, {
-  bgClass: string;
-  iconBg: string;
-  borderClass: string;
-}> = {
-  critical: {
-    bgClass: "bg-status-overdue/10",
-    iconBg: "text-status-overdue bg-status-overdue/20",
-    borderClass: "border-status-overdue/30",
-  },
-  important: {
-    bgClass: "bg-status-pending/10",
-    iconBg: "text-status-pending bg-status-pending/20",
-    borderClass: "border-status-pending/30",
-  },
-  info: {
-    bgClass: "bg-muted",
-    iconBg: "text-muted-foreground bg-muted",
-    borderClass: "border-border",
-  },
-};
-
 export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps) {
   const { notifications, loading, markAsRead, markAllAsRead, unreadCount } = useNotifications();
   const navigate = useNavigate();
 
-  // Sort notifications by priority (critical first)
-  const sortedNotifications = [...notifications].sort((a, b) => {
-    const priorityOrder: Record<NotificationPriority, number> = { critical: 0, important: 1, info: 2 };
-    const aPriority = priorityOrder[a.priority] ?? 2;
-    const bPriority = priorityOrder[b.priority] ?? 2;
-    if (aPriority !== bPriority) return aPriority - bPriority;
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
+  const sortedNotifications = useMemo(() => {
+    return [...notifications].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+  }, [notifications]);
 
   const handleClick = async (notif: Notification) => {
     if (!notif.is_read) {
       await markAsRead(notif.id);
     }
-    
-    // Close sheet first
+
     onOpenChange(false);
 
-    const safeTarget = notif.related_type === "installment" ? null : getSafeNotificationTarget(notif);
+    const safeTarget = getSafeNotificationTarget(notif);
     if (safeTarget) {
-      if (notif.related_type === "installment") {
-        await navigateToInstallment(notif.related_id as string);
-        return;
-      }
-
       navigate(safeTarget);
+      return;
+    }
+
+    if (notif.related_type === "installment" && notif.related_id) {
+      await navigateToInstallment(notif.related_id);
     }
   };
 
@@ -115,114 +70,90 @@ export function NotificationSheet({ open, onOpenChange }: NotificationSheetProps
     }
   };
 
-  const formatTime = (timestamp: string) => {
-    return formatDistanceToNow(new Date(timestamp), {
-      addSuffix: true,
-      locale: th,
-    });
-  };
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="bg-card">
-        <SheetHeader>
-          <div className="flex items-center justify-between">
-            <SheetTitle className="flex items-center gap-2">
-              <Bell className="w-5 h-5" />
-              การแจ้งเตือน
-            </SheetTitle>
-            {unreadCount > 0 && (
-              <Button 
+      <SheetContent
+        side="bottom"
+        className="mx-auto flex h-[82svh] max-w-md flex-col overflow-hidden rounded-t-2xl border-border bg-background p-0 shadow-elevated"
+      >
+        <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-border" aria-hidden />
+        <SheetHeader className="border-b border-border px-5 pb-4 pt-3 text-left">
+          <div className="flex items-start justify-between gap-4 pr-10">
+            <div className="min-w-0">
+              <SheetTitle className="flex items-center gap-2 font-serif-display text-2xl font-normal leading-none">
+                <Bell className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                การแจ้งเตือน
+              </SheetTitle>
+              <SheetDescription className="mt-2 text-xs leading-relaxed">
+                {unreadCount > 0
+                  ? `มี ${unreadCount} รายการที่ยังไม่อ่าน`
+                  : "รายการล่าสุดและงานที่เกี่ยวข้อง"}
+              </SheetDescription>
+            </div>
+            {unreadCount > 0 ? (
+              <Button
                 type="button"
-                variant="ghost" 
-                size="sm" 
+                variant="outline"
+                size="sm"
                 onClick={markAllAsRead}
-                className="text-xs"
+                className="h-8 shrink-0 rounded-md px-2.5 text-xs"
                 aria-label="อ่านการแจ้งเตือนทั้งหมด"
               >
+                <Check className="mr-1 h-3.5 w-3.5" strokeWidth={1.75} />
                 อ่านทั้งหมด
               </Button>
-            )}
+            ) : null}
           </div>
-          <SheetDescription>ดูการแจ้งเตือนล่าสุดและเปิดรายการที่เกี่ยวข้องได้ทันที</SheetDescription>
         </SheetHeader>
-        
-        <div className="mt-6 space-y-3" role="list" aria-live="polite" aria-relevant="additions text" aria-busy={loading}>
+
+        <div
+          className="flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-3"
+          aria-live="polite"
+          aria-relevant="additions removals text"
+          aria-busy={loading}
+        >
           {loading ? (
-            <div className="flex items-center justify-center py-12" role="status" aria-label="กำลังโหลดการแจ้งเตือน">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            <div className="space-y-2" role="status" aria-label="กำลังโหลดการแจ้งเตือน">
+              <div className="flex items-center gap-2 px-1 py-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                กำลังโหลด
+              </div>
+              {[0, 1, 2].map((item) => (
+                <div
+                  key={item}
+                  className="h-[76px] animate-pulse rounded-md border border-border bg-card"
+                />
+              ))}
             </div>
           ) : sortedNotifications.length === 0 ? (
-            <div className="text-center py-12" role="status">
-              <Bell className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-              <p className="text-muted-foreground">ไม่มีการแจ้งเตือน</p>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="flex min-h-[48vh] flex-col items-center justify-center text-center"
+              role="status"
+            >
+              <Bell className="mb-4 h-8 w-8 text-muted-foreground/40" strokeWidth={1.5} />
+              <p className="font-medium text-foreground">ไม่มีการแจ้งเตือน</p>
+              <p className="mt-1 max-w-[220px] text-xs leading-relaxed text-muted-foreground">
+                เมื่อมีกิจกรรมใหม่ ระบบจะแสดงรายการล่าสุดไว้ที่นี่
+              </p>
+            </motion.div>
           ) : (
-            sortedNotifications.map((notif, index) => {
-              const Icon = iconMap[notif.type] || iconMap.default;
-              const priority = notif.priority || "info";
-              const config = priorityConfig[priority];
-              
-              return (
-                <motion.button
-                  key={notif.id}
-                  type="button"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  onClick={() => handleClick(notif)}
-                  aria-label={`เปิดการแจ้งเตือน: ${notif.title}${notif.is_read ? "" : " ยังไม่อ่าน"}`}
-                  className={`w-full p-4 rounded-xl border text-left transition-all ${
-                    notif.is_read 
-                      ? "bg-background border-border hover:bg-secondary/50 opacity-75" 
-                      : `${config.bgClass} ${config.borderClass} hover:opacity-90 shadow-sm`
-                  } ${priority === "critical" && !notif.is_read ? "ring-1 ring-status-overdue/50" : ""}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      notif.is_read ? "text-muted-foreground bg-muted" : config.iconBg
-                    }`}>
-                      {priority === "critical" && !notif.is_read ? (
-                        <AlertTriangle className="w-5 h-5" />
-                      ) : (
-                        <Icon className="w-5 h-5" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className={`font-medium truncate ${notif.is_read ? 'text-muted-foreground' : 'text-foreground'}`}>
-                          {notif.title}
-                        </p>
-                        {!notif.is_read && (
-                          <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded-full ${
-                            priority === "critical" 
-                              ? "bg-status-overdue text-white animate-pulse"
-                              : priority === "important"
-                                ? "bg-status-pending text-white"
-                                : "bg-primary text-primary-foreground"
-                          }`}>
-                            {priority === "critical" ? "ด่วน!" : priority === "important" ? "สำคัญ" : "ใหม่"}
-                          </span>
-                        )}
-                      </div>
-                      <p className={`text-sm line-clamp-2 ${notif.is_read ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
-                        {notif.message}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <p className="text-xs text-muted-foreground">{formatTime(notif.created_at)}</p>
-                        {notif.is_read && (
-                          <span className="text-xs text-muted-foreground/50">• อ่านแล้ว</span>
-                        )}
-                      </div>
-                    </div>
-                    {/* Action indicator */}
-                    <ChevronRight className={`w-5 h-5 flex-shrink-0 ${
-                      notif.is_read ? "text-muted-foreground/50" : "text-foreground"
-                    }`} />
-                  </div>
-                </motion.button>
-              );
-            })
+            <ul className="space-y-2">
+              <AnimatePresence initial={false}>
+                {sortedNotifications.map((notif, index) => (
+                  <NotificationListItem
+                    key={notif.id}
+                    notification={notif}
+                    index={index}
+                    onOpen={(notification) => {
+                      void handleClick(notification);
+                    }}
+                  />
+                ))}
+              </AnimatePresence>
+            </ul>
           )}
         </div>
       </SheetContent>

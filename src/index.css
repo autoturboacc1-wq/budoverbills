@@ -6,66 +6,66 @@
 
 @layer base {
   :root {
-    /* Paper & Ink — neutral, almost monochrome */
-    --background: 36 14% 97%;          /* warm paper */
-    --foreground: 20 10% 12%;           /* ink */
+    /* Apple Native Mode — White/Gray & High End Minimal */
+    --background: 240 5% 96%;           /* #F2F2F7 system grouped background */
+    --foreground: 0 0% 0%;
 
     --card: 0 0% 100%;
-    --card-foreground: 20 10% 12%;
+    --card-foreground: 0 0% 0%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 20 10% 12%;
+    --popover-foreground: 0 0% 0%;
 
-    --primary: 20 10% 12%;              /* ink — primary action is just black */
-    --primary-foreground: 36 14% 97%;
+    --primary: 0 0% 9%;              /* slate black action */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 30 8% 94%;
-    --secondary-foreground: 20 10% 18%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
 
-    --muted: 30 8% 94%;
-    --muted-foreground: 20 6% 42%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
 
-    --accent: 30 8% 92%;
-    --accent-foreground: 20 10% 18%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
 
-    --destructive: 4 60% 44%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 6% 88%;                /* hairline */
-    --input: 30 6% 90%;
-    --ring: 20 10% 12%;
+    --border: 240 11% 91%;              /* subtle hairline #E5E5EA */
+    --input: 240 11% 91%;
+    --ring: 0 0% 9%;
 
-    --radius: 0.375rem;                 /* tight, editorial corners */
+    --radius: 1rem;                 /* smoother, larger radius */
 
-    --status-success: 152 30% 32%;
-    --status-warning: 32 70% 38%;
-    --status-danger: 4 60% 44%;
-    --status-info: 212 40% 38%;
-    --status-neutral: 20 6% 42%;
+    --status-success: 135 65% 42%;
+    --status-warning: 32 100% 50%;
+    --status-danger: 0 84% 60%;
+    --status-info: 211 100% 50%;
+    --status-neutral: 240 4% 46%;
 
-    --status-paid: 152 30% 32%;
-    --status-pending: 32 70% 38%;
-    --status-overdue: 4 60% 44%;
-    --status-negotiating: 212 40% 38%;
+    --status-paid: 135 65% 42%;     /* Apple Green */
+    --status-pending: 32 100% 50%;  /* Apple Orange */
+    --status-overdue: 0 84% 60%;    /* Apple Red */
+    --status-negotiating: 211 100% 50%; /* Apple Blue */
 
-    /* Chat bubbles — kept readable, quietly inked */
-    --chat-bubble-me: 20 10% 12%;
-    --chat-bubble-me-foreground: 36 14% 97%;
-    --chat-bubble-other: 30 8% 94%;
-    --chat-bubble-other-foreground: 20 10% 14%;
-    --chat-bubble-money: 152 30% 32%;
-    --chat-bubble-money-foreground: 36 14% 97%;
+    /* Chat bubbles */
+    --chat-bubble-me: 0 0% 9%;
+    --chat-bubble-me-foreground: 0 0% 100%;
+    --chat-bubble-other: 240 5% 92%;
+    --chat-bubble-other-foreground: 0 0% 0%;
+    --chat-bubble-money: 135 65% 42%;
+    --chat-bubble-money-foreground: 0 0% 100%;
 
-    /* Gradients — neutralized; left as flat fallbacks */
-    --gradient-warm: linear-gradient(180deg, hsl(36 14% 97%) 0%, hsl(36 14% 97%) 100%);
+    /* Gradients */
+    --gradient-warm: linear-gradient(180deg, hsl(240 5% 96%) 0%, hsl(240 5% 96%) 100%);
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 100%) 100%);
-    --gradient-primary: linear-gradient(180deg, hsl(20 10% 12%) 0%, hsl(20 10% 12%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(36 14% 97%) 0%, hsl(36 14% 97%) 100%);
+    --gradient-primary: linear-gradient(180deg, hsl(0 0% 9%) 0%, hsl(0 0% 9%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(240 5% 96%) 0%, hsl(240 5% 96%) 100%);
 
-    /* Shadows — almost none. Hairlines do the work. */
-    --shadow-soft: 0 0 0 1px hsl(30 6% 88%);
-    --shadow-card: 0 0 0 1px hsl(30 6% 88%);
-    --shadow-elevated: 0 12px 40px -24px hsl(20 10% 12% / 0.18);
+    /* Shadows — soft, elegant drops */
+    --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.04);
+    --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.06);
+    --shadow-elevated: 0 12px 40px rgba(0, 0, 0, 0.12);
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 20 10% 22%;
@@ -78,61 +78,61 @@
   }
 
   .dark {
-    /* Inkwell — neutral, low-contrast night */
-    --background: 24 6% 7%;
-    --foreground: 36 10% 92%;
+    /* OLED Black Dark Mode */
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
 
-    --card: 24 5% 10%;
-    --card-foreground: 36 10% 92%;
+    --card: 240 4% 11%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 24 5% 10%;
-    --popover-foreground: 36 10% 92%;
+    --popover: 240 4% 11%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 36 10% 92%;              /* invert — bone on ink */
-    --primary-foreground: 24 6% 7%;
+    --primary: 0 0% 100%;              /* bone on ink */
+    --primary-foreground: 0 0% 0%;
 
-    --secondary: 24 4% 14%;
-    --secondary-foreground: 36 10% 88%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 24 4% 13%;
-    --muted-foreground: 30 6% 60%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
 
-    --accent: 24 4% 16%;
-    --accent-foreground: 36 10% 88%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 4 55% 56%;
-    --destructive-foreground: 36 10% 95%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 24 4% 18%;
-    --input: 24 4% 16%;
-    --ring: 36 10% 92%;
+    --border: 240 4% 20%;
+    --input: 240 4% 20%;
+    --ring: 0 0% 100%;
 
-    --status-success: 152 32% 52%;
-    --status-warning: 32 65% 56%;
-    --status-danger: 4 55% 60%;
-    --status-info: 212 45% 60%;
-    --status-neutral: 30 6% 62%;
+    --status-success: 135 65% 42%;
+    --status-warning: 32 100% 50%;
+    --status-danger: 0 84% 60%;
+    --status-info: 211 100% 50%;
+    --status-neutral: 240 4% 46%;
 
-    --status-paid: 152 32% 52%;
-    --status-pending: 32 65% 56%;
-    --status-overdue: 4 55% 60%;
-    --status-negotiating: 212 45% 60%;
+    --status-paid: 135 65% 42%;
+    --status-pending: 32 100% 50%;
+    --status-overdue: 0 84% 60%;
+    --status-negotiating: 211 100% 50%;
 
-    --chat-bubble-me: 36 10% 88%;
-    --chat-bubble-me-foreground: 24 5% 10%;
-    --chat-bubble-other: 24 4% 16%;
-    --chat-bubble-other-foreground: 36 10% 92%;
-    --chat-bubble-money: 152 32% 42%;
-    --chat-bubble-money-foreground: 36 10% 95%;
+    --chat-bubble-me: 0 0% 100%;
+    --chat-bubble-me-foreground: 0 0% 0%;
+    --chat-bubble-other: 240 4% 16%;
+    --chat-bubble-other-foreground: 0 0% 100%;
+    --chat-bubble-money: 135 65% 42%;
+    --chat-bubble-money-foreground: 0 0% 100%;
 
-    --gradient-warm: linear-gradient(180deg, hsl(24 6% 7%) 0%, hsl(24 6% 7%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(24 5% 10%) 0%, hsl(24 5% 10%) 100%);
-    --gradient-primary: linear-gradient(180deg, hsl(36 10% 92%) 0%, hsl(36 10% 92%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(24 6% 7%) 0%, hsl(24 6% 7%) 100%);
+    --gradient-warm: linear-gradient(180deg, hsl(0 0% 0%) 0%, hsl(0 0% 0%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(240 4% 11%) 0%, hsl(240 4% 11%) 100%);
+    --gradient-primary: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(0 0% 0%) 0%, hsl(0 0% 0%) 100%);
 
-    --shadow-soft: 0 0 0 1px hsl(24 4% 18%);
-    --shadow-card: 0 0 0 1px hsl(24 4% 18%);
-    --shadow-elevated: 0 12px 40px -20px hsl(0 0% 0% / 0.6);
+    --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.4);
+    --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.5);
+    --shadow-elevated: 0 12px 40px rgba(0, 0, 0, 0.6);
 
     --sidebar-background: 24 5% 9%;
     --sidebar-foreground: 36 10% 88%;

@@ -33,7 +33,7 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 px-2 pb-safe backdrop-blur-xl">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/80 px-2 pb-safe backdrop-blur-2xl">
       <div className="mx-auto flex max-w-md items-stretch justify-between">
         {navItems.map((item) => {
           const Icon = item.icon;

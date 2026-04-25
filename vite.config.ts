@@ -38,7 +38,7 @@ export default defineConfig(async ({ mode }) => {
         name: "Bud Over Bills - จัดการข้อตกลงส่วนบุคคล",
         short_name: "BOB",
         description: "แพลตฟอร์มบันทึกและจัดการคำมั่นและข้อตกลงส่วนบุคคลระหว่างเพื่อน",
-        theme_color: "#f97316",
+        theme_color: "#ffffff",
         background_color: "#ffffff",
         display: "standalone",
         orientation: "portrait",
