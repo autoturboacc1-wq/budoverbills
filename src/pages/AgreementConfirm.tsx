@@ -1,5 +1,26 @@
 import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, User, Clock, CheckCircle, AlertCircle, Upload, Loader2, Eye, FileSignature } from "lucide-react";
+import { getErrorMessage } from "@/utils/errorHandler";
+
+// Map known server-side RPC errors (English, raised in plpgsql) to Thai user
+// messages.  Anything else falls through to the original message so the user
+// can still see what went wrong instead of a generic toast.
+const SERVER_ERROR_TH: Record<string, string> = {
+  "Unauthorized": "กรุณาเข้าสู่ระบบใหม่",
+  "Forbidden": "คุณไม่มีสิทธิ์ดำเนินการนี้",
+  "Agreement not found": "ไม่พบข้อตกลง",
+  "Invalid confirmation request": "คำขอยืนยันไม่ถูกต้อง",
+  "Transfer slip is required": "กรุณาอัปโหลดสลิปโอนเงินก่อน",
+};
+
+function toThaiServerError(error: unknown): string {
+  const raw = getErrorMessage(error, "");
+  if (!raw) return "เกิดข้อผิดพลาด กรุณาลองใหม่";
+  for (const [en, th] of Object.entries(SERVER_ERROR_TH)) {
+    if (raw.includes(en)) return th;
+  }
+  return raw;
+}
 import { PageTransition } from "@/components/ux/PageTransition";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -239,7 +260,9 @@ export default function AgreementConfirm() {
       navigate("/");
     } catch (error) {
       console.error("Error confirming agreement:", error);
-      toast.error("ไม่สามารถยืนยันได้");
+      toast.error("ไม่สามารถยืนยันได้", {
+        description: toThaiServerError(error),
+      });
     } finally {
       setIsConfirming(false);
     }
@@ -281,7 +304,10 @@ export default function AgreementConfirm() {
       toast.success("ปฏิเสธข้อตกลงแล้ว");
       navigate("/");
     } catch (error) {
-      toast.error("ไม่สามารถปฏิเสธได้");
+      console.error("Error rejecting agreement:", error);
+      toast.error("ไม่สามารถปฏิเสธได้", {
+        description: toThaiServerError(error),
+      });
     }
   };
 
