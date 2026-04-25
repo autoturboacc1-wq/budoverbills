@@ -291,9 +291,9 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
               status = "overdue";
             }
 
-            const partnerName = isUserBorrower 
-              ? "เจ้าหนี้" 
-              : (agreement.borrower_name || "ลูกหนี้");
+            const partnerName = isUserBorrower
+              ? "ผู้ให้ยืม"
+              : (agreement.borrower_name || "ผู้ยืม");
             const itemRole: UserRole = isUserBorrower ? "borrower" : "lender";
 
             items.push({
@@ -557,7 +557,7 @@ export function PaymentCalendar({ onRoleChange }: PaymentCalendarProps) {
       // Use file path instead of public URL
       const uploaded = await uploadSlip(pending.installmentId, result.path);
       if (uploaded) {
-        toast.success("อัปโหลดสลิปสำเร็จ", { description: "รอเจ้าหนี้ยืนยันการชำระ" });
+        toast.success("อัปโหลดสลิปสำเร็จ", { description: "รอผู้ให้ยืมยืนยันการชำระ" });
       }
     } catch (error) {
       console.error("Upload error:", error);

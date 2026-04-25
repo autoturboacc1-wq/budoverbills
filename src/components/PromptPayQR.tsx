@@ -93,7 +93,7 @@ export function PromptPayQR({ promptPayId, amount, recipientName }: PromptPayQRP
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        หลังโอนแล้วให้อัปโหลดสลิปในแท็บอัปโหลดสลิปเพื่อส่งให้เจ้าหนี้ตรวจสอบ
+        หลังโอนแล้วให้อัปโหลดสลิปในแท็บอัปโหลดสลิปเพื่อส่งให้ผู้ให้ยืมตรวจสอบ
       </p>
     </div>
   );

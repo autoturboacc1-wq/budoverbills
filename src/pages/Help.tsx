@@ -529,7 +529,7 @@ const buildGuideArticles = (isThai: boolean): HelpArticle[] => [
     title: isThai ? "วิธีสร้างข้อตกลง" : "How to create an agreement",
     content: (
       <div className="space-y-4 text-sm text-muted-foreground">
-        <p>{isThai ? "ผู้ยืมเป็นคนสร้างข้อตกลง ผู้ให้ยืมเป็นคนยืนยัน" : "The borrower creates the agreement and the lender confirms it."}</p>
+        <p>{isThai ? "ผู้ให้ยืมเป็นคนสร้างข้อตกลง ผู้ยืมเป็นคนยืนยัน" : "The lender creates the agreement and the borrower confirms it."}</p>
 
         <div className="space-y-3">
           <div className="flex gap-3">
@@ -538,7 +538,7 @@ const buildGuideArticles = (isThai: boolean): HelpArticle[] => [
           </div>
           <div className="flex gap-3">
             <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium flex-shrink-0">2</span>
-            <p>{isThai ? "เลือกเพื่อนที่เป็นผู้ให้ยืม (ต้องเพิ่มเพื่อนก่อน)" : "Choose the friend who will be the lender (you must add them first)."}</p>
+            <p>{isThai ? "เลือกเพื่อนที่จะเป็นผู้ยืม (ต้องเพิ่มเพื่อนก่อน)" : "Choose the friend who will be the borrower (you must add them first)."}</p>
           </div>
           <div className="flex gap-3">
             <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium flex-shrink-0">3</span>
@@ -550,7 +550,7 @@ const buildGuideArticles = (isThai: boolean): HelpArticle[] => [
           </div>
           <div className="flex gap-3">
             <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium flex-shrink-0">5</span>
-            <p>{isThai ? "รอผู้ให้ยืมอัพสลิปและยืนยัน" : "Wait for the lender to upload the slip and confirm."}</p>
+            <p>{isThai ? "รอผู้ยืมยืนยันข้อตกลงเพื่อเริ่มสัญญา" : "Wait for the borrower to confirm the agreement to start the contract."}</p>
           </div>
           <div className="flex gap-3">
             <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium flex-shrink-0">6</span>

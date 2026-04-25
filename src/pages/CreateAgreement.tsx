@@ -82,7 +82,7 @@ const parseBangkokDate = (value: string) => {
   if (!match) return null;
 
   const [, year, month, day] = match;
-  return new Date(`${year}-${month}-${day}T00:00:00+07:00`);
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
 };
 
 const getBangkokTodayDate = () => parseBangkokDate(formatBangkokDate(new Date())) ?? new Date();
@@ -256,7 +256,7 @@ export default function CreateAgreement() {
     }
 
     if (!selectedFriend) {
-      toast.error("กรุณาเลือกคู่สัญญาจากรายชื่อเพื่อน");
+      toast.error("กรุณาเลือกผู้ยืมจากรายชื่อเพื่อน");
       return;
     }
 
@@ -526,9 +526,9 @@ export default function CreateAgreement() {
   };
 
   const stepDefinitions = [
-    { title: "เลือกคู่สัญญา", description: "ระบุคนที่จะอยู่ในข้อตกลงนี้" },
+    { title: "เลือกผู้ยืม", description: "ระบุคนที่จะมายืมเงินจากคุณ" },
     { title: "กำหนดวงเงิน", description: "ตั้งเงินต้น งวด และดอกเบี้ย" },
-    { title: "ตรวจแผนชำระ", description: "ดูตารางผ่อนและบัญชีรับเงิน" },
+    { title: "บัญชีรับชำระคืน", description: "บัญชีของคุณสำหรับให้ผู้ยืมโอนคืน" },
     { title: "ตรวจสอบก่อนส่ง", description: "สรุปเงื่อนไขและยืนยัน" },
   ];
 
@@ -544,7 +544,7 @@ export default function CreateAgreement() {
 
   const reviewRows = selectedCalculation
     ? [
-        { label: "คู่สัญญา", value: selectedFriend?.friend_name || "-" },
+        { label: "ผู้ยืม", value: selectedFriend?.friend_name || "-" },
         { label: "เงินต้น", value: `฿${principalAmount.toLocaleString()}` },
         {
           label: "โครงสร้างดอกเบี้ย",
@@ -575,9 +575,27 @@ export default function CreateAgreement() {
       <div className="page-shell max-w-5xl">
         <PageHeader
           title="สร้างข้อตกลงใหม่"
-          description="สร้างข้อตกลงแบบเป็นขั้นตอน เพื่อให้วงเงิน เงื่อนไข และบัญชีรับเงินชัดเจนก่อนส่ง"
+          description="คุณคือผู้ให้ยืม — เลือกผู้ยืม กำหนดวงเงิน เงื่อนไข และบัญชีของคุณสำหรับรับชำระคืน"
           onBack={() => navigate(-1)}
         />
+
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="mb-4 flex items-start gap-3 rounded-2xl border border-primary/30 bg-primary/10 p-4"
+        >
+          <ShieldCheck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-foreground space-y-1">
+            <p>
+              <span className="font-medium">คุณ = ผู้ให้ยืม</span> (ปล่อยเงิน) •{" "}
+              <span className="font-medium">คู่สัญญาที่เลือก = ผู้ยืม</span> (รับเงินไป)
+            </p>
+            <p className="text-xs text-muted-foreground">
+              ผู้ยืมจะได้รับแจ้งเตือนให้เข้ามายืนยันข้อตกลงก่อนเริ่มสัญญา
+            </p>
+          </div>
+        </motion.div>
 
         {/* Subscription Banner */}
         {quota && (
@@ -618,7 +636,7 @@ export default function CreateAgreement() {
           >
             <div className="flex items-center gap-2 text-foreground font-medium">
               <User className="w-5 h-5 text-primary" />
-              <span>ข้อมูลคู่สัญญา</span>
+              <span>ผู้ยืม (ผู้รับเงินไป)</span>
             </div>
             
             {/* Selected Friend Display */}
@@ -1147,7 +1165,10 @@ export default function CreateAgreement() {
           >
             <div className="flex items-center gap-2 text-foreground font-medium">
               <Building className="w-5 h-5 text-primary" />
-              <span>บัญชีรับเงิน</span>
+              <div className="flex flex-col">
+                <span>บัญชีของคุณ (สำหรับรับชำระคืน)</span>
+                <span className="text-xs font-normal text-muted-foreground">ผู้ยืมจะโอนเงินเข้าบัญชีนี้ทุกงวด</span>
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
@@ -1193,7 +1214,7 @@ export default function CreateAgreement() {
             {currentStep === 2 && (!formData.bankName || !formData.accountNumber) ? (
               <InlineValidationMessage
                 tone="warning"
-                message="กรุณาระบุบัญชีรับเงินให้ครบก่อนขยับไปขั้นตรวจสอบสุดท้าย"
+                message="กรุณาระบุบัญชีของคุณให้ครบก่อนขยับไปขั้นตรวจสอบสุดท้าย"
               />
             ) : null}
           </div>
@@ -1385,7 +1406,7 @@ export default function CreateAgreement() {
               <p className="text-sm font-medium text-foreground text-center">สรุปการชำระเงิน</p>
               <div className="space-y-2">
                 <div className="flex justify-between items-center py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">เงินยืม</span>
+                  <span className="text-muted-foreground">ยอดที่ให้ยืม</span>
                   <span className="font-medium text-foreground">฿{Number(formData.amount).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border/50">
@@ -1432,7 +1453,7 @@ export default function CreateAgreement() {
               <div className="text-sm text-muted-foreground">
                 {currentStep < stepDefinitions.length - 1
                   ? `ขั้นถัดไป: ${stepDefinitions[currentStep + 1].title}`
-                  : "คู่สัญญาจะได้รับแจ้งเตือนเพื่อเข้ามายืนยันข้อตกลง"}
+                  : "ผู้ยืมจะได้รับแจ้งเตือนเพื่อเข้ามายืนยันข้อตกลง"}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -1472,7 +1493,7 @@ export default function CreateAgreement() {
         <Dialog open={showFriendPicker} onOpenChange={setShowFriendPicker}>
           <DialogContent className="max-w-md mx-4 max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="font-heading">เลือกคู่สัญญา</DialogTitle>
+              <DialogTitle className="font-heading">เลือกผู้ยืม</DialogTitle>
             </DialogHeader>
             
             <div className="space-y-2 mt-4">

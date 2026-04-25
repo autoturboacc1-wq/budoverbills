@@ -163,7 +163,7 @@ export function BankAccountSection({
           <p className="text-sm text-muted-foreground">
             {isLender
               ? "ยังไม่ได้ตั้งค่าบัญชีรับเงิน กด 'เพิ่ม' เพื่อตั้งค่า"
-              : "เจ้าหนี้ยังไม่ได้ตั้งค่าบัญชีรับเงิน"}
+              : "ผู้ให้ยืมยังไม่ได้ตั้งค่าบัญชีรับเงิน"}
           </p>
         )}
       </div>

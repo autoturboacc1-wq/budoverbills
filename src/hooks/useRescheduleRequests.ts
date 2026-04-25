@@ -38,7 +38,7 @@ interface CreateRescheduleInput {
   feeInstallments: number;
   customFeeRate?: number; // For no-interest: % of principal (1-20%), For interest: % of interest to prepay (10-100%)
   slipUrl?: string; // URL ของสลิปการโอนค่าเลื่อนงวด
-  submittedAmount?: number; // จำนวนเงินที่ลูกหนี้ระบุว่าโอน
+  submittedAmount?: number; // จำนวนเงินที่ผู้ยืมระบุว่าโอน
 }
 
 interface FeeCalculation {

@@ -239,8 +239,8 @@ export function RescheduleApprovalCard({
             <div className={`p-3 rounded-lg mt-4 ${amountDifference > 0 ? 'bg-blue-500/10' : 'bg-amber-500/10'}`}>
               <p className={`text-sm ${amountDifference > 0 ? 'text-blue-600' : 'text-amber-600'}`}>
                 {amountDifference > 0 
-                  ? `ลูกหนี้โอนเกิน ฿${amountDifference.toLocaleString()}`
-                  : `ลูกหนี้โอนขาด ฿${Math.abs(amountDifference).toLocaleString()}`
+                  ? `ผู้ยืมโอนเกิน ฿${amountDifference.toLocaleString()}`
+                  : `ผู้ยืมโอนขาด ฿${Math.abs(amountDifference).toLocaleString()}`
                 }
               </p>
             </div>

@@ -200,7 +200,7 @@ export default function DebtDetail() {
     if (isLender) {
       return agreement.borrower_name || "ผู้ยืม";
     }
-    return lenderName || "เจ้าหนี้";
+    return lenderName || "ผู้ให้ยืม";
   }, [agreement, isLender, lenderName]);
 
   const remainingAmount = useMemo(() => {

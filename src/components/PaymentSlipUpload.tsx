@@ -77,7 +77,7 @@ export function PaymentSlipUpload({
       // Store the file path (not public URL) - will use signed URL to display
       onSlipUploaded(result.path);
       toast.success("อัปโหลดสลิปสำเร็จ", {
-        description: "รอเจ้าหนี้ยืนยันการชำระ",
+        description: "รอผู้ให้ยืมยืนยันการชำระ",
       });
     } catch (error: unknown) {
       console.error("Upload error:", error);

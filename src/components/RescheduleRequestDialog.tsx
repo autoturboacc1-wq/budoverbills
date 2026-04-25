@@ -447,7 +447,7 @@ export function RescheduleRequestDialog({
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription className="text-xs text-muted-foreground">
-                คำขอนี้ต้องได้รับการอนุมัติจากเจ้าหนี้ หลังตรวจสอบสลิปแล้ว งวดนี้และงวดถัดไปจะถูกเลื่อนไป {frequencyInfo.label}
+                คำขอนี้ต้องได้รับการอนุมัติจากผู้ให้ยืม หลังตรวจสอบสลิปแล้ว งวดนี้และงวดถัดไปจะถูกเลื่อนไป {frequencyInfo.label}
               </AlertDescription>
             </Alert>
 
