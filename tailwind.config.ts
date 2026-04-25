@@ -20,10 +20,16 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Sarabun', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
-        heading: ['Sarabun', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
-        serif: ['"Instrument Serif"', '"Times New Roman"', 'Georgia', 'serif'],
-        mono: ['"JetBrains Mono"', '"SF Mono"', 'ui-monospace', 'monospace'],
+        sans: [
+          '-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"',
+          'Inter', '"Noto Sans Thai"', '"Helvetica Neue"', 'system-ui', 'sans-serif',
+        ],
+        heading: [
+          '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'Inter',
+          '"Noto Sans Thai"', 'system-ui', 'sans-serif',
+        ],
+        serif: ['ui-serif', '"New York"', 'Newsreader', '"Iowan Old Style"', '"Times New Roman"', 'serif'],
+        mono: ['ui-monospace', '"SF Mono"', '"SFMono-Regular"', 'Menlo', '"JetBrains Mono"', 'monospace'],
         cherry: ['"Cherry Bomb One"', 'cursive'],
       },
       colors: {

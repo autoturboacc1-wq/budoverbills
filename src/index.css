@@ -152,39 +152,46 @@
 
   html {
     text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    /* Apple-first sans stack — SF Pro on Apple, Inter on others, Noto Sans Thai for ภาษาไทย */
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+      "Inter", "Noto Sans Thai", "Helvetica Neue", system-ui, sans-serif;
     font-feature-settings: "ss01", "cv11", "tnum";
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior-y: none;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter",
+      "Noto Sans Thai", system-ui, sans-serif;
     @apply tracking-tight;
+    letter-spacing: -0.018em;
   }
 
-  /* Numerals everywhere align to a tabular grid */
+  /* Numerals everywhere align to a tabular grid — SF Mono on Apple */
   [data-numeral], .num {
-    font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+    font-family: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "JetBrains Mono", monospace;
     font-feature-settings: "tnum", "ss01";
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
   }
 }
 
 @layer utilities {
+  /* Apple "New York" serif on Apple devices, Newsreader fallback on others */
   .font-serif-display {
-    font-family: 'Instrument Serif', 'Times New Roman', Georgia, serif;
+    font-family: ui-serif, "New York", "Newsreader", "Iowan Old Style", "Times New Roman", Georgia, serif;
     font-weight: 400;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.018em;
   }
 
   .font-mono-tabular {
-    font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+    font-family: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, "JetBrains Mono", monospace;
     font-feature-settings: "tnum";
   }
 
@@ -223,12 +230,24 @@
     @apply h-px w-full bg-border;
   }
 
+  /* PWA mobile frame — every page renders inside a phone-width column */
   .page-shell {
-    @apply mx-auto w-full max-w-2xl px-5 pb-28 md:px-6;
+    @apply mx-auto w-full max-w-md px-5;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6.5rem);
   }
 
   .section-stack {
-    @apply space-y-8;
+    @apply space-y-7;
+  }
+
+  /* Optional: render the app as a centered phone-shaped surface on desktop  */
+  @media (min-width: 768px) {
+    body {
+      background:
+        radial-gradient(ellipse at top, hsl(var(--muted)) 0%, hsl(var(--background)) 60%),
+        hsl(var(--background));
+    }
   }
 
   .field-stack {
