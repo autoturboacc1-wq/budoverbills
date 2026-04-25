@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { PageTransition } from "@/components/ux/PageTransition";
-import { ArrowLeft, ArrowRight, Send, User, Calendar, Percent, Calculator, Info, AlertTriangle, Coins, Building, CheckCircle, Loader2, Scan, Link as LinkIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, Send, User, Calendar, Percent, Calculator, Info, AlertTriangle, Coins, Building, CheckCircle, Loader2, Link as LinkIcon, UserPlus, X } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -10,9 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useDebtAgreements, CreateAgreementInput } from "@/hooks/useDebtAgreements";
+import { useDbFriends, type DbFriend } from "@/hooks/useDbFriends";
 import { useAuth } from "@/contexts/AuthContext";
 import { PasswordConfirmDialog } from "@/components/PasswordConfirmDialog";
-import { QRCodeScanner } from "@/components/QRCodeScanner";
 import { supabase } from "@/integrations/supabase/client";
 import { THAI_BANKS } from "@/constants/thaibanks";
 import { buildEffectiveRateSchedule, getPeriodsPerYear } from "@/domains/debt/recalculateEffectiveRateSchedule";
@@ -24,6 +24,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   InlineValidationMessage,
   PageHeader,
@@ -49,14 +55,22 @@ interface PaymentScheduleItem {
   interest: number;
 }
 
-interface BorrowerProfile {
-  user_id: string;
-  display_name: string | null;
-  user_code: string;
+type SelectedBorrowerFriend = Pick<DbFriend, "id" | "friend_user_id" | "friend_name" | "friend_phone" | "nickname">;
+
+interface SavedBankAccount {
+  id: string;
+  label: string | null;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  is_default: boolean;
+}
+
+interface CreateAgreementLocationState {
+  selectedFriend?: SelectedBorrowerFriend;
 }
 
 const BANGKOK_TIME_ZONE = "Asia/Bangkok";
-const BORROWER_CODE_LENGTH = 8;
 const bangkokDateFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: BANGKOK_TIME_ZONE,
   year: "numeric",
@@ -95,19 +109,6 @@ const addBangkokMonths = (date: Date, months: number) => {
   return nextDate;
 };
 
-const normalizeBorrowerCode = (value: string) =>
-  value.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, BORROWER_CODE_LENGTH);
-
-const extractBorrowerCodeFromQr = (decodedText: string) => {
-  const trimmed = decodedText.trim();
-  const appLinkMatch = trimmed.match(/debtmate:\/\/add-friend\/([A-Z0-9]{8})/i);
-  if (appLinkMatch?.[1]) {
-    return normalizeBorrowerCode(appLinkMatch[1]);
-  }
-
-  return /^[A-Z0-9]{8}$/i.test(trimmed) ? normalizeBorrowerCode(trimmed) : null;
-};
-
 const createInvitationToken = () => {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
@@ -119,16 +120,17 @@ export default function CreateAgreement() {
   const location = useLocation();
   const { user } = useAuth();
   const { createAgreement } = useDebtAgreements();
+  const { friends, isLoading: friendsLoading } = useDbFriends();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
-  const [showBorrowerScanner, setShowBorrowerScanner] = useState(false);
-  const [borrowerProfile, setBorrowerProfile] = useState<BorrowerProfile | null>(null);
-  const [borrowerCodeError, setBorrowerCodeError] = useState<string | null>(null);
-  const [isResolvingBorrower, setIsResolvingBorrower] = useState(false);
+  const [showFriendPicker, setShowFriendPicker] = useState(false);
+  const [selectedFriend, setSelectedFriend] = useState<SelectedBorrowerFriend | null>(null);
+  const [savedBankAccounts, setSavedBankAccounts] = useState<SavedBankAccount[]>([]);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState("");
+  const [isLoadingBankAccounts, setIsLoadingBankAccounts] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
   
   const [formData, setFormData] = useState({
-    partnerCode: "",
     partnerName: "",
     amount: "",
     installments: "4",
@@ -145,129 +147,87 @@ export default function CreateAgreement() {
   });
 
   useEffect(() => {
-    const state = location.state as { partnerName?: string; partnerCode?: string } | null;
-    if (!state?.partnerName && !state?.partnerCode) return;
+    const state = location.state as CreateAgreementLocationState | null;
+    if (!state?.selectedFriend) return;
 
     setFormData((prev) => ({
       ...prev,
-      partnerName: prev.partnerName || state.partnerName || "",
-      partnerCode: prev.partnerCode || normalizeBorrowerCode(state.partnerCode || ""),
+      partnerName: state.selectedFriend?.nickname || state.selectedFriend?.friend_name || prev.partnerName,
     }));
+
+    setSelectedFriend(state.selectedFriend);
   }, [location.state]);
 
-  const lookupBorrowerByCode = useCallback(async (code: string) => {
-    const { data, error } = await supabase.rpc("search_profile_by_code", {
-      search_code: normalizeBorrowerCode(code),
-    });
+  const handleSelectFriend = (friend: DbFriend) => {
+    setSelectedFriend(friend);
+    setFormData((prev) => ({
+      ...prev,
+      partnerName: friend.nickname || friend.friend_name,
+    }));
+    setShowFriendPicker(false);
+  };
 
-    if (error) {
-      throw error;
-    }
+  const handleClearSelectedFriend = () => {
+    setSelectedFriend(null);
+    setFormData((prev) => ({
+      ...prev,
+      partnerName: "",
+    }));
+  };
 
-    if (!Array.isArray(data) || data.length === 0) {
-      return null;
-    }
-
-    return data[0] as BorrowerProfile;
-  }, []);
-
-  const handleBorrowerQrScanned = useCallback((decodedText: string) => {
-    const code = extractBorrowerCodeFromQr(decodedText);
-    if (!code) {
-      toast.error("QR code ไม่ถูกต้อง");
-      return;
-    }
-
-    setFormData((prev) => ({ ...prev, partnerCode: code }));
+  const applySavedBankAccount = useCallback((account: SavedBankAccount) => {
+    setSelectedBankAccountId(account.id);
+    setFormData((prev) => ({
+      ...prev,
+      bankName: account.bank_name,
+      accountNumber: account.account_number,
+      accountName: account.account_name,
+    }));
   }, []);
 
   useEffect(() => {
-    const code = normalizeBorrowerCode(formData.partnerCode);
+    const fetchBankAccounts = async () => {
+      if (!user?.id) {
+        setIsLoadingBankAccounts(false);
+        return;
+      }
 
-    if (!code) {
-      setBorrowerProfile(null);
-      setBorrowerCodeError(null);
-      setIsResolvingBorrower(false);
-      return;
-    }
+      setIsLoadingBankAccounts(true);
+      const { data, error } = await supabase
+        .from("user_bank_accounts")
+        .select("id, label, bank_name, account_number, account_name, is_default")
+        .eq("user_id", user.id)
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: false });
 
-    if (code.length < BORROWER_CODE_LENGTH) {
-      setBorrowerProfile(null);
-      setBorrowerCodeError(null);
-      setIsResolvingBorrower(false);
-      return;
-    }
+      if (error) {
+        console.error("Error fetching saved bank accounts:", error);
+        toast.error("โหลดบัญชีรับเงินไม่สำเร็จ");
+        setIsLoadingBankAccounts(false);
+        return;
+      }
 
-    let cancelled = false;
-    setIsResolvingBorrower(true);
-    setBorrowerCodeError(null);
+      const accounts = data || [];
+      setSavedBankAccounts(accounts);
 
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const profile = await lookupBorrowerByCode(code);
-
-          if (cancelled) {
-            return;
-          }
-
-          if (!profile) {
-            setBorrowerProfile(null);
-            setBorrowerCodeError("ไม่พบผู้ใช้รหัสนี้");
-            return;
-          }
-
-          setBorrowerProfile(profile);
-          setFormData((prev) => ({
-            ...prev,
-            partnerName: prev.partnerName || profile.display_name || `User ${profile.user_code}`,
-          }));
-        } catch (error) {
-          if (!cancelled) {
-            console.error("Borrower code lookup error:", error);
-            setBorrowerProfile(null);
-            setBorrowerCodeError("ตรวจสอบรหัสผู้ยืมไม่สำเร็จ");
-          }
-        } finally {
-          if (!cancelled) {
-            setIsResolvingBorrower(false);
-          }
-        }
-      })();
-    }, 300);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [formData.partnerCode, lookupBorrowerByCode]);
-
-  // Fetch bank account from previous agreements
-  useEffect(() => {
-    const fetchBankAccount = async () => {
-      if (!user?.id) return;
-      
-      const { data: agreement } = await supabase
-        .from("debt_agreements")
-        .select("bank_name, account_number, account_name")
-        .eq("lender_id", user.id)
-        .not("bank_name", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (agreement && agreement.bank_name) {
-        setFormData(prev => ({
+      const accountToUse = accounts.find((account) => account.is_default) || accounts[0];
+      if (accountToUse) {
+        applySavedBankAccount(accountToUse);
+      } else {
+        setSelectedBankAccountId("");
+        setFormData((prev) => ({
           ...prev,
-          bankName: agreement.bank_name || "",
-          accountNumber: agreement.account_number || "",
-          accountName: agreement.account_name || "",
+          bankName: "",
+          accountNumber: "",
+          accountName: "",
         }));
       }
+
+      setIsLoadingBankAccounts(false);
     };
-    
-    fetchBankAccount();
-  }, [user?.id]);
+
+    fetchBankAccounts();
+  }, [user?.id, applySavedBankAccount]);
 
   const THAI_DAY_NAMES = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 
@@ -314,24 +274,18 @@ export default function CreateAgreement() {
       return;
     }
 
-    if (!formData.partnerName.trim()) {
-      toast.error("กรุณาระบุชื่อผู้ยืม");
+    if (!selectedFriend) {
+      toast.error("กรุณาเลือกผู้ยืมจากรายชื่อเพื่อน");
       return;
     }
 
-    const borrowerCode = normalizeBorrowerCode(formData.partnerCode);
-    if (borrowerCode && borrowerCode.length !== BORROWER_CODE_LENGTH) {
-      toast.error("รหัสผู้ยืมต้องมี 8 ตัวอักษร");
+    if (selectedFriend?.friend_user_id && selectedFriend.friend_user_id === user.id) {
+      toast.error("ไม่สามารถสร้างข้อตกลงกับตัวเองได้");
       return;
     }
 
-    if (isResolvingBorrower) {
-      toast.error("กรุณารอระบบตรวจสอบรหัสผู้ยืม");
-      return;
-    }
-
-    if (borrowerCode && !borrowerProfile) {
-      toast.error(borrowerCodeError || "ไม่พบผู้ใช้รหัสนี้");
+    if (!selectedBankAccountId || !formData.bankName || !formData.accountNumber || !formData.accountName) {
+      toast.error("กรุณาเลือกบัญชีรับเงินที่ตั้งค่าไว้");
       return;
     }
 
@@ -344,11 +298,12 @@ export default function CreateAgreement() {
     setIsSubmitting(true);
 
     try {
-      const invitationToken = borrowerProfile ? undefined : createInvitationToken();
+      const borrowerId = selectedFriend?.friend_user_id ?? undefined;
+      const invitationToken = borrowerId ? undefined : createInvitationToken();
       const input: CreateAgreementInput = {
-        borrower_id: borrowerProfile?.user_id,
-        borrower_phone: undefined,
-        borrower_name: formData.partnerName.trim() || undefined,
+        borrower_id: borrowerId,
+        borrower_phone: selectedFriend?.friend_phone || undefined,
+        borrower_name: selectedFriend?.nickname || selectedFriend?.friend_name || undefined,
         invitation_token: invitationToken,
         principal_amount: principalAmount,
         interest_rate: annualInterestRate,
@@ -602,35 +557,41 @@ export default function CreateAgreement() {
     monthly: "รายเดือน",
   };
 
-  const borrowerCode = normalizeBorrowerCode(formData.partnerCode);
-  const hasBorrowerCode = borrowerCode.length > 0;
-  const isBorrowerCodeComplete = borrowerCode.length === BORROWER_CODE_LENGTH;
-  const canUseBorrowerCode =
-    !hasBorrowerCode || (isBorrowerCodeComplete && Boolean(borrowerProfile) && !borrowerCodeError);
+  const hasSelectedFriend = Boolean(selectedFriend);
+  const hasSelectedBankAccount =
+    Boolean(selectedBankAccountId) && Boolean(formData.bankName) && Boolean(formData.accountNumber) && Boolean(formData.accountName);
+  const selectedSavedBankAccount = savedBankAccounts.find((account) => account.id === selectedBankAccountId);
 
   const stepDefinitions = [
-    { title: "ผู้ยืม", description: "ชื่อและรหัส" },
+    { title: "ผู้ยืม", description: "เลือกจากเพื่อน" },
     { title: "ยอดเงิน", description: "เงิน งวด ดอก" },
     { title: "บัญชี", description: "รับเงินคืน" },
     { title: "ตรวจสอบ", description: "Review all" },
   ];
 
   const canProceedByStep = [
-    !!formData.partnerName.trim() && canUseBorrowerCode && !isResolvingBorrower,
+    hasSelectedFriend,
     !!formData.amount && principalAmount > 0 && installmentCount > 0 && !!selectedCalculation,
-    !!formData.bankName && !!formData.accountNumber,
-    !!selectedCalculation && !!formData.partnerName.trim() && canUseBorrowerCode && !isResolvingBorrower && !!formData.amount && !!formData.bankName && !!formData.accountNumber,
+    hasSelectedBankAccount,
+    !!selectedCalculation && hasSelectedFriend && !!formData.amount && hasSelectedBankAccount,
   ];
 
-  const selectedBankLabel =
-    THAI_BANKS.find((bank) => bank.value === formData.bankName)?.label || formData.bankName || "ยังไม่ได้เลือก";
+  const getBankLabel = (value: string) => {
+    return THAI_BANKS.find((bank) => bank.value === value)?.label || value;
+  };
+
+  const selectedBankLabel = formData.bankName ? getBankLabel(formData.bankName) : "ยังไม่ได้เลือก";
 
   const reviewRows = selectedCalculation
     ? [
-        { label: "ผู้ยืม", value: formData.partnerName || "-" },
+        { label: "ผู้ยืม", value: selectedFriend?.nickname || selectedFriend?.friend_name || "-" },
         {
           label: "การผูกบัญชีผู้ยืม",
-          value: borrowerProfile ? `รหัส ${borrowerProfile.user_code}` : "ลิงก์เชิญให้มายืนยัน",
+          value: selectedFriend
+            ? selectedFriend.friend_user_id
+              ? "เลือกจากรายชื่อเพื่อน"
+              : "เลือกจากรายชื่อเพื่อน + ลิงก์เชิญ"
+            : "-",
         },
         { label: "เงินต้น", value: `฿${principalAmount.toLocaleString()}` },
         {
@@ -700,66 +661,52 @@ export default function CreateAgreement() {
                 <span>ผู้ยืม (ผู้รับเงินไป)</span>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="partnerName">ชื่อผู้ยืม</Label>
-                  <Input
-                    id="partnerName"
-                    placeholder="เช่น สมชาย ใจดี"
-                    value={formData.partnerName}
-                    onChange={(e) => setFormData({ ...formData, partnerName: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="partnerCode">รหัสผู้ใช้ผู้ยืม (ไม่บังคับ)</Label>
+              <div className="rounded-xl border border-border/70 bg-background/70 p-3">
+                {selectedFriend ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground">เลือกจากรายชื่อเพื่อน</p>
+                      <p className="truncate font-medium text-foreground">
+                        {selectedFriend.nickname || selectedFriend.friend_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedFriend.friend_user_id ? "ผูกบัญชีผู้ยืมได้ทันที" : "ยังไม่ผูกบัญชี จะสร้างลิงก์เชิญให้ยืนยัน"}
+                      </p>
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
-                      className="h-8 gap-1 px-2 text-xs"
-                      onClick={() => setShowBorrowerScanner(true)}
+                      size="icon"
+                      onClick={handleClearSelectedFriend}
+                      aria-label="ล้างเพื่อนที่เลือก"
                     >
-                      <Scan className="h-3.5 w-3.5" aria-hidden="true" />
-                      สแกน QR
+                      <X className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </div>
-                  <div className="relative">
-                    <Input
-                      id="partnerCode"
-                      inputMode="text"
-                      autoCapitalize="characters"
-                      placeholder="ABC12345"
-                      value={formData.partnerCode}
-                      onChange={(e) =>
-                        setFormData({ ...formData, partnerCode: normalizeBorrowerCode(e.target.value) })
-                      }
-                      className="pr-10 font-mono uppercase tracking-wider"
-                      maxLength={BORROWER_CODE_LENGTH}
-                    />
-                    {isResolvingBorrower ? (
-                      <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-                    ) : borrowerProfile ? (
-                      <CheckCircle className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-status-paid" />
-                    ) : null}
-                  </div>
-                </div>
-              </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={() => setShowFriendPicker(true)}
+                  >
+                    <UserPlus className="h-4 w-4" aria-hidden="true" />
+                    เลือกเพื่อนจากรายชื่อ
+	                  </Button>
+	                )}
+	              </div>
 
-              {borrowerCodeError ? (
-                <InlineValidationMessage tone="warning" message={borrowerCodeError} />
-              ) : borrowerProfile ? (
-                <InlineValidationMessage
-                  tone="success"
-                  message={`พบผู้ยืม: ${borrowerProfile.display_name || `User ${borrowerProfile.user_code}`} ระบบจะผูก borrower_id ทันที`}
-                />
-              ) : (
+              {!selectedFriend ? (
+                <InlineValidationMessage tone="warning" message="กรุณาเลือกผู้ยืมจากรายชื่อเพื่อน" />
+              ) : !selectedFriend.friend_user_id ? (
                 <div className="flex items-start gap-2 rounded-xl border border-border/70 bg-background/70 p-3 text-xs text-muted-foreground">
                   <LinkIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                   <p>
-                    ถ้าไม่มีรหัสผู้ใช้ เวลาสร้างเสร็จระบบจะสร้างลิงก์เชิญให้ผู้ยืมกดผูกบัญชีและยืนยันเอง
+                    เพื่อนคนนี้ยังไม่ผูกบัญชีผู้ใช้ ระบบจะสร้างลิงก์เชิญให้ผู้ยืมกดผูกบัญชีและยืนยันเอง
                   </p>
                 </div>
+              ) : (
+                <InlineValidationMessage tone="success" message="ดึงข้อมูลผู้ยืมจากรายชื่อเพื่อนแล้ว" />
               )}
             </motion.div>
           )}
@@ -1187,50 +1134,95 @@ export default function CreateAgreement() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-2 md:col-span-1">
-                <Label>ธนาคารหรือช่องทางรับเงิน</Label>
-                <Select value={formData.bankName} onValueChange={(value) => setFormData({ ...formData, bankName: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="เลือกธนาคาร" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {THAI_BANKS.map((bank) => (
-                      <SelectItem key={bank.value} value={bank.value}>
-                        {bank.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {isLoadingBankAccounts ? (
+              <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                กำลังโหลดบัญชีรับเงิน
               </div>
+            ) : savedBankAccounts.length > 0 ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>เลือกบัญชีที่ตั้งไว้</Label>
+                  <Select
+                    value={selectedBankAccountId}
+                    onValueChange={(value) => {
+                      const account = savedBankAccounts.find((item) => item.id === value);
+                      if (account) applySavedBankAccount(account);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="เลือกบัญชีรับเงิน" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {savedBankAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {(account.label || getBankLabel(account.bank_name))}
+                          {account.is_default ? " · บัญชีหลัก" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="accountNumber">
-                  {formData.bankName === "promptpay" ? "PromptPay ID" : "เลขบัญชี"}
-                </Label>
-                <Input
-                  id="accountNumber"
-                  value={formData.accountNumber}
-                  onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-                  placeholder={formData.bankName === "promptpay" ? "0812345678" : "123-4-56789-0"}
-                />
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label>ธนาคารหรือช่องทางรับเงิน</Label>
+                    <Input value={selectedBankLabel} readOnly />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="accountNumber">
+                      {formData.bankName === "promptpay" ? "PromptPay ID" : "เลขบัญชี"}
+                    </Label>
+                    <Input
+                      id="accountNumber"
+                      value={formData.accountNumber}
+                      readOnly
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="accountName">ชื่อบัญชี</Label>
+                    <Input
+                      id="accountName"
+                      value={formData.accountName}
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                {selectedSavedBankAccount ? (
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">
+                    <p className="font-medium text-foreground">
+                      {selectedSavedBankAccount.label || selectedBankLabel}
+                    </p>
+                    <p className="text-muted-foreground">
+                      ข้อมูลนี้จะถูกบันทึกลงสัญญานี้ตอนสร้างข้อตกลง
+                    </p>
+                  </div>
+                ) : null}
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="accountName">ชื่อบัญชี</Label>
-                <Input
-                  id="accountName"
-                  value={formData.accountName}
-                  onChange={(e) => setFormData({ ...formData, accountName: e.target.value })}
-                  placeholder="ชื่อผู้ถือบัญชี"
-                />
+            ) : (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                <p className="text-sm font-medium text-foreground">ยังไม่มีบัญชีรับเงิน</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  เพิ่มบัญชีได้ที่หน้าโปรไฟล์ก่อนสร้างข้อตกลงในฐานะผู้ให้ยืม
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => navigate("/profile")}
+                >
+                  ไปตั้งค่าบัญชีรับเงิน
+                </Button>
               </div>
-            </div>
+            )}
 
-            {!formData.bankName || !formData.accountNumber ? (
+            {!hasSelectedBankAccount ? (
               <InlineValidationMessage
                 tone="warning"
-                message="กรุณาระบุบัญชีของคุณให้ครบก่อนขยับไปขั้นตรวจสอบสุดท้าย"
+                message="กรุณาเลือกบัญชีรับเงินที่ตั้งค่าไว้ก่อนขยับไปขั้นตรวจสอบสุดท้าย"
               />
             ) : null}
             </motion.div>
@@ -1476,6 +1468,63 @@ export default function CreateAgreement() {
         </motion.form>
         </StepFlowLayout>
 
+        <Dialog open={showFriendPicker} onOpenChange={setShowFriendPicker}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>เลือกเพื่อนเป็นผู้ยืม</DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[60vh] space-y-2 overflow-y-auto py-2">
+              {friendsLoading ? (
+                <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  กำลังโหลดรายชื่อเพื่อน...
+                </div>
+              ) : friends.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border p-5 text-center">
+                  <p className="text-sm font-medium text-foreground">ยังไม่มีเพื่อน</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    เพิ่มเพื่อนจากหน้าโปรไฟล์ก่อน แล้วกลับมาเลือกผู้ยืมได้ทันที
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => navigate("/friends")}
+                  >
+                    ไปหน้าเพื่อน
+                  </Button>
+                </div>
+              ) : (
+                friends.map((friend) => (
+                  <button
+                    key={friend.id}
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-xl border border-border/70 bg-background p-3 text-left transition-colors hover:bg-secondary/50"
+                    onClick={() => handleSelectFriend(friend)}
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                      {friend.friend_name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {friend.nickname || friend.friend_name}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {friend.nickname ? friend.friend_name : friend.friend_phone || "ไม่มีเบอร์โทร"}
+                      </p>
+                    </div>
+                    {friend.friend_user_id ? (
+                      <CheckCircle className="h-4 w-4 text-status-paid" aria-hidden="true" />
+                    ) : (
+                      <LinkIcon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Password Confirmation Dialog */}
         <PasswordConfirmDialog
           open={showPasswordConfirm}
@@ -1485,11 +1534,6 @@ export default function CreateAgreement() {
           description="กรุณาใส่รหัสผ่านเพื่อยืนยันการสร้างข้อตกลงในฐานะผู้ให้ยืม"
           confirmButtonText="ส่งให้ผู้ยืมยืนยัน"
           isLoading={isSubmitting}
-        />
-        <QRCodeScanner
-          open={showBorrowerScanner}
-          onClose={() => setShowBorrowerScanner(false)}
-          onScan={handleBorrowerQrScanned}
         />
       </div>
     </div>
