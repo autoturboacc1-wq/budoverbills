@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap");
+
 /* Editorial Paper — typography-first, hairline minimal */
 
 @tailwind base;
@@ -6,151 +8,151 @@
 
 @layer base {
   :root {
-    --font-apple-system: -apple-system, BlinkMacSystemFont, "SF Pro Text",
-      "SF Pro Display", "Helvetica Neue", "Sukhumvit Set", Thonburi, Arial,
-      system-ui, sans-serif;
-    --font-apple-display: -apple-system, BlinkMacSystemFont, "SF Pro Display",
-      "SF Pro Text", "Helvetica Neue", "Sukhumvit Set", Thonburi, Arial,
-      system-ui, sans-serif;
+    --font-apple-system: "IBM Plex Sans Thai", -apple-system, BlinkMacSystemFont,
+      "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Sukhumvit Set",
+      Thonburi, Arial, system-ui, sans-serif;
+    --font-apple-display: "IBM Plex Sans Thai", -apple-system, BlinkMacSystemFont,
+      "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Sukhumvit Set",
+      Thonburi, Arial, system-ui, sans-serif;
     --font-apple-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo,
       Monaco, Consolas, monospace;
 
-    /* Apple Native Mode — White/Gray & High End Minimal */
-    --background: 0 0% 99%;
-    --foreground: 0 0% 6%;
+    /* Bud Over Bills — blue and white */
+    --background: 0 0% 100%;
+    --foreground: 222 67% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 6%;
+    --card-foreground: 222 67% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
+    --popover-foreground: 222 67% 12%;
 
-    --primary: 0 0% 8%;
+    --primary: 219 91% 48%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 97%;
-    --secondary-foreground: 0 0% 9%;
+    --secondary: 214 100% 96%;
+    --secondary-foreground: 219 91% 28%;
 
-    --muted: 0 0% 97%;
-    --muted-foreground: 0 0% 42%;
+    --muted: 214 100% 96%;
+    --muted-foreground: 217 32% 42%;
 
-    --accent: 0 0% 97%;
-    --accent-foreground: 0 0% 9%;
+    --accent: 214 100% 94%;
+    --accent-foreground: 219 91% 30%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 89%;
-    --input: 0 0% 89%;
-    --ring: 0 0% 9%;
+    --border: 216 100% 90%;
+    --input: 216 100% 90%;
+    --ring: 219 91% 48%;
 
     --radius: 0.875rem;
 
-    --status-success: 135 65% 42%;
-    --status-warning: 32 100% 50%;
-    --status-danger: 0 84% 60%;
+    --status-success: 219 91% 42%;
+    --status-warning: 212 100% 46%;
+    --status-danger: 217 91% 38%;
     --status-info: 211 100% 50%;
-    --status-neutral: 240 4% 46%;
+    --status-neutral: 217 32% 42%;
 
-    --status-paid: 135 65% 42%;     /* Apple Green */
-    --status-pending: 32 100% 50%;  /* Apple Orange */
-    --status-overdue: 0 84% 60%;    /* Apple Red */
-    --status-negotiating: 211 100% 50%; /* Apple Blue */
+    --status-paid: 219 91% 42%;
+    --status-pending: 212 100% 46%;
+    --status-overdue: 217 91% 38%;
+    --status-negotiating: 211 100% 50%;
 
     /* Chat bubbles */
-    --chat-bubble-me: 0 0% 9%;
+    --chat-bubble-me: 219 91% 48%;
     --chat-bubble-me-foreground: 0 0% 100%;
-    --chat-bubble-other: 240 5% 92%;
-    --chat-bubble-other-foreground: 0 0% 0%;
-    --chat-bubble-money: 135 65% 42%;
+    --chat-bubble-other: 214 100% 96%;
+    --chat-bubble-other-foreground: 222 67% 12%;
+    --chat-bubble-money: 219 91% 48%;
     --chat-bubble-money-foreground: 0 0% 100%;
 
     /* Gradients */
-    --gradient-warm: linear-gradient(180deg, hsl(0 0% 99%) 0%, hsl(0 0% 98%) 100%);
+    --gradient-warm: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 100%) 100%);
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 100%) 100%);
-    --gradient-primary: linear-gradient(180deg, hsl(0 0% 8%) 0%, hsl(0 0% 8%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(0 0% 99%) 0%, hsl(0 0% 98%) 100%);
+    --gradient-primary: linear-gradient(180deg, hsl(219 91% 52%) 0%, hsl(219 91% 44%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 100%) 100%);
 
     /* Shadows — soft, elegant drops */
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.02);
-    --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.03);
-    --shadow-elevated: 0 16px 40px rgba(0, 0, 0, 0.05);
+    --shadow-soft: 0 1px 4px rgba(11, 99, 234, 0.05);
+    --shadow-card: 0 8px 24px rgba(11, 99, 234, 0.07);
+    --shadow-elevated: 0 16px 40px rgba(11, 99, 234, 0.11);
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 20 10% 22%;
-    --sidebar-primary: 20 10% 12%;
-    --sidebar-primary-foreground: 36 14% 97%;
-    --sidebar-accent: 30 8% 95%;
-    --sidebar-accent-foreground: 20 10% 16%;
-    --sidebar-border: 30 6% 88%;
-    --sidebar-ring: 20 10% 12%;
+    --sidebar-foreground: 222 67% 12%;
+    --sidebar-primary: 219 91% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 214 100% 96%;
+    --sidebar-accent-foreground: 219 91% 30%;
+    --sidebar-border: 216 100% 90%;
+    --sidebar-ring: 219 91% 48%;
   }
 
   .dark {
-    /* OLED Black Dark Mode */
-    --background: 0 0% 0%;
-    --foreground: 0 0% 100%;
+    /* Blue dark mode */
+    --background: 0 0% 100%;
+    --foreground: 222 67% 12%;
 
-    --card: 240 4% 11%;
-    --card-foreground: 0 0% 100%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 67% 12%;
 
-    --popover: 240 4% 11%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 67% 12%;
 
-    --primary: 0 0% 100%;              /* bone on ink */
-    --primary-foreground: 0 0% 0%;
+    --primary: 219 91% 58%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 219 63% 18%;
+    --secondary-foreground: 214 100% 98%;
 
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 219 63% 18%;
+    --muted-foreground: 214 52% 74%;
 
-    --accent: 240 4% 16%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 219 63% 22%;
+    --accent-foreground: 214 100% 98%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 240 4% 20%;
-    --input: 240 4% 20%;
-    --ring: 0 0% 100%;
+    --border: 219 55% 24%;
+    --input: 219 55% 24%;
+    --ring: 219 91% 58%;
 
-    --status-success: 135 65% 42%;
-    --status-warning: 32 100% 50%;
-    --status-danger: 0 84% 60%;
-    --status-info: 211 100% 50%;
-    --status-neutral: 240 4% 46%;
+    --status-success: 214 100% 68%;
+    --status-warning: 212 100% 64%;
+    --status-danger: 217 100% 72%;
+    --status-info: 211 100% 66%;
+    --status-neutral: 214 52% 74%;
 
-    --status-paid: 135 65% 42%;
-    --status-pending: 32 100% 50%;
-    --status-overdue: 0 84% 60%;
+    --status-paid: 214 100% 68%;
+    --status-pending: 212 100% 64%;
+    --status-overdue: 217 100% 72%;
     --status-negotiating: 211 100% 50%;
 
-    --chat-bubble-me: 0 0% 100%;
-    --chat-bubble-me-foreground: 0 0% 0%;
-    --chat-bubble-other: 240 4% 16%;
-    --chat-bubble-other-foreground: 0 0% 100%;
-    --chat-bubble-money: 135 65% 42%;
+    --chat-bubble-me: 219 91% 58%;
+    --chat-bubble-me-foreground: 0 0% 100%;
+    --chat-bubble-other: 219 63% 18%;
+    --chat-bubble-other-foreground: 214 100% 98%;
+    --chat-bubble-money: 219 91% 58%;
     --chat-bubble-money-foreground: 0 0% 100%;
 
-    --gradient-warm: linear-gradient(180deg, hsl(0 0% 0%) 0%, hsl(0 0% 0%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(240 4% 11%) 0%, hsl(240 4% 11%) 100%);
-    --gradient-primary: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 100%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(0 0% 0%) 0%, hsl(0 0% 0%) 100%);
+    --gradient-warm: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 100%) 100%);
+    --gradient-primary: linear-gradient(180deg, hsl(219 91% 62%) 0%, hsl(219 91% 50%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 100%) 100%);
 
-    --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.4);
-    --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.5);
-    --shadow-elevated: 0 12px 40px rgba(0, 0, 0, 0.6);
+    --shadow-soft: 0 2px 12px rgba(29, 155, 240, 0.12);
+    --shadow-card: 0 4px 24px rgba(29, 155, 240, 0.14);
+    --shadow-elevated: 0 12px 40px rgba(29, 155, 240, 0.18);
 
-    --sidebar-background: 24 5% 9%;
-    --sidebar-foreground: 36 10% 88%;
-    --sidebar-primary: 36 10% 92%;
-    --sidebar-primary-foreground: 24 6% 7%;
-    --sidebar-accent: 24 4% 14%;
-    --sidebar-accent-foreground: 36 10% 88%;
-    --sidebar-border: 24 4% 18%;
-    --sidebar-ring: 36 10% 92%;
+    --sidebar-background: 222 64% 11%;
+    --sidebar-foreground: 214 100% 98%;
+    --sidebar-primary: 219 91% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 219 63% 18%;
+    --sidebar-accent-foreground: 214 100% 98%;
+    --sidebar-border: 219 55% 24%;
+    --sidebar-ring: 219 91% 58%;
   }
 }
 
@@ -180,6 +182,7 @@
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-apple-display);
+    font-weight: 700;
     letter-spacing: 0;
   }
 
@@ -195,7 +198,7 @@
   /* Keep legacy class names mapped to Apple-native fonts. */
   .font-serif-display {
     font-family: var(--font-apple-display);
-    font-weight: 400;
+    font-weight: 700;
     letter-spacing: 0;
   }
 
@@ -219,6 +222,87 @@
   .bg-gradient-warm { background: var(--gradient-warm); }
   .bg-gradient-card { background: var(--gradient-card); }
   .bg-gradient-hero { background: var(--gradient-hero); }
+
+  [class*="bg-amber-"],
+  [class*="bg-orange-"],
+  [class*="bg-yellow-"],
+  [class*="bg-green-"],
+  [class*="bg-purple-"],
+  [class*="bg-violet-"],
+  [class*="bg-red-"],
+  [class*="bg-rose-"] {
+    background-color: hsl(var(--primary) / 0.1);
+  }
+
+  [class*="border-amber-"],
+  [class*="border-orange-"],
+  [class*="border-yellow-"],
+  [class*="border-green-"],
+  [class*="border-purple-"],
+  [class*="border-violet-"],
+  [class*="border-red-"],
+  [class*="border-rose-"] {
+    border-color: hsl(var(--primary) / 0.25);
+  }
+
+  [class*="text-amber-"],
+  [class*="text-orange-"],
+  [class*="text-yellow-"],
+  [class*="text-green-"],
+  [class*="text-purple-"],
+  [class*="text-violet-"],
+  [class*="text-red-"],
+  [class*="text-rose-"] {
+    color: hsl(var(--primary));
+  }
+
+  [class*="from-amber-"],
+  [class*="from-orange-"],
+  [class*="from-yellow-"],
+  [class*="from-green-"],
+  [class*="from-purple-"],
+  [class*="from-violet-"],
+  [class*="from-red-"],
+  [class*="from-rose-"] {
+    --tw-gradient-from: hsl(var(--primary) / 0.18) var(--tw-gradient-from-position);
+    --tw-gradient-to: hsl(var(--primary) / 0) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+  }
+
+  [class*="to-amber-"],
+  [class*="to-orange-"],
+  [class*="to-yellow-"],
+  [class*="to-green-"],
+  [class*="to-purple-"],
+  [class*="to-violet-"],
+  [class*="to-red-"],
+  [class*="to-rose-"] {
+    --tw-gradient-to: hsl(var(--primary) / 0.04) var(--tw-gradient-to-position);
+  }
+
+  .support-theme .support-hero-icon {
+    background: linear-gradient(135deg, #fbbf24 0%, #f97316 100%);
+  }
+
+  .support-theme .support-summary {
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(249, 115, 22, 0.12) 100%);
+    border-color: rgba(245, 158, 11, 0.28);
+  }
+
+  .support-theme .support-amount,
+  .support-theme .support-accent-icon {
+    color: #d97706;
+  }
+
+  .support-theme .support-submit {
+    background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+    border-color: transparent;
+    box-shadow: 0 10px 24px rgba(249, 115, 22, 0.18);
+  }
+
+  .support-theme .support-submit:hover {
+    background: linear-gradient(90deg, #d97706 0%, #ea580c 100%);
+  }
 
   .shadow-soft { box-shadow: var(--shadow-soft); }
   .shadow-card { box-shadow: var(--shadow-card); }
@@ -257,9 +341,7 @@
   /* Optional: render the app as a centered phone-shaped surface on desktop  */
   @media (min-width: 768px) {
     body {
-      background:
-        radial-gradient(ellipse at top, hsl(var(--muted)) 0%, hsl(var(--background)) 60%),
-        hsl(var(--background));
+      background: hsl(var(--background));
     }
   }
 

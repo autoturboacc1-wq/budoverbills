@@ -158,7 +158,7 @@ export default function Support() {
 
   return (
     <PageTransition>
-    <div className="min-h-screen bg-gradient-hero">
+    <div className="support-theme min-h-screen bg-gradient-hero">
       <div className="max-w-md mx-auto px-5 pb-24">
         {/* Header */}
         <motion.header
@@ -188,7 +188,7 @@ export default function Support() {
           transition={{ delay: 0.1 }}
           className="text-center mb-8"
         >
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 mx-auto flex items-center justify-center mb-4 shadow-lg">
+          <div className="support-hero-icon w-24 h-24 rounded-full mx-auto flex items-center justify-center mb-4 shadow-lg">
             <Coffee className="w-12 h-12 text-white" />
           </div>
           <h2 className="text-2xl font-heading font-bold text-foreground mb-2">
@@ -324,17 +324,17 @@ export default function Support() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-5 mb-6"
+          className="support-summary rounded-2xl border p-5 mb-6"
         >
           <div className="flex items-center justify-between mb-4">
             <span className="text-muted-foreground">{copy.amountLabel}</span>
-            <span className="text-2xl font-bold text-amber-600">
+            <span className="support-amount text-2xl font-bold">
               {currencySymbol}{selectedAmount || 0}
             </span>
           </div>
 
           <Button
-            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-medium py-6"
+            className="support-submit w-full text-white font-medium py-6"
             disabled={!selectedAmount || Number(selectedAmount) <= 0 || isSubmitting}
             onClick={handleSubmit}
           >
@@ -364,7 +364,7 @@ export default function Support() {
           className="bg-card rounded-2xl p-5 shadow-card"
         >
           <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
-            <Star className="w-5 h-5 text-amber-500" />
+            <Star className="support-accent-icon w-5 h-5" />
             {copy.whyTitle}
           </h3>
           <ul className="space-y-3 text-sm text-muted-foreground">
