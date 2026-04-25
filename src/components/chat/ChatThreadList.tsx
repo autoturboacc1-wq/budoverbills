@@ -84,6 +84,12 @@ export const ChatThreadList = ({
                       การเงิน
                     </span>
                   ) : null}
+                  {thread.chat_type === "direct" ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      <MessageCircle className="h-3 w-3" />
+                      แชททั่วไป
+                    </span>
+                  ) : null}
                 </div>
               </div>
               {thread.last_message_at && (
