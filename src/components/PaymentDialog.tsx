@@ -298,8 +298,10 @@ export function PaymentDialog({
       
       
     } catch (error) {
-      console.error("Upload error:", error);
-      toast.error("เกิดข้อผิดพลาดในการอัปโหลด");
+      const err = error as { message?: string; details?: string; hint?: string; code?: string };
+      console.error("Upload error:", err, "raw:", error);
+      const description = err?.message || err?.details || err?.hint || (err?.code ? `code: ${err.code}` : undefined);
+      toast.error("เกิดข้อผิดพลาดในการอัปโหลด", { description });
     } finally {
       setIsUploading(false);
       uploadLockRef.current = false;
@@ -384,8 +386,10 @@ export function PaymentDialog({
         setSlipUrl(null);
         setSignedSlipUrl(null);
       }
-      console.error("Submit payment error:", error);
-      toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่");
+      const err = error as { message?: string; details?: string; hint?: string; code?: string };
+      console.error("Submit payment error:", err, "raw:", error);
+      const description = err?.message || err?.details || err?.hint || (err?.code ? `code: ${err.code}` : undefined);
+      toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่", { description });
     } finally {
       setIsSubmitting(false);
       borrowerSubmitLockRef.current = false;
