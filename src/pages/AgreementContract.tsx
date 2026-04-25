@@ -22,6 +22,7 @@ import {
   LoanContractData,
   LoanContractTemplate,
 } from "@/components/contract/LoanContractTemplate";
+import { isIdCardValid } from "@/components/contract/PartyInfoForm";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useDebtAgreements, DebtAgreement } from "@/hooks/useDebtAgreements";
@@ -53,12 +54,12 @@ interface AgreementContractExtras {
   loan_purpose: string | null;
 }
 
-const EMPTY_PARTY: PartyInfoFormValue = { fullName: "", idCardLast4: "", address: "" };
+const EMPTY_PARTY: PartyInfoFormValue = { fullName: "", idCardNumber: "", address: "" };
 
 function partyToContract(value: PartyInfoFormValue): ContractParty {
   return {
     fullName: value.fullName.trim(),
-    idCardLast4: value.idCardLast4.trim(),
+    idCardNumber: (value.idCardNumber ?? value.idCardLast4 ?? "").trim(),
     address: value.address.trim(),
   };
 }
@@ -265,7 +266,7 @@ export default function AgreementContract() {
 
   const formIsValid = useMemo(() => {
     if (!myParty.fullName.trim()) return false;
-    if (myParty.idCardLast4.replace(/\D/g, "").length !== 4) return false;
+    if (!isIdCardValid(myParty.idCardNumber ?? "")) return false;
     if (!myParty.address.trim()) return false;
     if (isLender) {
       if (!placeOfSigning.trim()) return false;
@@ -384,7 +385,7 @@ export default function AgreementContract() {
         p_typed_name: typedName.trim(),
         p_party_info: {
           fullName: partyInfo.fullName.trim(),
-          idCardLast4: partyInfo.idCardLast4.trim(),
+          idCardNumber: (partyInfo.idCardNumber ?? "").trim(),
           address: partyInfo.address.trim(),
         },
         p_contract_html: html,

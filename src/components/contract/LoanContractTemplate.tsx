@@ -8,7 +8,8 @@ const APPLE_SYSTEM_FONT =
 
 export interface ContractParty {
   fullName: string;
-  idCardLast4: string;
+  /** Full 13-digit Thai national ID. Legacy blobs may contain only last-4. */
+  idCardNumber: string;
   address: string;
 }
 
@@ -65,10 +66,17 @@ function formatThaiDateTime(iso: string): string {
   return `${formatThaiDate(iso)} เวลา ${time} น.`;
 }
 
-function maskIdCard(last4: string): string {
-  if (!last4) return "X-XXXX-XXXXX-XX-X";
-  const safe = last4.replace(/\D/g, "").slice(-4).padStart(4, "X");
-  return `X-XXXX-XXXXX-${safe.slice(0, 2)}-${safe.slice(2)}`;
+function maskIdCard(idCardNumber: string): string {
+  const digits = (idCardNumber ?? "").replace(/\D/g, "");
+  if (digits.length === 13) {
+    // Show first digit + last 4, mask the rest: D-XXXX-XXXXX-XX-D
+    return `${digits[0]}-XXXX-XXXXX-${digits.slice(9, 11)}-${digits.slice(11)}`;
+  }
+  if (digits.length === 4) {
+    // Legacy: only last-4 stored
+    return `X-XXXX-XXXXX-${digits.slice(0, 2)}-${digits.slice(2)}`;
+  }
+  return "X-XXXX-XXXXX-XX-X";
 }
 
 /**
@@ -118,7 +126,7 @@ export const LoanContractTemplate = forwardRef<HTMLDivElement, { data: LoanContr
             <strong>ผู้ให้กู้</strong>{" "}
             <span style={{ borderBottom: "1px dotted #000", padding: "0 6px" }}>{data.lender.fullName || "—"}</span>{" "}
             เลขประจำตัวประชาชน{" "}
-            <span style={{ borderBottom: "1px dotted #000", padding: "0 6px" }}>{maskIdCard(data.lender.idCardLast4)}</span>{" "}
+            <span style={{ borderBottom: "1px dotted #000", padding: "0 6px" }}>{maskIdCard(data.lender.idCardNumber)}</span>{" "}
             ที่อยู่{" "}
             <span style={{ borderBottom: "1px dotted #000", padding: "0 6px" }}>{data.lender.address || "—"}</span>
             {" "}ซึ่งต่อไปในสัญญานี้เรียกว่า <strong>"ผู้ให้กู้"</strong>
@@ -127,7 +135,7 @@ export const LoanContractTemplate = forwardRef<HTMLDivElement, { data: LoanContr
             <strong>ผู้กู้</strong>{" "}
             <span style={{ borderBottom: "1px dotted #000", padding: "0 6px" }}>{data.borrower.fullName || "—"}</span>{" "}
             เลขประจำตัวประชาชน{" "}
-            <span style={{ borderBottom: "1px dotted #000", padding: "0 6px" }}>{maskIdCard(data.borrower.idCardLast4)}</span>{" "}
+            <span style={{ borderBottom: "1px dotted #000", padding: "0 6px" }}>{maskIdCard(data.borrower.idCardNumber)}</span>{" "}
             ที่อยู่{" "}
             <span style={{ borderBottom: "1px dotted #000", padding: "0 6px" }}>{data.borrower.address || "—"}</span>
             {" "}ซึ่งต่อไปในสัญญานี้เรียกว่า <strong>"ผู้กู้"</strong>

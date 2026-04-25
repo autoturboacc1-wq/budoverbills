@@ -4,8 +4,10 @@ import { Textarea } from "@/components/ui/textarea";
 
 export interface PartyInfoFormValue {
   fullName: string;
-  idCardLast4: string;
+  idCardNumber: string;
   address: string;
+  /** @deprecated kept for backward-compat with stored party_info blobs */
+  idCardLast4?: string;
 }
 
 interface PartyInfoFormProps {
@@ -15,8 +17,25 @@ interface PartyInfoFormProps {
   disabled?: boolean;
 }
 
+function validateThaiId(id: string): boolean {
+  const digits = id.replace(/\D/g, "");
+  if (digits.length !== 13) return false;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += parseInt(digits[i]) * (13 - i);
+  const check = (11 - (sum % 11)) % 10;
+  return check === parseInt(digits[12]);
+}
+
+export function isIdCardValid(idCardNumber: string): boolean {
+  return validateThaiId(idCardNumber);
+}
+
 export function PartyInfoForm({ value, onChange, roleLabel, disabled }: PartyInfoFormProps) {
   const update = (patch: Partial<PartyInfoFormValue>) => onChange({ ...value, ...patch });
+
+  const raw = value.idCardNumber ?? "";
+  const isValid = raw.length === 13 && validateThaiId(raw);
+  const showError = raw.length === 13 && !isValid;
 
   return (
     <div className="space-y-3">
@@ -35,22 +54,28 @@ export function PartyInfoForm({ value, onChange, roleLabel, disabled }: PartyInf
       </div>
 
       <div>
-        <Label htmlFor="party-id-last4" className="text-sm">
-          เลขประจำตัวประชาชน 4 หลักท้าย
+        <Label htmlFor="party-id-number" className="text-sm">
+          เลขประจำตัวประชาชน 13 หลัก
         </Label>
         <Input
-          id="party-id-last4"
-          value={value.idCardLast4}
-          onChange={(e) => update({ idCardLast4: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-          placeholder="เช่น 1234"
+          id="party-id-number"
+          value={raw}
+          onChange={(e) => update({ idCardNumber: e.target.value.replace(/\D/g, "").slice(0, 13) })}
+          placeholder="กรอกเลข 13 หลัก"
           inputMode="numeric"
-          pattern="[0-9]{4}"
+          pattern="[0-9]{13}"
           disabled={disabled}
-          maxLength={4}
+          maxLength={13}
+          className={showError ? "border-destructive focus-visible:ring-destructive" : ""}
         />
-        <p className="text-xs text-muted-foreground mt-1">
-          เก็บเฉพาะ 4 ตัวท้ายเพื่อยืนยันตัวตน 9 ตัวแรกจะแสดงเป็น X เพื่อความปลอดภัยตาม PDPA
-        </p>
+        {showError && (
+          <p className="text-xs text-destructive mt-1">เลขประจำตัวประชาชนไม่ถูกต้อง (checksum ไม่ผ่าน)</p>
+        )}
+        {!showError && (
+          <p className="text-xs text-muted-foreground mt-1">
+            ใช้เพื่อระบุตัวตนในสัญญา — แสดงในเอกสารเป็น X-XXXX-XXXXX-XX-X ตาม PDPA
+          </p>
+        )}
       </div>
 
       <div>
