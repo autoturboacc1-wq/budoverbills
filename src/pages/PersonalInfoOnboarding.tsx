@@ -14,10 +14,52 @@ import { BobLogo } from "@/components/BobLogo";
 import { InlineValidationMessage, PageHeader, PageSection } from "@/components/ux";
 
 const personalInfoSchema = z.object({
-  firstName: z.string().min(1, "กรุณากรอกชื่อ").max(100),
-  lastName: z.string().min(1, "กรุณากรอกนามสกุล").max(100),
-  phone: z.string().regex(/^0[0-9]{8,9}$/, "เบอร์โทรไม่ถูกต้อง (เช่น 0812345678)"),
+  firstName: z.string().trim().min(1, "กรุณากรอกชื่อ").max(100),
+  lastName: z.string().trim().min(1, "กรุณากรอกนามสกุล").max(100),
+  phone: z.string().trim().regex(/^0[0-9]{8,9}$/, "เบอร์โทรไม่ถูกต้อง (เช่น 0812345678)"),
 });
+
+async function savePersonalInfo(userId: string, values: z.infer<typeof personalInfoSchema>) {
+  const payload = {
+    first_name: values.firstName,
+    last_name: values.lastName,
+    phone: values.phone,
+    display_name: `${values.firstName} ${values.lastName}`,
+  };
+
+  const { data: updatedProfile, error: updateError } = await supabase
+    .from("profiles")
+    .update(payload)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (updateError) {
+    throw updateError;
+  }
+
+  if (updatedProfile) {
+    return;
+  }
+
+  const { data: generatedUserCode, error: userCodeError } = await supabase.rpc("generate_user_code");
+
+  if (userCodeError) {
+    throw userCodeError;
+  }
+
+  const { error: insertError } = await supabase
+    .from("profiles")
+    .insert({
+      user_id: userId,
+      user_code: generatedUserCode,
+      ...payload,
+    });
+
+  if (insertError) {
+    throw insertError;
+  }
+}
 
 export default function PersonalInfoOnboarding() {
   const navigate = useNavigate();
@@ -53,18 +95,7 @@ export default function PersonalInfoOnboarding() {
     setErrors({});
 
     try {
-      // Update profile with personal info
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          phone: phone.trim(),
-          display_name: `${firstName.trim()} ${lastName.trim()}`,
-        })
-        .eq("user_id", user.id);
-
-      if (error) throw error;
+      await savePersonalInfo(user.id, result.data);
 
       await refreshProfile();
       
