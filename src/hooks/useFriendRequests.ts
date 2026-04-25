@@ -175,16 +175,22 @@ function useFriendRequestsState(): FriendRequestsContextValue {
       return true;
     } catch (error: unknown) {
       console.error('Error accepting friend request:', error);
-      const message = typeof error === 'object' && error !== null
-        ? (error as { message?: string }).message
-        : undefined;
+      const errObj = (typeof error === 'object' && error !== null)
+        ? (error as { message?: string; code?: string; details?: string; hint?: string })
+        : null;
+      const message = errObj?.message;
       // accept_friend_request self-heals stale requests by deleting them and
       // raising this error — refresh so the dead row disappears from the list.
       if (message?.includes('counterparty no longer exists')) {
         toast.error('ผู้ส่งคำขอไม่มีอยู่ในระบบแล้ว');
         await fetchRequests();
       } else {
-        toast.error('ไม่สามารถยอมรับคำขอได้');
+        // Surface the real server error so we can pin down lingering failures
+        // instead of masking them behind the generic toast.
+        const detail = [errObj?.code, message, errObj?.details, errObj?.hint]
+          .filter(Boolean)
+          .join(' | ');
+        toast.error(detail ? `ไม่สามารถยอมรับคำขอได้: ${detail}` : 'ไม่สามารถยอมรับคำขอได้');
       }
       return false;
     }
