@@ -261,9 +261,14 @@ export default function DebtDetail() {
             : data.display_name || "ผู้ให้ยืม";
         }
       }
+
+      const rescheduleInfo = agreement.interest_type === 'none'
+        ? `${agreement.reschedule_fee_rate || 5}% ของเงินต้นต่อหนึ่งงวด (${defaultPrincipalPerInstallment.toLocaleString()} บาท/งวด)`
+        : `${agreement.reschedule_interest_multiplier || 1}x ของดอกเบี้ยต่องวด (ประมาณ ${roundMoney((paymentSummary.interest.total / Math.max(agreement.num_installments, 1)) * (agreement.reschedule_interest_multiplier || 1)).toLocaleString(undefined, { maximumFractionDigits: 2 })} บาท/ครั้ง)`;
       
       const pdfData = {
         agreementId: agreement.id,
+        agreementStatus: agreement.status,
         principalAmount: agreement.principal_amount,
         totalAmount: agreement.total_amount,
         interestRate: agreement.interest_rate || 0,
@@ -282,12 +287,28 @@ export default function DebtDetail() {
         borrowerConfirmedAt: agreement.borrower_confirmed_at ?? undefined,
         borrowerConfirmedIP: agreement.borrower_confirmed_ip ?? undefined,
         borrowerConfirmedDevice: agreement.borrower_confirmed_device ?? undefined,
+
+        paymentSummary,
+        rescheduleInfo,
         
         installments: (agreement.installments || []).map(inst => ({
           installmentNumber: inst.installment_number,
           dueDate: inst.due_date,
           amount: inst.amount,
-          status: inst.status,
+          principalAmount: inst.principal_portion,
+          interestAmount: inst.principal_portion === 0 ? inst.amount : (inst.interest_portion || 0),
+          displayStatus:
+            inst.status === 'paid'
+              ? 'paid'
+              : inst.status === 'rescheduled'
+                ? 'rescheduled'
+                : rejectedInstallments.has(inst.id) && !inst.payment_proof_url
+                  ? 'rejected'
+                  : inst.payment_proof_url
+                    ? 'verifying'
+                    : isInstallmentOverdue(inst)
+                      ? 'overdue'
+                      : 'pending',
           paidAt: inst.paid_at || undefined,
         })),
       };
