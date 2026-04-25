@@ -3,38 +3,19 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { MessageCircle, Users, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { ChatThreadList, ChatRoom, ChatThread, RoomType, PendingActionType } from "@/components/chat";
+import { ChatThreadList, ChatRoom, ChatThread } from "@/components/chat";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { EmptyState, PageHeader } from "@/components/ux";
 import { PageTransition } from "@/components/ux/PageTransition";
-
-type ChatThreadSummaryRow = {
-  chat_id: string;
-  chat_type: "agreement" | "direct";
-  agreement_id: string | null;
-  direct_chat_id: string | null;
-  room_type: "debt" | "agreement" | "casual" | null;
-  has_pending_action: boolean;
-  pending_action_type: "pay" | "confirm" | "extend" | "none" | null;
-  pending_action_for: string | null;
-  counterparty_id: string;
-  counterparty_name: string | null;
-  counterparty_avatar: string | null;
-  last_message: string | null;
-  last_message_at: string | null;
-  unread_count: number | string | null;
-  role: "lender" | "borrower" | null;
-  agreement_status: string | null;
-  principal_amount: number | null;
-};
-
-type ChatThreadSummaryRpcResult = {
-  data: ChatThreadSummaryRow[] | null;
-  error: { message: string } | null;
-};
+import {
+  createDirectChatThreadForFriend,
+  fetchChatThreadSummaries,
+  mapChatThreadSummaryRow,
+  type ChatThreadSummaryRow,
+} from "@/lib/chatThreads";
 
 interface ChatTargets {
   agreementIds: string[];
@@ -44,9 +25,6 @@ interface ChatTargets {
 function uniqueStrings(values?: Array<string | null | undefined>): string[] {
   return Array.from(new Set((values ?? []).filter((value): value is string => Boolean(value))));
 }
-
-const fetchChatThreadSummaries = () =>
-  supabase.rpc("get_chat_thread_summaries" as never) as unknown as Promise<ChatThreadSummaryRpcResult>;
 
 const Chat = () => {
   const { chatId } = useParams(); // Can be agreementId or directChatId
@@ -72,26 +50,7 @@ const Chat = () => {
 
       if (error) throw error;
 
-      const allThreads: ChatThread[] = (data || []).map((row: ChatThreadSummaryRow) => ({
-        chat_id: row.chat_id,
-        chat_type: row.chat_type,
-        agreement_id: row.agreement_id || undefined,
-        direct_chat_id: row.direct_chat_id || undefined,
-        room_type: (row.room_type || "casual") as RoomType,
-        has_pending_action: row.has_pending_action,
-        pending_action_type: (row.pending_action_type || "none") as PendingActionType,
-        pending_action_for: row.pending_action_for || undefined,
-        counterparty_id: row.counterparty_id,
-        counterparty_name: row.counterparty_name || "ผู้ใช้",
-        counterparty_avatar: row.counterparty_avatar,
-        last_message: row.last_message || null,
-        last_message_at: row.last_message_at || null,
-        unread_count:
-          typeof row.unread_count === "string" ? Number(row.unread_count) : row.unread_count || 0,
-        role: row.role || undefined,
-        agreement_status: row.agreement_status || undefined,
-        principal_amount: row.principal_amount ?? undefined,
-      }));
+      const allThreads: ChatThread[] = (data || []).map(mapChatThreadSummaryRow);
 
       setChatTargets({
         agreementIds: uniqueStrings((data || []).filter((row) => row.chat_type === "agreement").map((row) => row.agreement_id)),
@@ -423,102 +382,15 @@ const FriendsList = ({ onStartChat }: FriendsListProps) => {
     setStartingChat(friendUserId);
 
     try {
-      // Order user IDs to match the constraint (user1_id < user2_id)
-      const [user1_id, user2_id] = [user.id, friendUserId].sort();
-
-      // Try to find existing direct chat
-      const { data: existingChat, error: findError } = await supabase
-        .from("direct_chats")
-        .select("*")
-        .eq("user1_id", user1_id)
-        .eq("user2_id", user2_id)
-        .maybeSingle();
-
-      if (findError) {
-        throw findError;
-      }
-
-      if (existingChat) {
-        // Direct chat exists, navigate to it
-        const thread: ChatThread = {
-          chat_id: existingChat.id,
-          chat_type: "direct",
-          direct_chat_id: existingChat.id,
-          counterparty_id: friendUserId,
-          counterparty_name: friendName,
-          counterparty_avatar: friendAvatar,
-          last_message: null,
-          last_message_at: null,
-          unread_count: 0,
-        };
-        onStartChat(thread);
-        return;
-      }
-
-      // Create new direct chat
-      const { data: newChat, error: createError } = await supabase
-        .from("direct_chats")
-        .insert({ user1_id, user2_id })
-        .select()
-        .maybeSingle();
-
-      if (createError) {
-        const isDuplicateError = "code" in createError && createError.code === "23505";
-
-        if (!isDuplicateError) {
-          console.error("Error creating direct chat:", createError);
-          toast.error("ไม่สามารถเริ่มการสนทนาได้");
-          return;
-        }
-
-        const { data: racedChat, error: refetchError } = await supabase
-          .from("direct_chats")
-          .select("*")
-          .eq("user1_id", user1_id)
-          .eq("user2_id", user2_id)
-          .maybeSingle();
-
-        if (refetchError || !racedChat) {
-          console.error("Error refetching raced direct chat:", refetchError);
-          toast.error("ไม่สามารถเริ่มการสนทนาได้");
-          return;
-        }
-
-        const racedThread: ChatThread = {
-          chat_id: racedChat.id,
-          chat_type: "direct",
-          direct_chat_id: racedChat.id,
-          counterparty_id: friendUserId,
-          counterparty_name: friendName,
-          counterparty_avatar: friendAvatar,
-          last_message: null,
-          last_message_at: null,
-          unread_count: 0,
-        };
-        onStartChat(racedThread);
-        return;
-      }
-
-      if (!newChat) {
-        toast.error("ไม่สามารถเริ่มการสนทนาได้");
-        return;
-      }
-
-      const thread: ChatThread = {
-        chat_id: newChat.id,
-        chat_type: "direct",
-        direct_chat_id: newChat.id,
-        counterparty_id: friendUserId,
-        counterparty_name: friendName,
-        counterparty_avatar: friendAvatar,
-        last_message: null,
-        last_message_at: null,
-        unread_count: 0,
-      };
+      const thread = await createDirectChatThreadForFriend({
+        friendUserId,
+        friendName,
+        friendAvatar,
+      });
       onStartChat(thread);
     } catch (error) {
       console.error("Error starting direct chat:", error);
-      toast.error("เกิดข้อผิดพลาด");
+      toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
     } finally {
       setStartingChat(null);
     }

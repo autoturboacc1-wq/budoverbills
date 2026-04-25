@@ -6,6 +6,8 @@ import { ChatMessageBubble, Message } from "./ChatMessageBubble";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { VoiceRecorder } from "./VoiceRecorder";
+import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import { toast } from "sonner";
 
 /**
  * ChatRoom - เจ้าของ logic ทั้งหมด
@@ -43,6 +45,11 @@ interface ChatRoomProps {
   onBack: () => void;
 }
 
+type MarkMessagesReadRpcResult = {
+  data: { success?: boolean; error?: string; updated_count?: number } | null;
+  error: { message: string } | null;
+};
+
 export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
   const PAGE_SIZE = 50;
   const { user } = useAuth();
@@ -59,11 +66,28 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
   // CURRENT USER ID (from auth session)
   // ==============================
   const currentUserId = user?.id;
+  const isDirectChat = thread.chat_type === "direct";
+  const activeChatId = isDirectChat ? thread.direct_chat_id ?? thread.chat_id : thread.agreement_id ?? thread.chat_id;
+  const { isCounterpartyTyping, startTyping, stopTyping } = useTypingIndicator(activeChatId, isDirectChat);
 
   // Scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  const markMessagesRead = useCallback(async () => {
+    if (!currentUserId || !activeChatId) return;
+
+    const { data, error } = (await supabase.rpc("mark_chat_messages_read" as never, {
+      p_agreement_id: isDirectChat ? null : activeChatId,
+      p_direct_chat_id: isDirectChat ? activeChatId : null,
+    } as never)) as unknown as MarkMessagesReadRpcResult;
+
+    if (error) throw error;
+    if (data?.success === false) {
+      throw new Error(data.error || "Unable to mark chat messages as read");
+    }
+  }, [activeChatId, currentUserId, isDirectChat]);
 
   // Fetch messages from database
   const fetchMessages = useCallback(async () => {
@@ -104,26 +128,15 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
       setMessages(mappedMessages);
       setHasMoreMessages((data?.length || 0) === PAGE_SIZE);
 
-      // Mark messages as read
-      const updateQuery = supabase
-        .from("messages")
-        .update({ read_at: new Date().toISOString() })
-        .neq("sender_id", user.id)
-        .is("read_at", null);
-
-      if (isDirectChat) {
-        if (!thread.direct_chat_id) return;
-        await updateQuery.eq("direct_chat_id", thread.direct_chat_id);
-      } else {
-        if (!thread.agreement_id) return;
-        await updateQuery.eq("agreement_id", thread.agreement_id);
-      }
+      await markMessagesRead().catch((readError) => {
+        console.error("Error marking messages as read:", readError);
+      });
     } catch (error) {
       console.error("Error fetching messages:", error);
     } finally {
       setLoading(false);
     }
-  }, [thread, user]);
+  }, [markMessagesRead, thread, user]);
 
   const loadOlderMessages = useCallback(async () => {
     if (!thread || !user || loadingOlder || messages.length === 0) return;
@@ -226,6 +239,11 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
             if (prev.some((m) => m.id === mapped.id)) return prev;
             return [...prev, mapped];
           });
+          if (newMsg.sender_id !== user.id) {
+            void markMessagesRead().catch((readError) => {
+              console.error("Error marking realtime message as read:", readError);
+            });
+          }
           scrollToBottom();
         }
       )
@@ -234,7 +252,7 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [thread, user]);
+  }, [markMessagesRead, thread, user]);
 
   // Send message
   const handleSend = async () => {
@@ -254,8 +272,13 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
       if (error) throw error;
 
       setInputText("");
+      stopTyping();
+      await markMessagesRead().catch((readError) => {
+        console.error("Error marking messages as read after send:", readError);
+      });
     } catch (error) {
       console.error("Error sending message:", error);
+      toast.error("ส่งข้อความไม่สำเร็จ");
     } finally {
       setSending(false);
     }
@@ -282,8 +305,10 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
       if (error) throw error;
 
       setShowVoiceRecorder(false);
+      stopTyping();
     } catch (error) {
       console.error("Error sending voice note:", error);
+      toast.error("ส่งข้อความเสียงไม่สำเร็จ");
     } finally {
       setSending(false);
     }
@@ -373,11 +398,20 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
       </div>
 
       {/* Input */}
-      <div className="flex items-center gap-2 px-4 py-3 border-t border-border bg-background">
+      <div className="border-t border-border bg-background px-4 py-3">
+        {isCounterpartyTyping ? (
+          <p className="mb-2 px-1 text-xs text-muted-foreground">
+            {thread.counterparty_name} กำลังพิมพ์...
+          </p>
+        ) : null}
+        <div className="flex items-center gap-2">
         {showVoiceRecorder ? (
           <VoiceRecorder
             chatId={thread.chat_id}
-            onCancel={() => setShowVoiceRecorder(false)}
+            onCancel={() => {
+              setShowVoiceRecorder(false);
+              stopTyping();
+            }}
             onVoiceReady={handleVoiceReady}
             ownerId={user.id}
           />
@@ -394,7 +428,15 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
             </Button>
             <Input
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              onChange={(e) => {
+                const nextValue = e.target.value;
+                setInputText(nextValue);
+                if (nextValue.trim()) {
+                  startTyping();
+                } else {
+                  stopTyping();
+                }
+              }}
               placeholder="พิมพ์ข้อความ..."
               className="flex-1"
               onKeyDown={(e) => {
@@ -409,6 +451,7 @@ export const ChatRoom = ({ thread, onBack }: ChatRoomProps) => {
             </Button>
           </>
         )}
+        </div>
       </div>
     </div>
   );

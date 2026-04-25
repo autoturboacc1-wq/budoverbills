@@ -137,6 +137,15 @@ BEGIN
     RAISE EXCEPTION 'You have already signed this contract';
   END IF;
 
+  -- Lender must sign before borrower so the hashed contract text the borrower
+  -- agrees to includes the lender's identity.
+  IF p_signer_role = 'borrower' AND NOT EXISTS (
+    SELECT 1 FROM public.agreement_signatures
+    WHERE agreement_id = p_agreement_id AND signer_role = 'lender'
+  ) THEN
+    RAISE EXCEPTION 'Lender must sign the contract first';
+  END IF;
+
   -- Snapshot the latest contract HTML + hash.
   -- The borrower's signature produces the final, canonical snapshot.
   PERFORM set_config('app.agreement_mutation_source', 'rpc', true);

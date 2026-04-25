@@ -20,6 +20,7 @@ import { FriendRequestsProvider } from "@/hooks/useFriendRequests";
 const Index = lazy(() => import("./pages/Index"));
 const CreateAgreement = lazy(() => import("./pages/CreateAgreement"));
 const AgreementConfirm = lazy(() => import("./pages/AgreementConfirm"));
+const AgreementContract = lazy(() => import("./pages/AgreementContract"));
 const Friends = lazy(() => import("./pages/Friends"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Notifications = lazy(() => import("./pages/Notifications"));
@@ -57,7 +58,8 @@ const ROUTES_WITH_BOTTOM_NAV = ["/", "/create", "/chat", "/notifications", "/pro
 
 function AnimatedRoutes() {
   const location = useLocation();
-  const showBottomNav = ROUTES_WITH_BOTTOM_NAV.some(r =>
+  const isChatRoomRoute = location.pathname !== "/chat" && location.pathname.startsWith("/chat/");
+  const showBottomNav = !isChatRoomRoute && ROUTES_WITH_BOTTOM_NAV.some(r =>
     r === "/" ? location.pathname === "/" : location.pathname.startsWith(r)
   );
   return (
@@ -77,6 +79,7 @@ function AnimatedRoutes() {
             <Route path="/" element={<Index />} />
             <Route path="/create" element={<CreateAgreement />} />
             <Route path="/agreement/:id/confirm" element={<AgreementConfirm />} />
+            <Route path="/agreement/:id/contract" element={<AgreementContract />} />
             <Route path="/friends" element={<Friends />} />
             <Route path="/chat" element={<Chat />} />
             <Route path="/chat/:chatId" element={<Chat />} />

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, User, Clock, CheckCircle, AlertCircle, Upload, Loader2, Eye } from "lucide-react";
+import { ArrowLeft, Calendar, User, Clock, CheckCircle, AlertCircle, Upload, Loader2, Eye, FileSignature } from "lucide-react";
 import { PageTransition } from "@/components/ux/PageTransition";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -553,6 +553,26 @@ export default function AgreementConfirm() {
             />
           </motion.div>
         )}
+
+        {/* Sign formal contract CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18 }}
+          className="mb-4"
+        >
+          <Button
+            variant="outline"
+            className="w-full h-12 text-base border-primary/30 text-primary hover:bg-primary/5"
+            onClick={() => navigate(`/agreement/${agreement.id}/contract`)}
+          >
+            <FileSignature className="w-5 h-5 mr-2" />
+            ทำหนังสือสัญญากู้ยืมเงิน (สำหรับใช้ในชั้นศาล)
+          </Button>
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            ออกหนังสือสัญญาแบบเป็นทางการ ลงนามอิเล็กทรอนิกส์ทั้งสองฝ่าย พิมพ์เป็น PDF ได้
+          </p>
+        </motion.div>
 
         {/* Action Buttons */}
         <motion.div

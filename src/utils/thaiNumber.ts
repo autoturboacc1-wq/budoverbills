@@ -30,9 +30,12 @@ function readSixDigit(group: string): string {
       else if (d === 2) digitWord = "ยี่";
     }
 
-    // Units place special case: trailing 1 after a 10s+ digit => "เอ็ด"
-    if (place === 0 && d === 1 && padded.replace(/0+$/, "").length > 1) {
-      digitWord = "เอ็ด";
+    // Units place special case: 1 at units becomes "เอ็ด" only when another
+    // non-zero digit precedes it in the same six-digit block (e.g. 11, 101,
+    // 1001).  A bare 1, or 1 alone in its block (1,000,001), stays "หนึ่ง".
+    if (place === 0 && d === 1) {
+      const hasHigherDigitInBlock = padded.slice(0, -1).split("").some((c) => c !== "0");
+      if (hasHigherDigitInBlock) digitWord = "เอ็ด";
     }
 
     out += digitWord + PLACES[place]!;

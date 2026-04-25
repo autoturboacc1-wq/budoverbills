@@ -9,6 +9,13 @@ interface ChatTargets {
   directChatIds: string[];
 }
 
+type MessageRealtimePayload = {
+  eventType: "INSERT" | "UPDATE" | "DELETE";
+  new?: {
+    sender_id?: string;
+  };
+};
+
 function uniqueStrings(values?: Array<string | null | undefined>): string[] {
   return Array.from(new Set((values ?? []).filter((value): value is string => Boolean(value))));
 }
@@ -193,11 +200,13 @@ export const useGlobalChatNotification = () => {
 
     const channels: Array<ReturnType<typeof supabase.channel>> = [];
 
-    const handleMessage = (payload: { new: { sender_id: string } }) => {
-      const message = payload.new;
-
-      if (message.sender_id === userId) return;
+    const handleMessageChange = (payload: MessageRealtimePayload) => {
       void refreshChatTargets();
+
+      if (payload.eventType !== "INSERT") return;
+
+      const message = payload.new;
+      if (message?.sender_id === userId) return;
       if (!isInChatPageRef.current) {
         playNotificationSound();
       }
@@ -208,13 +217,13 @@ export const useGlobalChatNotification = () => {
         .channel(`global-chat-agreement-${userId}-${agreementId}`)
         .on(
           "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "messages",
-            filter: `agreement_id=eq.${agreementId}`,
-          },
-          handleMessage
+        {
+          event: "*",
+          schema: "public",
+          table: "messages",
+          filter: `agreement_id=eq.${agreementId}`,
+        },
+          handleMessageChange
         )
         .subscribe();
 
@@ -226,13 +235,13 @@ export const useGlobalChatNotification = () => {
         .channel(`global-chat-direct-${userId}-${directChatId}`)
         .on(
           "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "messages",
-            filter: `direct_chat_id=eq.${directChatId}`,
-          },
-          handleMessage
+        {
+          event: "*",
+          schema: "public",
+          table: "messages",
+          filter: `direct_chat_id=eq.${directChatId}`,
+        },
+          handleMessageChange
         )
         .subscribe();
 
