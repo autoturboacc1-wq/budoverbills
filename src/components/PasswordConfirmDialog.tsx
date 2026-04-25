@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Shield, AlertCircle, CheckCircle } from "lucide-react";
+import { Shield, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +36,7 @@ export function PasswordConfirmDialog({
 }: PasswordConfirmDialogProps) {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState<'password' | 'confirm' | 'text-confirm'>('password');
+  const [step, setStep] = useState<'password' | 'text-confirm'>('password');
   const [password, setPassword] = useState("");
   const [confirmText, setConfirmText] = useState("");
   const [isOAuthUser, setIsOAuthUser] = useState(false);
@@ -147,7 +147,7 @@ export function PasswordConfirmDialog({
       }
 
       passwordVerifyLimiter.reset();
-      setStep("confirm");
+      handleFinalConfirm();
     } catch (err) {
       passwordVerifyLimiter.recordAttempt(false);
       setError("เกิดข้อผิดพลาด กรุณาลองใหม่");
@@ -158,8 +158,8 @@ export function PasswordConfirmDialog({
 
   const handleTextConfirmCheck = () => {
     if (confirmText.trim().toLowerCase() === "ยืนยัน") {
-      setStep('confirm');
       setError("");
+      handleFinalConfirm();
     } else {
       setError("กรุณาพิมพ์คำว่า 'ยืนยัน' ให้ถูกต้อง");
     }
@@ -241,9 +241,13 @@ export function PasswordConfirmDialog({
               <Button
                 className="flex-1"
                 onClick={handleVerifyPassword}
-                disabled={isVerifying}
+                disabled={isVerifying || isLoading}
               >
-                {isVerifying ? "กำลังตรวจสอบ..." : "ยืนยันรหัสผ่าน"}
+                {isVerifying
+                  ? "กำลังตรวจสอบ..."
+                  : isLoading
+                    ? "กำลังดำเนินการ..."
+                    : confirmButtonText}
               </Button>
             </div>
           </motion.div>
@@ -291,46 +295,13 @@ export function PasswordConfirmDialog({
               <Button
                 className="flex-1"
                 onClick={handleTextConfirmCheck}
-                disabled={!confirmText.trim()}
-              >
-                ถัดไป
-              </Button>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-4 mt-4"
-          >
-            <div className="bg-status-paid/10 border border-status-paid/20 rounded-xl p-4 text-center">
-              <div className="flex items-center justify-center gap-2 text-status-paid font-medium">
-                <CheckCircle className="w-5 h-5" />
-                <span>{isOAuthUser ? "ยืนยันตัวตนแล้ว" : "ยืนยันรหัสสำเร็จแล้ว"}</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                กดยืนยันเพื่อดำเนินการต่อ
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setStep(isOAuthUser ? 'text-confirm' : 'password')}
-              >
-                ย้อนกลับ
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={handleFinalConfirm}
-                disabled={isLoading}
+                disabled={!confirmText.trim() || isLoading}
               >
                 {isLoading ? "กำลังดำเนินการ..." : confirmButtonText}
               </Button>
             </div>
           </motion.div>
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   );
