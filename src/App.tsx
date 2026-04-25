@@ -1,6 +1,6 @@
 import { Suspense, lazy, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
@@ -10,24 +10,18 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
-import { GlobalChatNotificationProvider } from "@/components/GlobalChatNotificationProvider";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppErrorBoundary } from "@/components/shared/AppErrorBoundary";
 import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 import { NotificationsProvider } from "@/hooks/useNotifications";
-import { FriendRequestsProvider } from "@/hooks/useFriendRequests";
 
 const Index = lazy(() => import("./pages/Index"));
 const CreateAgreement = lazy(() => import("./pages/CreateAgreement"));
 const AgreementConfirm = lazy(() => import("./pages/AgreementConfirm"));
 const AgreementContract = lazy(() => import("./pages/AgreementContract"));
-const Friends = lazy(() => import("./pages/Friends"));
-const Chat = lazy(() => import("./pages/Chat"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Settings = lazy(() => import("./pages/Settings"));
-const Badges = lazy(() => import("./pages/Badges"));
 const History = lazy(() => import("./pages/History"));
 const DebtDetail = lazy(() => import("./pages/DebtDetail"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -40,12 +34,10 @@ const AdminCodesPage = lazy(() => import("./pages/admin/AdminCodesPage"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const PDPAConsent = lazy(() => import("./pages/PDPAConsent"));
-const Subscription = lazy(() => import("./pages/Subscription"));
 const Support = lazy(() => import("./pages/Support"));
 const Help = lazy(() => import("./pages/Help"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PersonalInfoOnboarding = lazy(() => import("./pages/PersonalInfoOnboarding"));
-const DebtConsolidation = lazy(() => import("./pages/DebtConsolidation"));
 
 function RouteFallback() {
   return (
@@ -55,12 +47,11 @@ function RouteFallback() {
   );
 }
 
-const ROUTES_WITH_BOTTOM_NAV = ["/", "/create", "/chat", "/notifications", "/profile", "/settings", "/badges", "/history", "/friends", "/debt", "/agreement", "/pdpa-consent", "/personal-info", "/subscription", "/admin"];
+const ROUTES_WITH_BOTTOM_NAV = ["/", "/create", "/notifications", "/profile", "/settings", "/history", "/debt", "/agreement", "/pdpa-consent", "/personal-info", "/admin"];
 
 function AnimatedRoutes() {
   const location = useLocation();
-  const isChatRoomRoute = location.pathname !== "/chat" && location.pathname.startsWith("/chat/");
-  const showBottomNav = !isChatRoomRoute && ROUTES_WITH_BOTTOM_NAV.some(r =>
+  const showBottomNav = ROUTES_WITH_BOTTOM_NAV.some(r =>
     r === "/" ? location.pathname === "/" : location.pathname.startsWith(r)
   );
   return (
@@ -81,19 +72,19 @@ function AnimatedRoutes() {
             <Route path="/create" element={<CreateAgreement />} />
             <Route path="/agreement/:id/confirm" element={<RouteErrorBoundary area="หน้ายืนยันข้อตกลง"><AgreementConfirm /></RouteErrorBoundary>} />
             <Route path="/agreement/:id/contract" element={<RouteErrorBoundary area="หน้าทำสัญญา"><AgreementContract /></RouteErrorBoundary>} />
-            <Route path="/friends" element={<Friends />} />
-            <Route path="/chat" element={<RouteErrorBoundary area="หน้าแชท"><Chat /></RouteErrorBoundary>} />
-            <Route path="/chat/:chatId" element={<RouteErrorBoundary area="หน้าแชท"><Chat /></RouteErrorBoundary>} />
+            <Route path="/friends" element={<Navigate replace to="/create" />} />
+            <Route path="/chat" element={<Navigate replace to="/history" />} />
+            <Route path="/chat/:chatId" element={<Navigate replace to="/history" />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/badges" element={<Badges />} />
+            <Route path="/badges" element={<Navigate replace to="/profile" />} />
             <Route path="/history" element={<History />} />
-            <Route path="/history/debt-consolidation" element={<DebtConsolidation />} />
+            <Route path="/history/debt-consolidation" element={<Navigate replace to="/history" />} />
             <Route path="/debt/:id" element={<DebtDetail />} />
             <Route path="/pdpa-consent" element={<PDPAConsent />} />
             <Route path="/personal-info" element={<PersonalInfoOnboarding />} />
-            <Route path="/subscription" element={<Subscription />} />
+            <Route path="/subscription" element={<Navigate replace to="/profile" />} />
           </Route>
 
           <Route element={<ProtectedRoute requireAdminSession />}>
@@ -136,14 +127,9 @@ const App = () => {
               <Toaster />
               <Sonner />
               <BrowserRouter>
-                <PWAInstallPrompt />
                 <AppErrorBoundary>
                   <NotificationsProvider>
-                    <FriendRequestsProvider>
-                      <GlobalChatNotificationProvider>
-                        <AnimatedRoutes />
-                      </GlobalChatNotificationProvider>
-                    </FriendRequestsProvider>
+                    <AnimatedRoutes />
                   </NotificationsProvider>
                 </AppErrorBoundary>
               </BrowserRouter>

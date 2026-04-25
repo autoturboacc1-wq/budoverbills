@@ -1,7 +1,6 @@
-import { CalendarCheck, User, Bell, MessageCircle, Plus } from "lucide-react";
+import { Bell, CalendarCheck, FileText, Plus, User } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useNotifications } from "@/hooks/useNotifications";
-import { useUnreadChatMessageCount } from "@/hooks/useGlobalChatNotification";
 
 interface NavItem {
   icon?: React.ElementType;
@@ -15,15 +14,14 @@ export function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const { notifications } = useNotifications();
-  const unreadMessages = useUnreadChatMessageCount();
 
   const unreadNotifications = notifications?.filter((n) => !n.is_read).length || 0;
 
   const navItems: NavItem[] = [
-    { icon: CalendarCheck, label: "ปฏิทิน", path: "/" },
+    { icon: CalendarCheck, label: "ภาพรวม", path: "/" },
+    { icon: FileText, label: "ประวัติ", path: "/history" },
+    { icon: Plus, label: "ปล่อยยืม", path: "/create", isPrimary: true },
     { icon: Bell, label: "แจ้งเตือน", path: "/notifications", badge: unreadNotifications },
-    { icon: Plus, label: "สร้าง", path: "/create", isPrimary: true },
-    { icon: MessageCircle, label: "แชท", path: "/chat", badge: unreadMessages },
     { icon: User, label: "โปรไฟล์", path: "/profile" },
   ];
 
@@ -33,8 +31,8 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/80 px-2 pb-safe backdrop-blur-2xl">
-      <div className="mx-auto flex max-w-md items-stretch justify-between">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 px-3 pb-safe">
+      <div className="mx-auto flex max-w-md items-stretch justify-between rounded-[1.5rem] border border-border/80 bg-background/88 px-1.5 shadow-card backdrop-blur-xl">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = isNavItemActive(item.path);
@@ -45,9 +43,9 @@ export function BottomNav() {
                 key={item.label}
                 onClick={() => navigate(item.path)}
                 aria-label={item.label}
-                className="group relative flex flex-1 flex-col items-center justify-center py-3"
+                className="group relative flex flex-1 flex-col items-center justify-center py-2.5"
               >
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-foreground text-background transition-transform group-active:scale-95">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full border border-foreground bg-foreground text-background transition-transform group-active:scale-95">
                   {Icon && <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} />}
                 </span>
               </button>
@@ -59,7 +57,7 @@ export function BottomNav() {
               key={item.label}
               onClick={() => navigate(item.path)}
               aria-current={isActive ? "page" : undefined}
-              className={`relative flex flex-1 flex-col items-center justify-center gap-1 py-3 transition-colors ${
+              className={`relative flex flex-1 flex-col items-center justify-center gap-1 py-2.5 transition-colors ${
                 isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -72,9 +70,9 @@ export function BottomNav() {
                   />
                 )}
               </span>
-              <span className="text-[10px] font-medium tracking-wide">{item.label}</span>
+              <span className="text-[10px] font-medium">{item.label}</span>
               {isActive && (
-                <span aria-hidden className="absolute bottom-0 h-px w-6 bg-foreground" />
+                <span aria-hidden className="absolute bottom-1 h-1 w-1 rounded-full bg-foreground" />
               )}
             </button>
           );

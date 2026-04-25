@@ -458,7 +458,7 @@ const FriendsList = ({ onStartChat }: FriendsListProps) => {
         <EmptyState
           icon={<Users className="h-6 w-6" strokeWidth={1.5} />}
           title="ยังไม่มีเพื่อน"
-          description="เพิ่มเพื่อนจากหน้าโปรไฟล์ก่อน แล้วคุณจะเริ่มคุยหรือสร้างข้อตกลงได้ทันที"
+          description="เพิ่มเพื่อนจากหน้าโปรไฟล์ก่อน แล้วคุณจะเริ่มคุยหรือปล่อยยืมให้เพื่อนได้ทันที"
           action={
             <button
               type="button"
@@ -573,7 +573,7 @@ const FriendsList = ({ onStartChat }: FriendsListProps) => {
                   }}
                   className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary/20"
                 >
-                  สร้างข้อตกลง
+                    ปล่อยยืม
                 </button>
               </div>
             </motion.div>

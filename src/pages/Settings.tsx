@@ -1,24 +1,15 @@
 import { motion } from "framer-motion";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { 
-  ArrowLeft, 
   Bell, 
-  BellOff, 
   Shield, 
   Eye, 
   EyeOff, 
   Moon, 
   Sun, 
   ChevronRight,
-  Check,
   FileText,
-  Lock,
-  Palette,
-  Crown,
-  Sparkles,
-  Zap,
-  Clock,
-  Gift
+  Lock
 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
@@ -27,15 +18,6 @@ import { toast } from "sonner";
 import { PushNotificationToggle } from "@/components/PushNotificationToggle";
 import { featureFlags } from "@/config/featureFlags";
 import { useTheme } from "next-themes";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { useSubscription } from "@/hooks/useSubscription";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { ThemePicker } from "@/components/ThemePicker";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -123,7 +105,6 @@ export default function Settings() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
-  const { limits, isPremium, isLoading: subscriptionLoading, isTrial, trialDaysRemaining, hasUsedTrial, startTrial, isStartingTrial } = useSubscription();
   const [mounted, setMounted] = useState(false);
   const [settings, setSettings] = useState<SettingsState>(getInitialSettings);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -245,13 +226,6 @@ export default function Settings() {
   };
 
   const isDarkMode = mounted && theme === "dark";
-  const usagePercent = useMemo(() => {
-    if (!limits || limits.agreements_limit <= 0) {
-      return 0;
-    }
-
-    return Math.min(100, Math.round((limits.agreements_used / limits.agreements_limit) * 100));
-  }, [limits]);
 
   return (
     <PageTransition>
@@ -423,38 +397,9 @@ export default function Settings() {
           className="mb-6"
         >
           <PageSection
-            title="Plan & Billing"
-            description="ตรวจสอบสถานะแพ็กเกจ สิทธิ์ทดลองใช้ และเอกสารด้านกฎหมายในส่วนเดียว"
+            title="Legal"
+            description="เอกสารสำคัญและนโยบายที่เกี่ยวข้องกับการใช้งานระบบ"
           >
-            <div className="rounded-2xl border border-border/70 bg-secondary/35 p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {isPremium ? "Premium" : isTrial ? "Trial" : "Free"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {subscriptionLoading
-                      ? "กำลังตรวจสอบสถานะ"
-                      : isPremium
-                        ? "คุณใช้สิทธิ์แบบพรีเมียมอยู่"
-                        : isTrial
-                          ? `ทดลองใช้อีก ${trialDaysRemaining ?? 0} วัน`
-                          : "บัญชีใช้งานฟรี"}
-                  </p>
-                </div>
-                {!isPremium && !isTrial && !hasUsedTrial ? (
-                  <Button
-                    size="sm"
-                    onClick={() => void startTrial()}
-                    disabled={isStartingTrial}
-                  >
-                    {isStartingTrial ? "กำลังเริ่มทดลองใช้..." : "เริ่ม Trial"}
-                  </Button>
-                ) : null}
-              </div>
-              <Progress value={usagePercent} className="h-2" />
-            </div>
-
             <div className="divide-y divide-border rounded-2xl border border-border/70">
             <Link
               to="/terms"

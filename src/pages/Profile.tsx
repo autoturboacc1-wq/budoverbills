@@ -7,39 +7,39 @@ import {
   HelpCircle, 
   LogOut, 
   ChevronRight,
-  Award,
   FileText,
-  Users,
   LogIn,
   ScrollText,
   Sun,
   Moon,
-  Crown,
-  Sparkles,
-  Zap,
   LayoutDashboard
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { NotificationSheet } from "@/components/NotificationSheet";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { AddFriendSection } from "@/components/AddFriendSection";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { EditNameDialog } from "@/components/EditNameDialog";
-import { FriendRequestsSection } from "@/components/FriendRequestsSection";
 import { ProfileBankAccount } from "@/components/ProfileBankAccount";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/hooks/useNotifications";
-import { useFriendRequests } from "@/hooks/useFriendRequests";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "next-themes";
-import { useSubscription } from "@/hooks/useSubscription";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { hasAdminSession } from "@/utils/adminSession";
 import { PageTransition } from "@/components/ux/PageTransition";
+
+interface ProfileMenuItem {
+  icon: React.ElementType;
+  label: string;
+  path: string;
+  action: () => void;
+  badge?: number;
+  highlight?: boolean;
+}
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -47,10 +47,8 @@ export default function Profile() {
   const { user, profile, signOut, isLoading } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const { unreadCount } = useNotifications();
-  const { pendingCount } = useFriendRequests();
   const { theme, setTheme } = useTheme();
   const isDarkMode = theme === "dark";
-  const { isPremium } = useSubscription();
   const { isAdmin, isModerator } = useUserRole();
   const hasAdminAccess = isAdmin || isModerator;
 
@@ -59,18 +57,7 @@ export default function Profile() {
     queryKey: ['user-profile-stats', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      
-      // Fetch engagement badges
-      const { data: badges } = await supabase
-        .from('engagement_badges')
-        .select('badge_type, badge_tier')
-        .eq('user_id', user.id);
-      
-      // Count badges by type
-      const ontimeBadges = badges?.filter(b => b.badge_type === 'ontime_payment').length || 0;
-      const closedBadges = badges?.filter(b => b.badge_type === 'debt_closed').length || 0;
-      const newMemberBadge = badges?.some(b => b.badge_type === 'new_member') ? 1 : 0;
-      
+
       // Fetch agreements count - filter by specific user role
       const { data: lenderAgreements } = await supabase
         .from('debt_agreements')
@@ -96,9 +83,6 @@ export default function Profile() {
       const borrowerCount = (borrowerAgreements || []).filter(a => a.status === 'active').length;
       
       return {
-        ontimeBadges,
-        closedBadges,
-        newMemberBadge,
         totalAgreements,
         completedAgreements,
         lenderCount,
@@ -138,18 +122,6 @@ export default function Profile() {
           refetchStats();
         }
       )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'engagement_badges',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          refetchStats();
-        }
-      )
       .subscribe();
 
     return () => {
@@ -157,17 +129,9 @@ export default function Profile() {
     };
   }, [user?.id, refetchStats]);
 
-  const menuItems = [
-    { 
-      icon: Users, 
-      label: t('friends.title'), 
-      path: "/friends", 
-      action: () => navigate("/friends"),
-      badge: pendingCount > 0 ? pendingCount : undefined
-    },
-    { icon: Bell, label: t('profile.notifications'), path: "/settings", action: () => navigate("/settings") },
+  const menuItems: ProfileMenuItem[] = [
+    { icon: Bell, label: t('profile.notifications'), path: "/notifications", action: () => navigate("/notifications") },
     { icon: Shield, label: t('profile.privacy'), path: "/settings", action: () => navigate("/settings") },
-    { icon: Award, label: t('profile.badges'), path: "/badges", action: () => navigate("/badges") },
     { icon: FileText, label: t('profile.history'), path: "/history", action: () => navigate("/history") },
     { icon: ScrollText, label: "ข้อกำหนดการใช้งาน", path: "/terms", action: () => navigate("/terms") },
     { 
@@ -182,18 +146,12 @@ export default function Profile() {
     { icon: Settings, label: t('profile.settings'), path: "/settings", action: () => navigate("/settings") },
   ];
 
-  const badges = [
-    { emoji: "⭐", label: t('profile.paidOnTime'), count: userStats?.ontimeBadges || 0 },
-    { emoji: "🏆", label: t('profile.debtClosed'), count: userStats?.closedBadges || 0 },
-    { emoji: "💎", label: t('profile.newMember'), count: userStats?.newMemberBadge || 0 },
-  ];
-
   const handleLogout = async () => {
     await signOut();
     toast.success(t('profile.logoutSuccess'));
   };
 
-  const handleMenuClick = (item: typeof menuItems[0]) => {
+  const handleMenuClick = (item: ProfileMenuItem) => {
     if (item.action) {
       item.action();
     } else {
@@ -286,7 +244,7 @@ export default function Profile() {
           >
             <h2 className="font-medium text-primary-foreground mb-2">เริ่มต้นใช้งาน</h2>
             <p className="text-sm text-primary-foreground/80 mb-4">
-              สมัครสมาชิกเพื่อสร้างข้อตกลง เพิ่มเพื่อน และจัดการการเงินอย่างเป็นระบบ
+              สมัครสมาชิกเพื่อสร้างข้อตกลง ติดตามหนี้ และจัดการการเงินอย่างเป็นระบบ
             </p>
             <Button
               onClick={() => navigate("/auth")}
@@ -299,45 +257,14 @@ export default function Profile() {
           </motion.div>
         )}
 
-        {/* Add Friend Section - LINE style */}
-        <AddFriendSection />
-
-        {/* Friend Requests Section */}
-        {user && <FriendRequestsSection />}
-
         {/* Bank Account Section */}
         {user && <ProfileBankAccount />}
-
-        {/* Badges */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-card rounded-2xl p-5 shadow-card mb-6"
-        >
-          <h2 className="font-medium text-foreground mb-4">{t('profile.yourBadges')}</h2>
-          <div className="flex items-center justify-around">
-            {badges.map((badge, index) => (
-              <motion.div
-                key={badge.label}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.3 + index * 0.1 }}
-                className="text-center"
-              >
-                <div className="text-3xl mb-1">{badge.emoji}</div>
-                <p className="text-xs text-muted-foreground">{badge.label}</p>
-                <p className="text-sm font-medium text-foreground">{badge.count}</p>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
 
         {/* Stats */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.2 }}
           className="grid grid-cols-2 gap-4 mb-6"
         >
           <div className="bg-card rounded-2xl p-5 shadow-card text-center">
@@ -354,71 +281,9 @@ export default function Profile() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.3 }}
           className="bg-card rounded-2xl shadow-card overflow-hidden"
         >
-          {/* Subscription Quick Link - Premium Highlight */}
-          <motion.button
-            onClick={() => navigate("/subscription")}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            className={`w-full relative overflow-hidden border-b border-border transition-all ${
-              isPremium 
-                ? 'bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-orange-500/10' 
-                : 'bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 hover:from-primary/10 hover:via-primary/15 hover:to-primary/10'
-            }`}
-          >
-            {/* Animated shine effect */}
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12"
-              initial={{ x: '-100%' }}
-              animate={{ x: '200%' }}
-              transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
-            />
-            
-            <div className="relative flex items-center justify-between p-4">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                  isPremium 
-                    ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg shadow-amber-500/30' 
-                    : 'bg-gradient-to-br from-primary/80 to-primary shadow-lg shadow-primary/20'
-                }`}>
-                  <Crown className="w-5 h-5 text-white" />
-                </div>
-                <div className="text-left">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground">แพ็กเกจสมาชิก</span>
-                    <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      isPremium 
-                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md' 
-                        : 'bg-primary/20 text-primary'
-                    }`}>
-                      {isPremium ? (
-                        <>
-                          <Sparkles className="w-3 h-3" />
-                          พรีเมียม
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-3 h-3" />
-                          ฟรี
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {isPremium ? 'ไม่จำกัดข้อตกลง • ฟีเจอร์พิเศษ' : 'อัปเกรดเพื่อรับสิทธิพิเศษ'}
-                  </p>
-                </div>
-              </div>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                isPremium ? 'bg-amber-500/20' : 'bg-primary/10'
-              }`}>
-                <ChevronRight className={`w-4 h-4 ${isPremium ? 'text-amber-600' : 'text-primary'}`} />
-              </div>
-            </div>
-          </motion.button>
-
           {/* Admin Menu - Only visible to Admin/Moderator */}
           {(isAdmin || isModerator) && (
             <button

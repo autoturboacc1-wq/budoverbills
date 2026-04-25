@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, FileText, Check, Calendar, Loader2, Download, Sparkles } from "lucide-react";
+import { ArrowLeft, FileText, Check, Calendar, Loader2, Download } from "lucide-react";
 import { PageTransition } from "@/components/ux/PageTransition";
 import { useNavigate } from "react-router-dom";
 import { useDebtAgreements } from "@/hooks/useDebtAgreements";
@@ -17,7 +17,6 @@ import {
   mapToCompletedAgreements,
   getAgreementDisplayStatus,
   CompletedAgreementData,
-  calculateRemainingAmount,
 } from "@/domains/debt";
 
 export default function History() {
@@ -47,15 +46,6 @@ export default function History() {
   // Use domain function for completed agreements
   const completedAgreements = useMemo<CompletedAgreementData[]>(() => {
     return mapToCompletedAgreements(agreements, user?.id);
-  }, [agreements, user?.id]);
-
-  const borrowerActiveAgreements = useMemo(() => {
-    return agreements.filter(
-      (agreement) =>
-        !isUserLender(agreement, user?.id) &&
-        agreement.status === "active" &&
-        calculateRemainingAmount(agreement.installments) > 0,
-    );
   }, [agreements, user?.id]);
 
   // Summary stats
@@ -126,34 +116,6 @@ export default function History() {
             </TabsList>
 
             <TabsContent value="all">
-              {borrowerActiveAgreements.length > 1 ? (
-                <motion.button
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  onClick={() => navigate("/history/debt-consolidation")}
-                  className="mb-4 w-full rounded-2xl border border-primary/15 bg-[linear-gradient(135deg,rgba(14,116,144,0.12),rgba(249,115,22,0.10),rgba(255,255,255,0.55))] p-4 text-left shadow-card transition-transform hover:-translate-y-0.5"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-background/80 px-3 py-1 text-xs font-medium text-foreground">
-                        <Sparkles className="w-3.5 h-3.5 text-primary" />
-                        Debt Consolidation
-                      </div>
-                      <p className="font-heading text-lg font-semibold text-foreground">
-                        ลองเทียบแผน Snowball vs Avalanche
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        คุณมีหนี้ฝั่งผู้ยืม {borrowerActiveAgreements.length} ก้อนที่ยังค้างอยู่
-                        กดเพื่อดูว่าควรเร่งปิดก้อนไหนก่อน
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-background/80 px-3 py-1 text-xs font-medium text-primary">
-                      เปิดเครื่องมือ
-                    </span>
-                  </div>
-                </motion.button>
-              ) : null}
-
               {allAgreements.length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
