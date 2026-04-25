@@ -15,12 +15,14 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppErrorBoundary } from "@/components/shared/AppErrorBoundary";
 import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 import { NotificationsProvider } from "@/hooks/useNotifications";
+import { FriendRequestsProvider } from "@/hooks/useFriendRequests";
 
 const Index = lazy(() => import("./pages/Index"));
 const CreateAgreement = lazy(() => import("./pages/CreateAgreement"));
 const AgreementConfirm = lazy(() => import("./pages/AgreementConfirm"));
 const AgreementInvite = lazy(() => import("./pages/AgreementInvite"));
 const AgreementContract = lazy(() => import("./pages/AgreementContract"));
+const Friends = lazy(() => import("./pages/Friends"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Profile = lazy(() => import("./pages/Profile"));
@@ -50,7 +52,7 @@ function RouteFallback() {
   );
 }
 
-const ROUTES_WITH_BOTTOM_NAV = ["/", "/create", "/chat", "/notifications", "/profile", "/settings", "/history", "/debt", "/agreement", "/pdpa-consent", "/personal-info", "/admin"];
+const ROUTES_WITH_BOTTOM_NAV = ["/", "/create", "/chat", "/notifications", "/profile", "/settings", "/history", "/friends", "/debt", "/agreement", "/admin"];
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -77,7 +79,7 @@ function AnimatedRoutes() {
             <Route path="/agreement/invite/:token" element={<RouteErrorBoundary area="หน้าลิงก์เชิญข้อตกลง"><AgreementInvite /></RouteErrorBoundary>} />
             <Route path="/agreement/:id/confirm" element={<RouteErrorBoundary area="หน้ายืนยันข้อตกลง"><AgreementConfirm /></RouteErrorBoundary>} />
             <Route path="/agreement/:id/contract" element={<RouteErrorBoundary area="หน้าทำสัญญา"><AgreementContract /></RouteErrorBoundary>} />
-            <Route path="/friends" element={<Navigate replace to="/create" />} />
+            <Route path="/friends" element={<Friends />} />
             <Route path="/chat" element={<RouteErrorBoundary area="หน้าแชท"><Chat /></RouteErrorBoundary>} />
             <Route path="/chat/:chatId" element={<RouteErrorBoundary area="หน้าแชท"><Chat /></RouteErrorBoundary>} />
             <Route path="/notifications" element={<Notifications />} />
@@ -134,9 +136,11 @@ const App = () => {
               <BrowserRouter>
                 <AppErrorBoundary>
                   <NotificationsProvider>
-                    <GlobalChatNotificationProvider>
-                      <AnimatedRoutes />
-                    </GlobalChatNotificationProvider>
+                    <FriendRequestsProvider>
+                      <GlobalChatNotificationProvider>
+                        <AnimatedRoutes />
+                      </GlobalChatNotificationProvider>
+                    </FriendRequestsProvider>
                   </NotificationsProvider>
                 </AppErrorBoundary>
               </BrowserRouter>

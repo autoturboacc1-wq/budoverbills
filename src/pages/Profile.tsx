@@ -1,31 +1,27 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import {
-  Settings, 
   Bell, 
+  Coffee,
   Shield, 
-  HelpCircle, 
   LogOut, 
   ChevronRight,
-  FileText,
   LogIn,
   ScrollText,
-  Sun,
-  Moon,
-  LayoutDashboard
+  LayoutDashboard,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { NotificationSheet } from "@/components/NotificationSheet";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { AddFriendSection } from "@/components/AddFriendSection";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { EditNameDialog } from "@/components/EditNameDialog";
+import { FriendRequestsSection } from "@/components/FriendRequestsSection";
 import { ProfileBankAccount } from "@/components/ProfileBankAccount";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/hooks/useNotifications";
-import { Switch } from "@/components/ui/switch";
-import { useTheme } from "next-themes";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,7 +33,6 @@ interface ProfileMenuItem {
   label: string;
   path: string;
   action: () => void;
-  badge?: number;
   highlight?: boolean;
 }
 
@@ -47,8 +42,6 @@ export default function Profile() {
   const { user, profile, signOut, isLoading } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const { unreadCount } = useNotifications();
-  const { theme, setTheme } = useTheme();
-  const isDarkMode = theme === "dark";
   const { isAdmin, isModerator } = useUserRole();
   const hasAdminAccess = isAdmin || isModerator;
 
@@ -130,9 +123,7 @@ export default function Profile() {
   }, [user?.id, refetchStats]);
 
   const menuItems: ProfileMenuItem[] = [
-    { icon: Bell, label: t('profile.notifications'), path: "/notifications", action: () => navigate("/notifications") },
-    { icon: Shield, label: t('profile.privacy'), path: "/settings", action: () => navigate("/settings") },
-    { icon: FileText, label: t('profile.history'), path: "/history", action: () => navigate("/history") },
+    { icon: Coffee, label: "Support Us", path: "/support", action: () => navigate("/support"), highlight: true },
     { icon: ScrollText, label: "ข้อกำหนดการใช้งาน", path: "/terms", action: () => navigate("/terms") },
     { 
       icon: Shield, 
@@ -142,8 +133,6 @@ export default function Profile() {
       highlight: !!profile?.pdpa_accepted_at 
     },
     { icon: Shield, label: "นโยบายความเป็นส่วนตัว", path: "/privacy", action: () => navigate("/privacy") },
-    { icon: HelpCircle, label: t('profile.help'), path: "/help", action: () => navigate("/help") },
-    { icon: Settings, label: t('profile.settings'), path: "/settings", action: () => navigate("/settings") },
   ];
 
   const handleLogout = async () => {
@@ -257,6 +246,10 @@ export default function Profile() {
           </motion.div>
         )}
 
+        <AddFriendSection />
+
+        {user && <FriendRequestsSection />}
+
         {/* Bank Account Section */}
         {user && <ProfileBankAccount />}
 
@@ -307,24 +300,7 @@ export default function Profile() {
             </button>
           )}
 
-          {/* Dark Mode Toggle */}
-          <div className="flex items-center justify-between p-4 border-b border-border">
-            <div className="flex items-center gap-3">
-              {isDarkMode ? (
-                <Moon className="w-5 h-5 text-muted-foreground" />
-              ) : (
-                <Sun className="w-5 h-5 text-muted-foreground" />
-              )}
-              <span className="text-foreground">โหมดมืด</span>
-            </div>
-            <Switch
-              checked={isDarkMode}
-              onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
-              aria-label={isDarkMode ? "ปิดโหมดมืด" : "เปิดโหมดมืด"}
-            />
-          </div>
-
-          {menuItems.map((item, index) => {
+          {menuItems.map((item) => {
             const Icon = item.icon;
             const menuItem = item as typeof item & { highlight?: boolean };
             return (
@@ -336,11 +312,6 @@ export default function Profile() {
                 <div className="flex items-center gap-3">
                   <Icon className={`w-5 h-5 ${menuItem.highlight ? 'text-status-paid' : 'text-muted-foreground'}`} />
                   <span className={menuItem.highlight ? 'text-status-paid' : 'text-foreground'}>{item.label}</span>
-                  {item.badge && (
-                    <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
-                      {item.badge}
-                    </span>
-                  )}
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </button>
