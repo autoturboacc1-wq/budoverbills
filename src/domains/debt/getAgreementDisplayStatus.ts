@@ -19,8 +19,11 @@ export function getAgreementDisplayStatus(agreement: DebtAgreement): DebtDisplay
   }
   
   if (agreement.status === 'pending_confirmation') {
-    // Check if lender has uploaded transfer slip but borrower hasn't confirmed
-    if (agreement.transfer_slip_url && !agreement.borrower_confirmed_transfer) {
+    if (!agreement.contract_finalized_at) {
+      return 'pending_confirmation';
+    }
+
+    if (agreement.lender_confirmed && agreement.transfer_slip_url && !agreement.borrower_confirmed_transfer) {
       return 'awaiting_transfer_confirmation';
     }
     return 'pending_confirmation';
@@ -78,8 +81,16 @@ export function needsUserConfirmation(
   }
   
   if (isLender) {
-    return !agreement.lender_confirmed;
+    return agreement.borrower_confirmed && !agreement.lender_confirmed;
   }
   
-  return !agreement.borrower_confirmed;
+  if (!agreement.borrower_confirmed) {
+    return true;
+  }
+
+  return Boolean(
+    agreement.lender_confirmed &&
+    agreement.transfer_slip_url &&
+    !agreement.borrower_confirmed_transfer
+  );
 }

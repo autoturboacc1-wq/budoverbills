@@ -17,6 +17,7 @@ interface PendingAction {
   dueDate?: string;
   agreementId: string;
   counterpartyName: string;
+  actionUrl: string;
   priority: "critical" | "important" | "info";
 }
 
@@ -93,7 +94,12 @@ export const PendingActionsCard = () => {
           borrower_id,
           lender_id,
           status,
-          borrower_name
+          borrower_name,
+          lender_confirmed,
+          borrower_confirmed,
+          borrower_confirmed_transfer,
+          transfer_slip_url,
+          contract_finalized_at
         `)
         .in("id", agreementIds);
 
@@ -144,8 +150,22 @@ export const PendingActionsCard = () => {
             description = `กับ ${counterpartyName}`;
             break;
           case "confirm":
-            title = "รอยืนยันการรับเงิน";
-            description = `${counterpartyName} ชำระแล้ว`;
+            if (!agreement.contract_finalized_at) {
+              title = "ต้องลงนามสัญญา";
+              description = `กับ ${counterpartyName}`;
+            } else if (!agreement.borrower_confirmed) {
+              title = "รอยอมรับข้อตกลง";
+              description = `จาก ${counterpartyName}`;
+            } else if (!agreement.lender_confirmed) {
+              title = "รอโอนและอัปโหลดสลิป";
+              description = `${counterpartyName} ยอมรับแล้ว`;
+            } else if (agreement.transfer_slip_url && !agreement.borrower_confirmed_transfer) {
+              title = "รอยืนยันรับเงิน";
+              description = `${counterpartyName} อัปโหลดสลิปแล้ว`;
+            } else {
+              title = "รอยืนยัน";
+              description = `กับ ${counterpartyName}`;
+            }
             break;
           case "extend":
             title = "มีคำขอเลื่อนกำหนด";
@@ -162,6 +182,18 @@ export const PendingActionsCard = () => {
           dueDate: nextInstallment?.due_date,
           agreementId: room.agreement_id!,
           counterpartyName,
+          actionUrl:
+            room.pending_action_type === "confirm" && !agreement.contract_finalized_at
+              ? `/agreement/${room.agreement_id}/contract`
+              : room.pending_action_type === "confirm" &&
+                  agreement.borrower_confirmed &&
+                  agreement.lender_confirmed &&
+                  agreement.transfer_slip_url &&
+                  !agreement.borrower_confirmed_transfer
+                ? `/debt/${room.agreement_id}`
+                : room.pending_action_type === "confirm"
+                  ? `/agreement/${room.agreement_id}/confirm`
+                  : `/debt/${room.agreement_id}`,
           priority,
         };
       }).filter(Boolean) as PendingAction[];
@@ -290,7 +322,7 @@ export const PendingActionsCard = () => {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
-              onClick={() => navigate(`/debt/${action.agreementId}`)}
+              onClick={() => navigate(action.actionUrl)}
               className={`w-full rounded-[1.1rem] border p-3 text-left transition-colors ${config.bgClass}`}
             >
               <div className="flex items-center gap-3">

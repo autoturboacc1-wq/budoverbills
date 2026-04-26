@@ -128,6 +128,7 @@ describe('AgreementConfirm', () => {
       lender_id: 'lender-id',
       borrower_id: 'borrower-id',
       transfer_slip_url: null,
+      contract_finalized_at: '2026-04-15T12:00:00.000Z',
     });
 
     pageMocks.getAgreement.mockReturnValue(agreement);
@@ -159,6 +160,9 @@ describe('AgreementConfirm', () => {
               status: 'pending_confirmation',
               lender_confirmed: false,
               borrower_confirmed: false,
+              borrower_confirmed_transfer: false,
+              transfer_slip_url: null,
+              contract_finalized_at: '2026-04-15T12:00:00.000Z',
             },
             error: null,
           }),
@@ -178,7 +182,7 @@ describe('AgreementConfirm', () => {
     });
 
     const confirmButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('ยืนยันข้อตกลง')
+      button.textContent?.includes('ยอมรับข้อตกลง')
     );
     expect(confirmButton).toBeDefined();
 
@@ -203,7 +207,7 @@ describe('AgreementConfirm', () => {
       p_transfer_slip_url: null,
       p_mark_lender_confirmed: false,
       p_mark_borrower_confirmed: true,
-      p_mark_borrower_transfer_confirmed: true,
+      p_mark_borrower_transfer_confirmed: false,
       p_confirmed_at: '2026-04-15T12:34:56.000Z',
       p_client_ip: '203.0.113.10',
       p_device_id: 'device-123',

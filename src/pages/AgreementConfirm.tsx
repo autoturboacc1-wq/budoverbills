@@ -11,6 +11,10 @@ const SERVER_ERROR_TH: Record<string, string> = {
   "Agreement not found": "ไม่พบข้อตกลง",
   "Invalid confirmation request": "คำขอยืนยันไม่ถูกต้อง",
   "Transfer slip is required": "กรุณาอัปโหลดสลิปโอนเงินก่อน",
+  "Loan contract must be signed by both parties first": "กรุณาลงนามสัญญากู้ยืมให้ครบทั้งสองฝ่ายก่อน",
+  "Borrower must accept the agreement before lender transfer confirmation": "ต้องรอผู้ยืมยอมรับข้อตกลงก่อน",
+  "Borrower must accept agreement before lender transfer confirmation": "ต้องรอผู้ยืมยอมรับข้อตกลงก่อน",
+  "Lender must upload transfer proof first": "ต้องรอผู้ให้ยืมอัปโหลดหลักฐานการโอนเงินก่อน",
 };
 
 function toThaiServerError(error: unknown): string {
@@ -107,6 +111,15 @@ export default function AgreementConfirm() {
 
   const isLender = userRole === 'lender';
   const isBorrower = userRole === 'borrower';
+  const contractReady = Boolean(agreement?.contract_finalized_at);
+  const borrowerAcceptedAgreement = Boolean(agreement?.borrower_confirmed);
+  const lenderConfirmedTransfer = Boolean(agreement?.lender_confirmed);
+  const borrowerConfirmedTransfer = Boolean(agreement?.borrower_confirmed_transfer);
+  const canBorrowerAcceptAgreement = isBorrower && !borrowerAcceptedAgreement;
+  const canLenderConfirmTransfer = isLender && borrowerAcceptedAgreement && !lenderConfirmedTransfer;
+  const canCurrentUserConfirm = contractReady && (canBorrowerAcceptAgreement || canLenderConfirmTransfer);
+  const borrowerShouldConfirmReceipt =
+    isBorrower && borrowerAcceptedAgreement && lenderConfirmedTransfer && !borrowerConfirmedTransfer;
 
   const fetchAgreementConfirmationState = async () => {
     if (!id) {
@@ -115,7 +128,7 @@ export default function AgreementConfirm() {
 
     const { data, error } = await supabase
       .from("debt_agreements")
-      .select("id, status, lender_confirmed, borrower_confirmed")
+      .select("id, status, lender_confirmed, borrower_confirmed, borrower_confirmed_transfer, transfer_slip_url, contract_finalized_at")
       .eq("id", id)
       .maybeSingle();
 
@@ -142,6 +155,11 @@ export default function AgreementConfirm() {
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !agreement) return;
+
+    if (!isLender || !agreement.borrower_confirmed || !contractReady) {
+      toast.error("อัปโหลดสลิปได้หลังจากผู้ยืมยอมรับข้อตกลงแล้ว");
+      return;
+    }
 
     const validationError = validatePaymentSlipFile(file);
     if (validationError) {
@@ -182,16 +200,37 @@ export default function AgreementConfirm() {
       navigate("/auth");
       return;
     }
-    
-    // Lender must upload transfer slip before confirming
-    if (isLender && !effectiveTransferSlipUrl) {
+
+    if (!agreement) {
+      toast.error("ไม่พบข้อตกลง");
+      return;
+    }
+
+    if (!contractReady) {
+      toast.error("กรุณาลงนามสัญญากู้ยืมให้ครบก่อน", {
+        description: "ต้องมีลายมือชื่ออิเล็กทรอนิกส์ของทั้งสองฝ่ายก่อนยืนยันข้อตกลง",
+      });
+      navigate(`/agreement/${agreement.id}/contract`);
+      return;
+    }
+
+    if (!canCurrentUserConfirm) {
+      if (borrowerShouldConfirmReceipt && agreement) {
+        navigate(`/debt/${agreement.id}`);
+        return;
+      }
+
+      toast.error("ยังไม่ถึงขั้นตอนที่คุณต้องยืนยัน");
+      return;
+    }
+
+    if (canLenderConfirmTransfer && !effectiveTransferSlipUrl) {
       toast.error("กรุณาอัปโหลดสลิปโอนเงินให้ยืมก่อน", {
         description: "สลิปโอนเงินเป็นหลักฐานสำคัญสำหรับทั้งสองฝ่าย"
       });
       return;
     }
     
-    // Must accept legal agreement text
     if (!agreementAccepted) {
       toast.error("กรุณาอ่านและยอมรับข้อตกลงก่อน");
       return;
@@ -208,6 +247,13 @@ export default function AgreementConfirm() {
     }
 
     const effectiveTransferSlipUrl = transferSlipUrl || agreement.transfer_slip_url || null;
+    const confirmingBorrowerAcceptance = isBorrower && !agreement.borrower_confirmed;
+    const confirmingLenderTransfer = isLender && agreement.borrower_confirmed && !agreement.lender_confirmed;
+
+    if (!confirmingBorrowerAcceptance && !confirmingLenderTransfer) {
+      toast.error("ยังไม่ถึงขั้นตอนที่คุณต้องยืนยัน");
+      return;
+    }
 
     setIsConfirming(true);
     try {
@@ -222,6 +268,33 @@ export default function AgreementConfirm() {
         return;
       }
 
+      if (!latestAgreement.contract_finalized_at) {
+        toast.error("กรุณาลงนามสัญญากู้ยืมให้ครบก่อน");
+        return;
+      }
+
+      if (confirmingBorrowerAcceptance && latestAgreement.borrower_confirmed) {
+        toast.error("คุณยอมรับข้อตกลงนี้แล้ว");
+        return;
+      }
+
+      if (confirmingLenderTransfer) {
+        if (!latestAgreement.borrower_confirmed) {
+          toast.error("ต้องรอผู้ยืมยอมรับข้อตกลงก่อน");
+          return;
+        }
+
+        if (latestAgreement.lender_confirmed) {
+          toast.error("คุณยืนยันการโอนเงินแล้ว");
+          return;
+        }
+
+        if (!effectiveTransferSlipUrl) {
+          toast.error("กรุณาอัปโหลดสลิปโอนเงินให้ยืมก่อน");
+          return;
+        }
+      }
+
       // Get IP and Device info for legal evidence
       const [clientIP, deviceId] = await Promise.all([
         getClientIP(),
@@ -230,10 +303,10 @@ export default function AgreementConfirm() {
       const confirmedAt = new Date().toISOString();
       const { error } = await supabase.rpc("confirm_agreement_transfer", {
         p_agreement_id: agreement.id,
-        p_transfer_slip_url: isLender ? effectiveTransferSlipUrl : null,
-        p_mark_lender_confirmed: isLender,
-        p_mark_borrower_confirmed: isBorrower,
-        p_mark_borrower_transfer_confirmed: isBorrower,
+        p_transfer_slip_url: confirmingLenderTransfer ? effectiveTransferSlipUrl : null,
+        p_mark_lender_confirmed: confirmingLenderTransfer,
+        p_mark_borrower_confirmed: confirmingBorrowerAcceptance,
+        p_mark_borrower_transfer_confirmed: false,
         p_confirmed_at: confirmedAt,
         p_client_ip: clientIP,
         p_device_id: deviceId,
@@ -242,22 +315,18 @@ export default function AgreementConfirm() {
       if (error) throw error;
 
       await refresh();
-      
-      const willBeFullyConfirmed = isLender
-        ? Boolean(latestAgreement.borrower_confirmed)
-        : Boolean(latestAgreement.lender_confirmed);
 
-      if (willBeFullyConfirmed) {
-        toast.success("ข้อตกลงถูกยืนยันแล้ว!", {
-          description: "งวดชำระจะแสดงในปฏิทิน",
+      if (confirmingLenderTransfer) {
+        toast.success("ยืนยันการโอนเงินแล้ว", {
+          description: "รอผู้ยืมยืนยันว่าได้รับเงิน ก่อนเริ่มชำระงวด",
         });
+        navigate(`/debt/${agreement.id}`);
       } else {
-        toast.success("ยืนยันข้อตกลงสำเร็จ!", {
-          description: "รออีกฝ่ายยืนยัน",
+        toast.success("ยอมรับข้อตกลงแล้ว", {
+          description: "รอผู้ให้ยืมโอนเงินและอัปโหลดสลิป",
         });
+        navigate("/");
       }
-      
-      navigate("/");
     } catch (error) {
       console.error("Error confirming agreement:", error);
       toast.error("ไม่สามารถยืนยันได้", {
@@ -339,8 +408,37 @@ export default function AgreementConfirm() {
     );
   }
 
-  const partnerName = isLender ? agreement.borrower_name : "ผู้ให้ยืม";
+  const partnerName = isLender ? agreement.borrower_name : (lenderName || "ผู้ให้ยืม");
   const roleLabel = isLender ? "คุณให้ยืม" : "คุณยืม";
+  const statusTitle = !contractReady
+    ? "ต้องลงนามสัญญาก่อน"
+    : !agreement.borrower_confirmed
+    ? "รอผู้ยืมยอมรับข้อตกลง"
+    : !agreement.lender_confirmed
+      ? "รอผู้ให้ยืมโอนเงิน"
+      : !agreement.borrower_confirmed_transfer
+        ? "รอผู้ยืมยืนยันรับเงิน"
+        : "พร้อมเริ่มชำระงวด";
+  const statusDescription = !contractReady
+    ? "ผู้ให้ยืมและผู้ยืมต้องลงนามสัญญากู้ยืมเงินก่อนเริ่มขั้นตอนยืนยัน"
+    : !agreement.borrower_confirmed
+    ? "ผู้ให้ยืมสร้างรายการแล้ว ผู้ยืมต้องตรวจสอบและยอมรับก่อน"
+    : !agreement.lender_confirmed
+      ? "ผู้ยืมยอมรับแล้ว ผู้ให้ยืมต้องโอนเงินจริงและอัปโหลดสลิป"
+      : !agreement.borrower_confirmed_transfer
+        ? "ผู้ให้ยืมอัปโหลดสลิปแล้ว ผู้ยืมต้องยืนยันว่าได้รับเงิน"
+        : "ทั้งสองฝ่ายยืนยันครบแล้ว";
+  const primaryButtonText = !contractReady
+    ? "ลงนามสัญญาก่อน"
+    : canBorrowerAcceptAgreement
+    ? "ยอมรับข้อตกลง"
+    : canLenderConfirmTransfer
+      ? "ยืนยันว่าโอนเงินแล้ว"
+      : borrowerShouldConfirmReceipt
+        ? "ไปยืนยันรับเงิน"
+        : isLender && !agreement.borrower_confirmed
+          ? "รอผู้ยืมยอมรับ"
+          : "ยืนยันแล้ว";
 
   return (
     <PageTransition>
@@ -382,18 +480,16 @@ export default function AgreementConfirm() {
               <Clock className="w-5 h-5 text-status-pending" />
             </div>
             <div>
-              <p className="font-medium text-foreground">รอการยืนยัน</p>
+              <p className="font-medium text-foreground">{statusTitle}</p>
               <p className="text-sm text-muted-foreground">
-                {agreement.lender_confirmed ? "ผู้ให้ยืมยืนยันแล้ว" : "รอผู้ให้ยืมยืนยัน"}
-                {" • "}
-                {agreement.borrower_confirmed ? "ผู้ยืมยืนยันแล้ว" : "รอผู้ยืมยืนยัน"}
+                {statusDescription}
               </p>
             </div>
           </div>
         </motion.div>
 
         {/* Transfer Slip Upload Section for Lender */}
-        {isLender && !agreement.lender_confirmed && (
+        {canLenderConfirmTransfer && contractReady && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -566,7 +662,7 @@ export default function AgreementConfirm() {
         </motion.div>
 
         {/* Legal Agreement Text Section */}
-        {!(isLender && agreement.lender_confirmed) && !(isBorrower && agreement.borrower_confirmed) && (
+        {canCurrentUserConfirm && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -588,24 +684,46 @@ export default function AgreementConfirm() {
           </motion.div>
         )}
 
-        {/* Sign formal contract CTA */}
+        {/* Required loan contract step */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.18 }}
-          className="mb-4"
+          className={`mb-4 rounded-2xl border p-4 ${
+            contractReady
+              ? "border-status-paid/20 bg-status-paid/10"
+              : "border-primary/25 bg-primary/5"
+          }`}
         >
+          <div className="mb-3 flex items-start gap-3">
+            <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-full ${
+              contractReady ? "bg-status-paid/20" : "bg-primary/10"
+            }`}>
+              {contractReady ? (
+                <CheckCircle className="h-4 w-4 text-status-paid" aria-hidden="true" />
+              ) : (
+                <FileSignature className="h-4 w-4 text-primary" aria-hidden="true" />
+              )}
+            </div>
+            <div>
+              <p className="font-medium text-foreground">
+                {contractReady ? "สัญญาลงนามครบแล้ว" : "ต้องทำสัญญากู้ยืมก่อน"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {contractReady
+                  ? "สามารถดูหรือดาวน์โหลดสัญญาที่ลงนามครบทั้งสองฝ่ายได้"
+                  : "ผู้ให้ยืมต้องลงนามก่อน จากนั้นผู้ยืมต้องรีวิวและลงนามก่อนยืนยันข้อตกลง"}
+              </p>
+            </div>
+          </div>
           <Button
             variant="outline"
             className="w-full h-12 text-base border-primary/30 text-primary hover:bg-primary/5"
             onClick={() => navigate(`/agreement/${agreement.id}/contract`)}
           >
             <FileSignature className="w-5 h-5 mr-2" />
-            ทำหนังสือสัญญากู้ยืมเงิน (สำหรับใช้ในชั้นศาล)
+            {contractReady ? "ดูสัญญากู้ยืม" : "ตรวจสอบและลงนามสัญญา"}
           </Button>
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            ออกหนังสือสัญญาแบบเป็นทางการ ลงนามอิเล็กทรอนิกส์ทั้งสองฝ่าย พิมพ์เป็น PDF ได้
-          </p>
         </motion.div>
 
         {/* Action Buttons */}
@@ -618,18 +736,10 @@ export default function AgreementConfirm() {
           <Button
             className="w-full h-12 text-base"
             onClick={handleConfirmClick}
-            disabled={
-              (isLender && agreement.lender_confirmed) ||
-              (isBorrower && agreement.borrower_confirmed)
-            }
+            disabled={contractReady && !canCurrentUserConfirm && !borrowerShouldConfirmReceipt}
           >
             <CheckCircle className="w-5 h-5 mr-2" />
-            {(isLender && agreement.lender_confirmed) || (isBorrower && agreement.borrower_confirmed)
-              ? "ยืนยันแล้ว"
-              : isLender 
-                ? "ยืนยันข้อตกลงพร้อมสลิปโอน" 
-                : "ยืนยันข้อตกลง"
-            }
+            {primaryButtonText}
           </Button>
           
           {agreement.status === 'pending_confirmation' && (
@@ -645,10 +755,15 @@ export default function AgreementConfirm() {
         </motion.div>
 
         <p className="text-xs text-center text-muted-foreground mt-4">
-          {isLender 
-            ? "อัปโหลดสลิปโอนเงินให้ยืมก่อนกดยืนยัน" 
-            : "เมื่อทั้งสองฝ่ายยืนยันแล้ว ข้อตกลงจะเริ่มใช้งานทันที"
-          }
+          {!contractReady
+            ? "ลงนามสัญญากู้ยืมให้ครบก่อน แล้วจึงเข้าสู่ขั้นตอนยอมรับ/โอนเงิน"
+            : canLenderConfirmTransfer
+            ? "อัปโหลดสลิปโอนเงิน แล้วกดยืนยันหลังตรวจรายละเอียดครบถ้วน"
+            : canBorrowerAcceptAgreement
+              ? "เมื่อยอมรับแล้ว ระบบจะรอผู้ให้ยืมโอนเงินจริงและอัปโหลดสลิป"
+              : borrowerShouldConfirmReceipt
+                ? "ยืนยันรับเงินได้ที่หน้ารายละเอียด หลังตรวจสลิปโอนเงิน"
+                : statusDescription}
         </p>
       </div>
 
@@ -657,9 +772,13 @@ export default function AgreementConfirm() {
         open={showPasswordConfirm}
         onOpenChange={setShowPasswordConfirm}
         onConfirm={handleConfirmedApproval}
-        title="ยืนยันการอนุมัติ"
-        description="กรุณาใส่รหัสผ่านเพื่อยืนยันข้อตกลงนี้"
-        confirmButtonText="ยืนยันข้อตกลง"
+        title={canLenderConfirmTransfer ? "ยืนยันการโอนเงิน" : "ยืนยันการยอมรับข้อตกลง"}
+        description={
+          canLenderConfirmTransfer
+            ? "กรุณาใส่รหัสผ่านเพื่อยืนยันว่าได้โอนเงินและอัปโหลดสลิปแล้ว"
+            : "กรุณาใส่รหัสผ่านเพื่อยืนยันการยอมรับข้อตกลงนี้"
+        }
+        confirmButtonText={canLenderConfirmTransfer ? "ยืนยันว่าโอนแล้ว" : "ยอมรับข้อตกลง"}
         isLoading={isConfirming}
       />
 

@@ -21,8 +21,10 @@ describe('getAgreementDisplayStatus', () => {
       getAgreementDisplayStatus(
         createAgreement({
           status: 'pending_confirmation',
+          lender_confirmed: true,
           transfer_slip_url: 'some/path',
           borrower_confirmed_transfer: false,
+          contract_finalized_at: '2026-04-01T00:00:00.000Z',
         })
       )
     ).toBe('awaiting_transfer_confirmation');

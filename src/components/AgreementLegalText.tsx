@@ -34,7 +34,7 @@ export function AgreementLegalText({
   const formattedStartDate = format(new Date(startDate), "d MMMM yyyy", { locale: th });
   const installmentAmount = Math.ceil(totalAmount / numInstallments);
 
-  // Generate agreement text based on role
+  // Generate agreement text based on the current handoff step.
   const agreementText = isLender
     ? `ข้าพเจ้า ${lenderName || "[ชื่อผู้ให้ยืม]"} 
 ยืนยันว่าได้โอนเงินจำนวน ${amount.toLocaleString()} บาท 
@@ -51,11 +51,10 @@ ${interestRate > 0 ? `• อัตราดอกเบี้ย: ${interestRat
 การกดยืนยันนี้ถือเป็นการแสดงเจตนาโดยสมัครใจ
 และสามารถใช้เป็นหลักฐานทางกฎหมายได้`
     : `ข้าพเจ้า ${borrowerName || "[ชื่อผู้ยืม]"} 
-ยืนยันว่าได้รับเงินจำนวน ${amount.toLocaleString()} บาท 
-จาก ${lenderName || "[ชื่อผู้ให้ยืม]"} 
-เมื่อวันที่ ${formattedDate}
+ยอมรับข้อตกลงการยืมเงินจำนวน ${amount.toLocaleString()} บาท
+จาก ${lenderName || "[ชื่อผู้ให้ยืม]"} ตามหนังสือสัญญาที่ลงนามครบถ้วนแล้ว เมื่อวันที่ ${formattedDate}
 
-และตกลงจะชำระคืนตามเงื่อนไขดังนี้:
+และตกลงจะชำระคืนหลังจากผู้ให้ยืมโอนเงินจริงและข้าพเจ้ายืนยันว่าได้รับเงินแล้ว ตามเงื่อนไขดังนี้:
 • ยอดรวมที่ต้องชำระ: ${totalAmount.toLocaleString()} บาท
 ${interestRate > 0 ? `• อัตราดอกเบี้ย: ${interestRate}%` : "• ไม่มีดอกเบี้ย"}
 • จำนวนงวด: ${numInstallments} งวด
@@ -100,7 +99,9 @@ ${interestRate > 0 ? `• อัตราดอกเบี้ย: ${interestRat
           htmlFor="accept-agreement"
           className="text-sm text-foreground cursor-pointer leading-relaxed"
         >
-          ข้าพเจ้าได้อ่านและยอมรับข้อตกลงข้างต้น และยืนยันว่าข้อมูลทั้งหมดเป็นความจริง
+          {isLender
+            ? "ข้าพเจ้าได้อ่านข้อตกลงและยืนยันว่าได้โอนเงินตามหลักฐานที่อัปโหลดจริง"
+            : "ข้าพเจ้าได้อ่านและยอมรับเงื่อนไขข้างต้น ก่อนรอผู้ให้ยืมโอนเงินจริง"}
         </label>
       </div>
     </div>

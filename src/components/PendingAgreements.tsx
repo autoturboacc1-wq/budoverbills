@@ -38,8 +38,23 @@ export function PendingAgreements({ agreements, userId }: PendingAgreementsProps
         {pendingAgreements.map((agreement, index) => {
           // Use domain functions instead of direct comparisons
           const isLender = isUserLender(agreement, userId);
+          const needsContract = !agreement.contract_finalized_at;
+          const needsReceiptConfirmation =
+            !isLender &&
+            agreement.borrower_confirmed &&
+            agreement.lender_confirmed &&
+            Boolean(agreement.transfer_slip_url) &&
+            !agreement.borrower_confirmed_transfer;
           const needsMyConfirmation = needsUserConfirmation(agreement, userId, isLender);
           const partnerName = getPartnerName(agreement, userId);
+          const targetPath = needsContract
+            ? `/agreement/${agreement.id}/contract`
+            : needsReceiptConfirmation
+              ? `/debt/${agreement.id}`
+            : needsMyConfirmation
+              ? `/agreement/${agreement.id}/confirm`
+              : `/agreement/${agreement.id}/confirm`;
+          const isActionable = needsContract || needsMyConfirmation || needsReceiptConfirmation;
 
           return (
             <motion.div
@@ -47,9 +62,9 @@ export function PendingAgreements({ agreements, userId }: PendingAgreementsProps
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
-              onClick={() => navigate(`/agreement/${agreement.id}/confirm`)}
+              onClick={() => navigate(targetPath)}
               className={`cursor-pointer rounded-[1.1rem] border p-3 text-left transition-colors ${
-                needsMyConfirmation 
+                isActionable
                   ? "border-status-pending/30 bg-status-pending/10 hover:border-status-pending/50"
                   : "border-border/80 bg-card/90 hover:border-foreground/20"
               }`}
@@ -57,23 +72,34 @@ export function PendingAgreements({ agreements, userId }: PendingAgreementsProps
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`flex h-9 w-9 items-center justify-center rounded-full border ${
-                    needsMyConfirmation ? "border-status-pending/20 bg-status-pending/10" : "border-border/80 bg-secondary/60"
+                    isActionable ? "border-status-pending/20 bg-status-pending/10" : "border-border/80 bg-secondary/60"
                   }`}>
                     <Clock className={`w-4 h-4 ${
-                      needsMyConfirmation ? "text-status-pending" : "text-muted-foreground"
+                      isActionable ? "text-status-pending" : "text-muted-foreground"
                     }`} />
                   </div>
                   <div>
                     <p className="font-medium text-foreground">{partnerName}</p>
                     <p className="text-xs text-muted-foreground">
-                      {isLender ? "คุณให้ยืม" : "คุณยืม"} ฿{agreement.total_amount.toLocaleString()}
+                      {needsContract
+                        ? "ต้องทำสัญญากู้ยืมก่อน"
+                        : needsReceiptConfirmation
+                          ? "ผู้ให้ยืมโอนแล้ว รอคุณรับเงิน"
+                        : isLender && agreement.borrower_confirmed && !agreement.lender_confirmed
+                          ? "ผู้ยืมยอมรับแล้ว รอโอนเงิน"
+                          : isLender
+                            ? "รอผู้ยืมยอมรับ"
+                            : agreement.borrower_confirmed
+                              ? "รอผู้ให้ยืมโอนเงิน"
+                              : "คุณยืม"}{" "}
+                      ฿{agreement.total_amount.toLocaleString()}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {needsMyConfirmation && (
+                  {isActionable && (
                     <span className="rounded-full border border-status-pending/20 bg-status-pending/10 px-2 py-1 text-xs font-medium text-status-pending">
-                      รอคุณยืนยัน
+                      {needsContract ? "ทำสัญญา" : needsReceiptConfirmation ? "รับเงิน" : "รอคุณยืนยัน"}
                     </span>
                   )}
                   <ArrowRight className="w-4 h-4 text-muted-foreground" />
