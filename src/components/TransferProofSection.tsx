@@ -80,12 +80,6 @@ export function TransferProofSection({
       return;
     }
 
-    if (requiresLenderConfirmationForUpload) {
-      toast.error("กรุณายืนยันการโอนเงินจากหน้าคอนเฟิร์ม");
-      navigate(`/agreement/${agreementId}/confirm`);
-      return;
-    }
-
     const validationError = validatePaymentSlipFile(file);
     if (validationError) {
       toast.error(validationError);
@@ -117,8 +111,16 @@ export function TransferProofSection({
         throw rpcError;
       }
 
-      toast.success("อัปโหลดสลิปโอนเงินให้ยืมสำเร็จ");
+      toast.success("อัปโหลดสลิปโอนเงินให้ยืมสำเร็จ", {
+        description: requiresLenderConfirmationForUpload
+          ? "ตรวจสอบรายละเอียด แล้วกดยืนยันว่าโอนเงินแล้ว"
+          : undefined,
+      });
       onUpdate();
+
+      if (requiresLenderConfirmationForUpload) {
+        navigate(`/agreement/${agreementId}/confirm`);
+      }
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("เกิดข้อผิดพลาดในการอัปโหลด");
@@ -161,11 +163,6 @@ export function TransferProofSection({
   };
 
   const triggerFileInput = () => {
-    if (isLender && requiresLenderConfirmationForUpload) {
-      navigate(`/agreement/${agreementId}/confirm`);
-      return;
-    }
-
     fileInputRef.current?.click();
   };
 
@@ -228,7 +225,7 @@ export function TransferProofSection({
                 ) : (
                   <>
                     <Upload className="w-4 h-4 mr-2" />
-                    {requiresLenderConfirmationForUpload ? "ยืนยันโอนเงิน" : "อัปโหลดสลิปโอน"}
+                    {requiresLenderConfirmationForUpload ? "อัปโหลดสลิปเพื่อยืนยันโอนเงิน" : "อัปโหลดสลิปโอน"}
                   </>
                 )}
               </Button>
@@ -348,7 +345,7 @@ export function TransferProofSection({
                 ) : (
                   <Upload className="w-4 h-4 mr-1" />
                 )}
-                {requiresLenderConfirmationForUpload ? "แก้ไขสลิปที่หน้ายืนยัน" : "อัปโหลดใหม่"}
+                {requiresLenderConfirmationForUpload ? "เปลี่ยนสลิปเพื่อยืนยันโอนเงิน" : "อัปโหลดใหม่"}
               </Button>
             </div>
           )}
