@@ -1,6 +1,26 @@
 import { DebtAgreement, DebtDisplayStatus } from '@/domains/debt/types';
 import { getNextInstallment, isInstallmentOverdue } from './getNextInstallment';
 
+interface AgreementPaymentReadiness {
+  status?: string | null;
+  borrower_confirmed?: boolean | null;
+  lender_confirmed?: boolean | null;
+  transfer_slip_url?: string | null;
+  borrower_confirmed_transfer?: boolean | null;
+}
+
+export function isAgreementPaymentReady(agreement: AgreementPaymentReadiness | null | undefined): boolean {
+  if (!agreement) return false;
+
+  return (
+    (agreement.status === 'active' || agreement.status === 'rescheduling') &&
+    agreement.borrower_confirmed === true &&
+    agreement.lender_confirmed === true &&
+    Boolean(agreement.transfer_slip_url) &&
+    agreement.borrower_confirmed_transfer === true
+  );
+}
+
 /**
  * SINGLE SOURCE OF TRUTH for determining display status of an agreement.
  * 
@@ -39,6 +59,13 @@ export function getAgreementDisplayStatus(agreement: DebtAgreement): DebtDisplay
   
   // For active agreements, check installments
   if (agreement.status === 'active') {
+    if (!isAgreementPaymentReady(agreement)) {
+      return getAgreementDisplayStatus({
+        ...agreement,
+        status: 'pending_confirmation',
+      });
+    }
+
     const nextInstallment = getNextInstallment(agreement.installments);
     
     // All payable installments are cleared

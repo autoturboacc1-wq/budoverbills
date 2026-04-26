@@ -41,6 +41,7 @@ import {
 import { PromptPayQR } from "@/components/PromptPayQR";
 import { SlipOcrBadge } from "@/components/SlipOcrBadge";
 import { AsyncResultState, PageSection, ReviewPanel, StatusTimeline, type StatusTimelineItem } from "@/components/ux";
+import { isAgreementPaymentReady } from "@/domains/debt";
 
 interface PaymentDialogProps {
   open: boolean;
@@ -233,7 +234,7 @@ export function PaymentDialog({
   }, [effectiveAmount, installment, agreement, calculateExtraPaymentPreview, liveInstallmentAmount]);
 
   const isExtraPayment = effectiveAmount > liveInstallmentAmount;
-  const canSubmitInstallmentPayment = agreement.status === 'active' || agreement.status === 'rescheduling';
+  const canSubmitInstallmentPayment = isAgreementPaymentReady(agreement);
 
   // Count rejected verifications
   const rejectionCount = useMemo(() => {

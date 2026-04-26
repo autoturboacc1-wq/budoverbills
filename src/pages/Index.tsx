@@ -15,7 +15,7 @@ import { PageSection } from "@/components/ux";
 import { PageTransition } from "@/components/ux/PageTransition";
 
 // Domain imports - SINGLE SOURCE OF TRUTH
-import { mapAgreementsToDebtCards, isAgreementEffectivelyCompleted } from "@/domains/debt";
+import { mapAgreementsToDebtCards, isAgreementEffectivelyCompleted, isAgreementPaymentReady } from "@/domains/debt";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ const Index = () => {
 
   const debtCards = useMemo(() => {
     const activeAgreements = agreements.filter(a =>
-      (a.status === 'active' || a.status === 'rescheduling') &&
+      isAgreementPaymentReady(a) &&
       !isAgreementEffectivelyCompleted(a.installments)
     );
     return mapAgreementsToDebtCards(activeAgreements, user?.id);

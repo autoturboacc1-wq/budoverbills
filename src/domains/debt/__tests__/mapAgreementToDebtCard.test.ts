@@ -74,4 +74,16 @@ describe('mapAgreementToDebtCard', () => {
     expect(upcoming.map((item) => item.amount)).toEqual([100, 500]);
     expect(upcoming).toHaveLength(2);
   });
+
+  it('does not map upcoming installments before all funding confirmations are complete', () => {
+    const agreement = createAgreement({
+      status: 'active',
+      borrower_confirmed: true,
+      lender_confirmed: true,
+      transfer_slip_url: 'transfer/slip.jpg',
+      borrower_confirmed_transfer: false,
+    });
+
+    expect(mapToUpcomingInstallments([agreement], 'borrower-id', 7, 10)).toEqual([]);
+  });
 });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAgreementDisplayStatus, needsUserConfirmation } from '@/domains/debt/getAgreementDisplayStatus';
+import { getAgreementDisplayStatus, isAgreementPaymentReady, needsUserConfirmation } from '@/domains/debt/getAgreementDisplayStatus';
 import { createAgreement } from '@/test/fixtures/debt';
 
 describe('getAgreementDisplayStatus', () => {
@@ -32,6 +32,20 @@ describe('getAgreementDisplayStatus', () => {
 
   it('returns active for active agreements with pending installments', () => {
     expect(getAgreementDisplayStatus(createAgreement())).toBe('active');
+  });
+
+  it('does not treat active-looking agreements as payable until funding receipt is confirmed', () => {
+    const agreement = createAgreement({
+      status: 'active',
+      borrower_confirmed: true,
+      lender_confirmed: true,
+      transfer_slip_url: 'transfer/slip.jpg',
+      borrower_confirmed_transfer: false,
+      contract_finalized_at: '2026-04-01T00:00:00.000Z',
+    });
+
+    expect(isAgreementPaymentReady(agreement)).toBe(false);
+    expect(getAgreementDisplayStatus(agreement)).toBe('awaiting_transfer_confirmation');
   });
 
   it('returns cancelled for cancelled agreements', () => {

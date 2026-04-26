@@ -18,7 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { th } from "date-fns/locale";
-import { getUserRoleInAgreement, isInstallmentOverdue, getAgreementDisplayStatus } from "@/domains/debt";
+import { getUserRoleInAgreement, isInstallmentOverdue, getAgreementDisplayStatus, isAgreementPaymentReady } from "@/domains/debt";
 import { generateAgreementPDF, downloadPDF } from "@/utils/pdfExport";
 import { divideMoney, roundMoney } from "@/utils/money";
 import { PageHeader, PageSection, ReviewPanel, StatusTimeline, type StatusTimelineItem } from "@/components/ux";
@@ -33,8 +33,7 @@ export default function DebtDetail() {
   const { requests, fetchRequests, loading: rescheduleLoading } = useRescheduleRequests();
 
   const agreement = getAgreement(id || "");
-  const canUseInstallmentActions =
-    agreement?.status === 'active' || agreement?.status === 'rescheduling';
+  const canUseInstallmentActions = isAgreementPaymentReady(agreement);
   const showTransferProof =
     agreement?.status === 'active' ||
     (agreement?.status === 'pending_confirmation' &&

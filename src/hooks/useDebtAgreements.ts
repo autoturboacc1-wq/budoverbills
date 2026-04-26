@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   calculateRemainingAmount,
   getUserRoleInAgreement,
+  isAgreementPaymentReady,
 } from '@/domains/debt';
 import type {
   AgreementFrequency,
@@ -545,7 +546,7 @@ export function useDebtAgreements() {
   );
 
   const getActiveAgreements = useCallback(
-    () => agreements.filter((agreement) => agreement.status === 'active' || agreement.status === 'rescheduling'),
+    () => agreements.filter(isAgreementPaymentReady),
     [agreements]
   );
 
@@ -559,7 +560,7 @@ export function useDebtAgreements() {
       ...agreements
         .filter((agreement) =>
           getUserRoleInAgreement(agreement, user?.id) === 'lender' &&
-          (agreement.status === 'active' || agreement.status === 'rescheduling')
+          isAgreementPaymentReady(agreement)
         )
         .map((agreement) => calculateRemainingAmount(agreement.installments))
     ),
@@ -567,12 +568,12 @@ export function useDebtAgreements() {
       ...agreements
         .filter((agreement) =>
           getUserRoleInAgreement(agreement, user?.id) === 'borrower' &&
-          (agreement.status === 'active' || agreement.status === 'rescheduling')
+          isAgreementPaymentReady(agreement)
         )
         .map((agreement) => calculateRemainingAmount(agreement.installments))
     ),
     activeCount: agreements.filter((agreement) =>
-      (agreement.status === 'active' || agreement.status === 'rescheduling') &&
+      isAgreementPaymentReady(agreement) &&
       calculateRemainingAmount(agreement.installments) > 0
     ).length,
     pendingCount: agreements.filter((agreement) => agreement.status === 'pending_confirmation').length,

@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { PageSection } from "@/components/ux";
+import { isAgreementPaymentReady } from "@/domains/debt";
 
 interface PendingAction {
   id: string;
@@ -136,15 +137,26 @@ export const PendingActionsCard = () => {
         const nextInstallment = installments?.find(i => i.agreement_id === room.agreement_id);
         const counterpartyId = agreement.lender_id === user.id ? agreement.borrower_id : agreement.lender_id;
         const counterpartyName = profileMap.get(counterpartyId || "") || agreement.borrower_name || "ไม่ระบุชื่อ";
+        const canShowPaymentAction = isAgreementPaymentReady({
+          status: agreement.status,
+          borrower_confirmed: agreement.borrower_confirmed ?? false,
+          lender_confirmed: agreement.lender_confirmed ?? false,
+          transfer_slip_url: agreement.transfer_slip_url,
+          borrower_confirmed_transfer: agreement.borrower_confirmed_transfer ?? false,
+        });
+        const actionType =
+          room.pending_action_type === "pay" && !canShowPaymentAction
+            ? "confirm"
+            : room.pending_action_type;
 
         const isOverdue = nextInstallment?.status === "overdue";
         const priority: "critical" | "important" | "info" =
-          room.pending_action_type === "pay" || isOverdue ? "critical" : "info";
+          actionType === "pay" ? "critical" : "info";
 
         let title = "";
         let description = "";
 
-        switch (room.pending_action_type) {
+        switch (actionType) {
           case "pay":
             title = isOverdue ? "ค้างชำระ!" : "ต้องชำระเงิน";
             description = `กับ ${counterpartyName}`;
@@ -175,7 +187,7 @@ export const PendingActionsCard = () => {
 
         return {
           id: room.id,
-          type: room.pending_action_type as "pay" | "confirm" | "extend",
+          type: actionType as "pay" | "confirm" | "extend",
           title,
           description,
           amount: nextInstallment?.amount || agreement.principal_amount,
@@ -183,15 +195,15 @@ export const PendingActionsCard = () => {
           agreementId: room.agreement_id!,
           counterpartyName,
           actionUrl:
-            room.pending_action_type === "confirm" && !agreement.contract_finalized_at
+            actionType === "confirm" && !agreement.contract_finalized_at
               ? `/agreement/${room.agreement_id}/contract`
-              : room.pending_action_type === "confirm" &&
+              : actionType === "confirm" &&
                   agreement.borrower_confirmed &&
                   agreement.lender_confirmed &&
                   agreement.transfer_slip_url &&
                   !agreement.borrower_confirmed_transfer
                 ? `/debt/${room.agreement_id}`
-                : room.pending_action_type === "confirm"
+                : actionType === "confirm"
                   ? `/agreement/${room.agreement_id}/confirm`
                   : `/debt/${room.agreement_id}`,
           priority,

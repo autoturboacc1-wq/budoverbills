@@ -2,7 +2,7 @@ import { DebtAgreement, DebtCardData, UpcomingInstallmentData, CompletedAgreemen
 import { isUserLender } from '@/domains/role/getUserRoleInAgreement';
 import { calculateRemainingAmount, countPaidInstallments, calculateInterestPaid, isAgreementEffectivelyCompleted } from './calculateRemainingAmount';
 import { getNextInstallment, formatDueDate, calculateDaysUntilDue } from './getNextInstallment';
-import { getDebtCardStatus } from './getAgreementDisplayStatus';
+import { getDebtCardStatus, isAgreementPaymentReady } from './getAgreementDisplayStatus';
 
 /**
  * Get partner name based on user role
@@ -102,7 +102,7 @@ export function mapToUpcomingInstallments(
   const upcoming: UpcomingInstallmentData[] = [];
   
   agreements.forEach((agreement) => {
-    if (agreement.status !== 'active') return;
+    if (!isAgreementPaymentReady(agreement)) return;
     
     const isLender = isUserLender(agreement, userId);
     const partnerName = getPartnerName(agreement, userId);

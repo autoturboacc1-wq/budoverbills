@@ -42,6 +42,7 @@ export {
 export { 
   getAgreementDisplayStatus, 
   getDebtCardStatus,
+  isAgreementPaymentReady,
   needsUserConfirmation 
 } from './getAgreementDisplayStatus';
 
