@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { PageTransition } from "@/components/ux/PageTransition";
-import { ArrowLeft, ArrowRight, Send, User, Calendar, Percent, Calculator, Info, AlertTriangle, Coins, Building, CheckCircle, Loader2, Link as LinkIcon, UserPlus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Send, User, Calendar, Percent, Calculator, Info, AlertTriangle, AlertCircle, Coins, Building, CheckCircle, Loader2, Link as LinkIcon, Shield, UserPlus, X } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -12,7 +12,6 @@ import { toast } from "sonner";
 import { useDebtAgreements, CreateAgreementInput } from "@/hooks/useDebtAgreements";
 import { useDbFriends, type DbFriend } from "@/hooks/useDbFriends";
 import { useAuth } from "@/contexts/AuthContext";
-import { PasswordConfirmDialog } from "@/components/PasswordConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { THAI_BANKS } from "@/constants/thaibanks";
 import { buildEffectiveRateSchedule, getPeriodsPerYear } from "@/domains/debt/recalculateEffectiveRateSchedule";
@@ -39,7 +38,7 @@ import {
 } from "@/components/ux";
 
 type InterestType = "none" | "flat" | "effective";
-const FINAL_CREATE_AGREEMENT_STEP = 3;
+const FINAL_CREATE_AGREEMENT_STEP = 4;
 
 interface CalculationResult {
   perInstallment: number;
@@ -137,13 +136,13 @@ export default function CreateAgreement() {
   const { createAgreement } = useDebtAgreements();
   const { friends, isLoading: friendsLoading } = useDbFriends();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [showFriendPicker, setShowFriendPicker] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<SelectedBorrowerFriend | null>(null);
   const [savedBankAccounts, setSavedBankAccounts] = useState<SavedBankAccount[]>([]);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState("");
   const [isLoadingBankAccounts, setIsLoadingBankAccounts] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
+  const [createConfirmText, setCreateConfirmText] = useState("");
   
   const [formData, setFormData] = useState({
     partnerName: "",
@@ -316,8 +315,12 @@ export default function CreateAgreement() {
       return;
     }
 
-    // Show password confirmation dialog
-    setShowPasswordConfirm(true);
+    if (!isCreateConfirmTextValid) {
+      toast.error("กรุณาพิมพ์คำว่า 'ยืนยัน' ให้ถูกต้อง");
+      return;
+    }
+
+    void handleConfirmedSubmit();
   };
 
   // Actually submit after password verification
@@ -601,12 +604,15 @@ export default function CreateAgreement() {
   const hasSelectedBankAccount =
     Boolean(selectedBankAccountId) && Boolean(formData.bankName) && Boolean(formData.accountNumber) && Boolean(formData.accountName);
   const selectedSavedBankAccount = savedBankAccounts.find((account) => account.id === selectedBankAccountId);
+  const isCreateConfirmTextValid = createConfirmText.trim().toLowerCase() === "ยืนยัน";
+  const showCreateConfirmMismatch = createConfirmText.trim().length > 0 && !isCreateConfirmTextValid;
 
   const stepDefinitions = [
     { title: "ผู้ยืม", description: "เลือกจากเพื่อน" },
     { title: "ยอดเงิน", description: "เงิน งวด ดอก" },
     { title: "บัญชี", description: "รับเงินคืน" },
     { title: "ตรวจสอบ", description: "Review all" },
+    { title: "ยืนยัน", description: "พิมพ์ยืนยัน" },
   ];
 
   const canProceedByStep = [
@@ -614,6 +620,12 @@ export default function CreateAgreement() {
     !!formData.amount && principalAmount > 0 && installmentCount > 0 && !!selectedCalculation && hasValidRequiredInterestRate,
     hasSelectedBankAccount,
     !!selectedCalculation && hasSelectedFriend && !!formData.amount && hasSelectedBankAccount && hasValidRequiredInterestRate,
+    !!selectedCalculation &&
+      hasSelectedFriend &&
+      !!formData.amount &&
+      hasSelectedBankAccount &&
+      hasValidRequiredInterestRate &&
+      isCreateConfirmTextValid,
   ];
 
   const getBankLabel = (value: string) => {
@@ -663,6 +675,12 @@ export default function CreateAgreement() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentStep]);
+
+  useEffect(() => {
+    if (currentStep !== FINAL_CREATE_AGREEMENT_STEP) {
+      setCreateConfirmText("");
+    }
   }, [currentStep]);
 
   return (
@@ -1466,12 +1484,50 @@ export default function CreateAgreement() {
             </motion.div>
           )}
 
+          {currentStep === FINAL_CREATE_AGREEMENT_STEP && (
+            <motion.div
+              id="agreement-step-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-5 rounded-[1.25rem] border border-primary/25 bg-primary/[0.03] p-5 transition-all"
+            >
+              <div className="text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                  <Shield className="h-8 w-8 text-primary" aria-hidden="true" />
+                </div>
+                <h2 className="font-heading text-lg font-semibold text-foreground">ยืนยันการสร้างข้อตกลง</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  ตรวจสอบรายละเอียดทั้งหมดแล้ว พิมพ์คำว่า "ยืนยัน" เพื่อสร้างรายการและไปลงนามสัญญา
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="create-confirm-text">พิมพ์คำว่า "ยืนยัน" เพื่อดำเนินการ</Label>
+                <Input
+                  id="create-confirm-text"
+                  type="text"
+                  value={createConfirmText}
+                  onChange={(event) => setCreateConfirmText(event.target.value)}
+                  placeholder="พิมพ์ ยืนยัน"
+                  className={`h-12 text-center text-lg ${showCreateConfirmMismatch ? "border-destructive" : ""}`}
+                  aria-invalid={showCreateConfirmMismatch}
+                />
+                {showCreateConfirmMismatch && (
+                  <p className="flex items-center gap-1 text-sm text-destructive">
+                    <AlertCircle className="h-3 w-3" aria-hidden="true" />
+                    กรุณาพิมพ์คำว่า "ยืนยัน" ให้ถูกต้อง
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
+
           <PrimaryActionBar>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-muted-foreground">
                 {currentStep < stepDefinitions.length - 1
                   ? `ขั้นถัดไป: ${stepDefinitions[currentStep + 1].title}`
-                  : "พร้อมสร้างและลงนามสัญญา"}
+                  : "พิมพ์ยืนยันเพื่อสร้างและลงนามสัญญา"}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -1494,7 +1550,7 @@ export default function CreateAgreement() {
                     onClick={() => setCurrentStep((step) => step + 1)}
                     disabled={!canProceedByStep[currentStep]}
                   >
-                    ถัดไป
+                    {currentStep === 3 ? "ยืนยันรายละเอียด" : "ถัดไป"}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 ) : (
@@ -1575,16 +1631,6 @@ export default function CreateAgreement() {
           </DialogContent>
         </Dialog>
 
-        {/* Password Confirmation Dialog */}
-        <PasswordConfirmDialog
-          open={showPasswordConfirm}
-          onOpenChange={setShowPasswordConfirm}
-          onConfirm={handleConfirmedSubmit}
-          title="ยืนยันการสร้างข้อตกลง"
-          description="กรุณาใส่รหัสผ่านเพื่อสร้างข้อตกลง จากนั้นระบบจะพาไปลงนามสัญญากู้ยืม"
-          confirmButtonText="สร้างข้อตกลง"
-          isLoading={isSubmitting}
-        />
       </div>
     </div>
     </PageTransition>
