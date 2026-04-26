@@ -23,8 +23,8 @@ const statusConfig: Record<
     Icon: CircleDashed,
   },
   due_soon: {
-    dot: "bg-amber-500",
-    card: "border-amber-500/20 bg-amber-500/8",
+    dot: "bg-status-overdue",
+    card: "border-status-overdue/20 bg-status-overdue/8",
     Icon: Clock3,
   },
   overdue: {

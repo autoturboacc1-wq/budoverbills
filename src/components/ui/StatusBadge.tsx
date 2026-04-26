@@ -24,7 +24,7 @@ const statusConfig = {
   paid: { label: "ชำระแล้ว", dotClass: "bg-status-paid" },
   pending: { label: "ยังไม่ยืนยัน", dotClass: "bg-status-pending" },
   overdue: { label: "เลยกำหนด", dotClass: "bg-status-overdue" },
-  due_soon: { label: "ใกล้ครบกำหนด", dotClass: "bg-status-pending" },
+  due_soon: { label: "ใกล้ครบกำหนด", dotClass: "bg-status-overdue" },
   verifying: { label: "รอตรวจสอบ", dotClass: "bg-foreground" },
   rejected: { label: "ต้องแก้ไข", dotClass: "bg-destructive" },
   negotiating: { label: "อยู่ระหว่างตกลง", dotClass: "bg-status-negotiating" },

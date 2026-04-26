@@ -674,7 +674,7 @@ const buildGuideArticles = (isThai: boolean): HelpArticle[] => [
               {isThai ? "รอยืนยัน" : "waiting for confirmation"}
             </li>
             <li>
-              • <span className="text-status-overdue font-medium">{isThai ? "สีส้ม" : "Orange"}</span> ={" "}
+              • <span className="text-status-overdue font-medium">{isThai ? "สีแดง" : "Red"}</span> ={" "}
               {isThai ? "เลยกำหนด" : "overdue"}
             </li>
           </ul>

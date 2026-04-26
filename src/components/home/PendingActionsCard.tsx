@@ -138,8 +138,8 @@ export const PendingActionsCard = () => {
         const counterpartyName = profileMap.get(counterpartyId || "") || agreement.borrower_name || "ไม่ระบุชื่อ";
 
         const isOverdue = nextInstallment?.status === "overdue";
-        const priority: "critical" | "important" | "info" = isOverdue ? "critical" : 
-          room.pending_action_type === "pay" ? "important" : "info";
+        const priority: "critical" | "important" | "info" =
+          room.pending_action_type === "pay" || isOverdue ? "critical" : "info";
 
         let title = "";
         let description = "";

@@ -34,6 +34,8 @@ export function DebtCard({
     100,
     (installmentProgress.current / Math.max(installmentProgress.total, 1)) * 100,
   );
+  const obligationClass = isLender ? "text-muted-foreground" : "text-destructive";
+  const progressClass = isLender ? "bg-foreground" : "bg-destructive";
 
   return (
     <motion.button
@@ -59,7 +61,7 @@ export function DebtCard({
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-foreground">{partnerName}</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
+            <p className={`mt-0.5 text-[11px] ${obligationClass}`}>
               {isLender ? "ต้องรับ" : "ต้องจ่าย"} <span className="num">฿{remainingAmount.toLocaleString()}</span>
             </p>
           </div>
@@ -85,7 +87,7 @@ export function DebtCard({
             initial={{ width: 0 }}
             animate={{ width: `${progressPercent}%` }}
             transition={{ duration: 0.7, delay: delay + 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className="h-px bg-foreground"
+            className={`h-px ${progressClass}`}
           />
         </div>
       </div>

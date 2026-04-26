@@ -492,7 +492,7 @@ export default function DebtDetail() {
 
           <div className="text-center py-4 border-y border-border">
             <p className="text-sm text-muted-foreground">ยอดคงเหลือ</p>
-            <p className="text-3xl font-heading font-bold text-foreground">
+            <p className={`text-3xl font-heading font-bold ${isBorrower ? "text-destructive" : "text-foreground"}`}>
               ฿{remainingAmount.toLocaleString()}
             </p>
             <p className="text-sm text-muted-foreground">
@@ -653,6 +653,8 @@ export default function DebtDetail() {
               const status = getInstallmentStatus(inst);
               const hasSlip = !!inst.payment_proof_url;
               const isFeeInstallment = inst.principal_portion === 0 && inst.amount > 0;
+              const isPaymentDueForCurrentUser =
+                isBorrower && canUseInstallmentActions && status !== 'paid' && !hasSlip;
               
               return (
                 <motion.div
@@ -661,12 +663,14 @@ export default function DebtDetail() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.3 + index * 0.1 }}
                   className={`p-4 rounded-xl border-2 ${
-                    isFeeInstallment
-                      ? "bg-amber-500/5 border-amber-500/20"
-                      : status === 'paid' 
+                    status === 'paid'
                       ? "bg-status-paid/10 border-status-paid/30" 
                       : status === 'rejected'
                       ? "bg-destructive/10 border-destructive"
+                      : isPaymentDueForCurrentUser
+                      ? "bg-destructive/8 border-destructive/30"
+                      : isFeeInstallment
+                      ? "bg-amber-500/5 border-amber-500/20"
                       : status === 'overdue'
                       ? "bg-status-overdue/10 border-transparent"
                       : status === 'pending'
@@ -706,7 +710,15 @@ export default function DebtDetail() {
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      {isFeeInstallment ? (
+                      {isPaymentDueForCurrentUser ? (
+                        <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center">
+                          {isFeeInstallment ? (
+                            <ReceiptText className="w-4 h-4 text-destructive" />
+                          ) : (
+                            <CreditCard className="w-4 h-4 text-destructive" />
+                          )}
+                        </div>
+                      ) : isFeeInstallment ? (
                         <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center">
                           <ReceiptText className="w-4 h-4 text-amber-600" />
                         </div>
@@ -723,11 +735,15 @@ export default function DebtDetail() {
                       )}
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-foreground">
+                          <p className={`font-medium ${isPaymentDueForCurrentUser ? "text-destructive" : "text-foreground"}`}>
                             {isFeeInstallment ? 'ค่าเลื่อนงวด' : `งวดที่ ${inst.installment_number}`}
                           </p>
                           {isFeeInstallment && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                              isPaymentDueForCurrentUser
+                                ? "bg-destructive/10 text-destructive"
+                                : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                            }`}>
                               Fee
                             </span>
                           )}
@@ -758,7 +774,13 @@ export default function DebtDetail() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className={`font-semibold ${isFeeInstallment ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}`}>
+                      <p className={`font-semibold ${
+                        isPaymentDueForCurrentUser
+                          ? "text-destructive"
+                          : isFeeInstallment
+                            ? "text-amber-700 dark:text-amber-400"
+                            : "text-foreground"
+                      }`}>
                         ฿{inst.amount.toLocaleString()}
                       </p>
                     </div>
@@ -818,7 +840,11 @@ export default function DebtDetail() {
                           <Button
                             size="sm"
                             variant={inst.payment_proof_url ? "ghost" : "outline"}
-                            className="text-xs"
+                            className={`text-xs ${
+                              inst.payment_proof_url
+                                ? ""
+                                : "border-destructive/30 text-destructive hover:border-destructive hover:bg-destructive/10 hover:text-destructive"
+                            }`}
                             onClick={() => handleInstallmentClick(inst as Installment)}
                           >
                             {inst.payment_proof_url ? (
@@ -875,9 +901,9 @@ export default function DebtDetail() {
                 <p className="text-xs text-muted-foreground mb-1">จ่ายแล้ว</p>
                 <p className="font-semibold text-status-paid">฿{feeSummary.paid.toLocaleString()}</p>
               </div>
-              <div className="text-center p-3 rounded-xl bg-amber-500/10">
+              <div className="text-center p-3 rounded-xl bg-destructive/10">
                 <p className="text-xs text-muted-foreground mb-1">ค้างชำระ</p>
-                <p className="font-semibold text-amber-600">฿{feeSummary.pending.toLocaleString()}</p>
+                <p className="font-semibold text-destructive">฿{feeSummary.pending.toLocaleString()}</p>
               </div>
             </div>
           </motion.div>

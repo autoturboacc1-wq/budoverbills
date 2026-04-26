@@ -50,13 +50,13 @@
 
     --status-success: 219 91% 42%;
     --status-warning: 212 100% 46%;
-    --status-danger: 217 91% 38%;
+    --status-danger: 0 84% 60%;
     --status-info: 211 100% 50%;
     --status-neutral: 217 32% 42%;
 
     --status-paid: 219 91% 42%;
     --status-pending: 212 100% 46%;
-    --status-overdue: 217 91% 38%;
+    --status-overdue: 0 84% 60%;
     --status-negotiating: 211 100% 50%;
 
     /* Chat bubbles */
@@ -120,13 +120,13 @@
 
     --status-success: 214 100% 68%;
     --status-warning: 212 100% 64%;
-    --status-danger: 217 100% 72%;
+    --status-danger: 0 84% 64%;
     --status-info: 211 100% 66%;
     --status-neutral: 214 52% 74%;
 
     --status-paid: 214 100% 68%;
     --status-pending: 212 100% 64%;
-    --status-overdue: 217 100% 72%;
+    --status-overdue: 0 84% 64%;
     --status-negotiating: 211 100% 50%;
 
     --chat-bubble-me: 219 91% 58%;

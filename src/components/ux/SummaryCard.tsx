@@ -38,7 +38,7 @@ export function SummaryCard({
           />
         ) : null}
       </div>
-      <p className="font-serif-display text-[1.85rem] leading-none text-foreground num">
+      <p className={cn("font-serif-display text-[1.85rem] leading-none num", accentClass[priority])}>
         {value}
       </p>
       {hint ? (

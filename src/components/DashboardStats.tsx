@@ -16,13 +16,15 @@ function formatDueLabel(days: number): string {
   return `อีก ${days} วัน`;
 }
 
-function getDueAccent(days: number): string {
+function getDueAccent(days: number, isLender: boolean): string {
+  if (!isLender) return "text-destructive";
   if (days <= 0) return "text-destructive";
   if (days <= 2) return "text-status-pending";
   return "text-muted-foreground";
 }
 
-function getDueDot(days: number): string {
+function getDueDot(days: number, isLender: boolean): string {
+  if (!isLender) return "bg-destructive";
   if (days <= 0) return "bg-destructive";
   if (days <= 2) return "bg-status-pending";
   return "bg-muted-foreground/60";
@@ -56,7 +58,7 @@ export function DashboardStats() {
           label="ต้องจ่าย"
           value={`฿${stats.totalToPay.toLocaleString()}`}
           icon={TrendingDown}
-          priority="warning"
+          priority="danger"
         />
       </div>
 
@@ -82,17 +84,19 @@ export function DashboardStats() {
                 <div className="flex min-w-0 items-center gap-3">
                   <span
                     aria-hidden
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${getDueDot(item.daysUntilDue)}`}
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${getDueDot(item.daysUntilDue, item.isLender)}`}
                   />
                   <div className="min-w-0">
                     <p className="truncate text-sm text-foreground">{item.partnerName}</p>
                     <p className="text-[11px] text-muted-foreground">
                       {item.isLender ? "รับ" : "จ่าย"}{" "}
-                      <span className="num">฿{item.amount.toLocaleString()}</span>
+                      <span className={`num ${item.isLender ? "" : "font-medium text-destructive"}`}>
+                        ฿{item.amount.toLocaleString()}
+                      </span>
                     </p>
                   </div>
                 </div>
-                <span className={`text-[11px] font-medium ${getDueAccent(item.daysUntilDue)}`}>
+                <span className={`text-[11px] font-medium ${getDueAccent(item.daysUntilDue, item.isLender)}`}>
                   {formatDueLabel(item.daysUntilDue)}
                 </span>
               </motion.li>
