@@ -33,6 +33,13 @@ export default function DebtDetail() {
   const { requests, fetchRequests, loading: rescheduleLoading } = useRescheduleRequests();
 
   const agreement = getAgreement(id || "");
+  const canUseInstallmentActions =
+    agreement?.status === 'active' || agreement?.status === 'rescheduling';
+  const showTransferProof =
+    agreement?.status === 'active' ||
+    (agreement?.status === 'pending_confirmation' &&
+      Boolean(agreement.contract_finalized_at) &&
+      Boolean(agreement.borrower_confirmed));
   
   // State for reschedule dialog
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
@@ -79,7 +86,9 @@ export default function DebtDetail() {
     let shouldReplaceSearchParams = false;
     
     if (payInstallmentId) {
-      const installment = agreement.installments.find(i => i.id === payInstallmentId);
+      const installment = canUseInstallmentActions
+        ? agreement.installments.find(i => i.id === payInstallmentId)
+        : null;
       if (installment && installment.status !== 'paid') {
         setSelectedPaymentInstallment(installment);
         setPaymentDialogOpen(true);
@@ -108,7 +117,7 @@ export default function DebtDetail() {
     if (shouldReplaceSearchParams) {
       setSearchParams(nextSearchParams, { replace: true });
     }
-  }, [agreement?.installments, searchParams, setSearchParams]);
+  }, [agreement?.installments, canUseInstallmentActions, searchParams, setSearchParams]);
   
   // Filter pending requests
   const pendingRequests = useMemo(() => {
@@ -228,6 +237,13 @@ export default function DebtDetail() {
   }, [agreement]);
 
   const handleInstallmentClick = (inst: Installment) => {
+    if (!canUseInstallmentActions) {
+      toast.error("ยังไม่สามารถชำระงวดได้", {
+        description: "ต้องรอผู้ให้ยืมอัปโหลดสลิปโอนเงิน และผู้ยืมยืนยันว่าได้รับเงินก่อน",
+      });
+      return;
+    }
+
     // Only allow clicking on unpaid installments
     if (inst.status === 'paid') return;
     setSelectedPaymentInstallment(inst);
@@ -610,7 +626,7 @@ export default function DebtDetail() {
         </motion.div>
 
         {/* Transfer Proof Section - Lender's proof of transfer */}
-        {agreement.status === 'active' && (
+        {showTransferProof && (
           <TransferProofSection
             agreementId={agreement.id}
             transferSlipUrl={agreement.transfer_slip_url || null}
@@ -619,6 +635,7 @@ export default function DebtDetail() {
             borrowerConfirmedTransferAt={agreement.borrower_confirmed_transfer_at || null}
             isLender={isLender}
             isBorrower={isBorrower}
+            requiresLenderConfirmationForUpload={agreement.status === 'pending_confirmation'}
             onUpdate={refresh}
           />
         )}
@@ -751,7 +768,7 @@ export default function DebtDetail() {
                   {status !== 'paid' && (
                     <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between gap-2">
                       {/* Reschedule button for borrowers - only for regular installments */}
-                      {isBorrower && !isFeeInstallment && (
+                      {isBorrower && canUseInstallmentActions && !isFeeInstallment && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -764,6 +781,9 @@ export default function DebtDetail() {
                           <Clock className="w-3 h-3 mr-1" />
                           ขอเลื่อน
                         </Button>
+                      )}
+                      {isBorrower && !canUseInstallmentActions && !isFeeInstallment && (
+                        <span className="text-xs text-muted-foreground">รอยืนยันรับเงินก่อนเริ่มชำระ</span>
                       )}
                       {isFeeInstallment && (
                         <span className="text-xs text-muted-foreground">ไม่สามารถขอเลื่อนได้</span>
@@ -794,7 +814,7 @@ export default function DebtDetail() {
                           </Button>
                         )}
                         {/* Borrower: can pay or view slip */}
-                        {isBorrower && (
+                        {isBorrower && canUseInstallmentActions && (
                           <Button
                             size="sm"
                             variant={inst.payment_proof_url ? "ghost" : "outline"}
@@ -812,6 +832,17 @@ export default function DebtDetail() {
                                 ชำระเงิน
                               </>
                             )}
+                          </Button>
+                        )}
+                        {isBorrower && !canUseInstallmentActions && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs"
+                            disabled
+                          >
+                            <CreditCard className="w-3 h-3 mr-1" />
+                            ยังชำระไม่ได้
                           </Button>
                         )}
                       </div>

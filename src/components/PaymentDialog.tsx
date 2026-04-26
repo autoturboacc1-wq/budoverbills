@@ -233,6 +233,7 @@ export function PaymentDialog({
   }, [effectiveAmount, installment, agreement, calculateExtraPaymentPreview, liveInstallmentAmount]);
 
   const isExtraPayment = effectiveAmount > liveInstallmentAmount;
+  const canSubmitInstallmentPayment = agreement.status === 'active' || agreement.status === 'rescheduling';
 
   // Count rejected verifications
   const rejectionCount = useMemo(() => {
@@ -245,6 +246,13 @@ export function PaymentDialog({
     if (uploadLockRef.current) return;
     if (!user || isLender || user.id !== agreement.borrower_id) {
       toast.error("คุณไม่มีสิทธิ์อัปโหลดสลิปงวดนี้");
+      return;
+    }
+
+    if (!canSubmitInstallmentPayment) {
+      toast.error("ยังไม่สามารถชำระงวดได้", {
+        description: "ต้องรอการยืนยันรับเงินให้ครบก่อน",
+      });
       return;
     }
 
@@ -315,6 +323,12 @@ export function PaymentDialog({
   const handleSubmitPayment = async () => {
     if (!installment || !slipUrl || !user) return;
     if (borrowerSubmitLockRef.current) return;
+    if (!canSubmitInstallmentPayment) {
+      toast.error("ยังไม่สามารถชำระงวดได้", {
+        description: "ต้องรอการยืนยันรับเงินให้ครบก่อน",
+      });
+      return;
+    }
     if (numericAmount < liveInstallmentAmount) {
       toast.error("ยอดเงินต้องไม่น้อยกว่าค่างวด");
       return;

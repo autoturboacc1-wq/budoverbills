@@ -19,6 +19,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import {
   getPaymentSlipSignedUrl,
   uploadPaymentSlip,
@@ -33,6 +34,7 @@ interface TransferProofSectionProps {
   borrowerConfirmedTransferAt: string | null;
   isLender: boolean;
   isBorrower: boolean;
+  requiresLenderConfirmationForUpload?: boolean;
   onUpdate: () => void;
 }
 
@@ -44,6 +46,7 @@ export function TransferProofSection({
   borrowerConfirmedTransferAt,
   isLender,
   isBorrower,
+  requiresLenderConfirmationForUpload = false,
   onUpdate,
 }: TransferProofSectionProps) {
   const [isUploading, setIsUploading] = useState(false);
@@ -53,6 +56,7 @@ export function TransferProofSection({
   const [loadingUrl, setLoadingUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Get signed URL when opening preview
   useEffect(() => {
@@ -73,6 +77,12 @@ export function TransferProofSection({
 
     if (!user?.id || !isLender) {
       toast.error("คุณไม่มีสิทธิ์อัปโหลดสลิปนี้");
+      return;
+    }
+
+    if (requiresLenderConfirmationForUpload) {
+      toast.error("กรุณายืนยันการโอนเงินจากหน้าคอนเฟิร์ม");
+      navigate(`/agreement/${agreementId}/confirm`);
       return;
     }
 
@@ -151,6 +161,11 @@ export function TransferProofSection({
   };
 
   const triggerFileInput = () => {
+    if (isLender && requiresLenderConfirmationForUpload) {
+      navigate(`/agreement/${agreementId}/confirm`);
+      return;
+    }
+
     fileInputRef.current?.click();
   };
 
@@ -213,7 +228,7 @@ export function TransferProofSection({
                 ) : (
                   <>
                     <Upload className="w-4 h-4 mr-2" />
-                    อัปโหลดสลิปโอน
+                    {requiresLenderConfirmationForUpload ? "ยืนยันโอนเงิน" : "อัปโหลดสลิปโอน"}
                   </>
                 )}
               </Button>
@@ -310,7 +325,7 @@ export function TransferProofSection({
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4 mr-1" />
-                      ยืนยันรับเงิน
+                      ตกลง รับเงินแล้ว
                     </>
                   )}
                 </Button>
@@ -333,7 +348,7 @@ export function TransferProofSection({
                 ) : (
                   <Upload className="w-4 h-4 mr-1" />
                 )}
-                อัปโหลดใหม่
+                {requiresLenderConfirmationForUpload ? "แก้ไขสลิปที่หน้ายืนยัน" : "อัปโหลดใหม่"}
               </Button>
             </div>
           )}
