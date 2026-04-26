@@ -82,6 +82,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   requireAuth: (action: string) => boolean;
   refreshProfile: () => Promise<void>;
+  markPdpaAccepted: (acceptedAt: string) => void;
   isPasswordRecovery: boolean;
 }
 
@@ -170,6 +171,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await fetchProfile(user.id, setProfileLoading);
     }
   }, [fetchProfile, user]);
+
+  const markPdpaAccepted = useCallback((acceptedAt: string) => {
+    setProfile((currentProfile) => (
+      currentProfile
+        ? { ...currentProfile, pdpa_accepted_at: acceptedAt }
+        : currentProfile
+    ));
+  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -327,6 +336,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     requireAuth,
     refreshProfile,
+    markPdpaAccepted,
     isPasswordRecovery,
   }), [
     user,
@@ -339,6 +349,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     requireAuth,
     refreshProfile,
+    markPdpaAccepted,
     isPasswordRecovery,
   ]);
 

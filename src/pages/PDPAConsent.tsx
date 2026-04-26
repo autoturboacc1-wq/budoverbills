@@ -1,24 +1,80 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { PageTransition } from "@/components/ux/PageTransition";
 import { useNavigate } from "react-router-dom";
-import { Shield, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Shield, Check, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+const PDPA_DASHBOARD_REDIRECT_KEY = "budoverbills:pdpa-dashboard-redirect";
+
+function readPendingDashboardRedirect() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    return window.sessionStorage.getItem(PDPA_DASHBOARD_REDIRECT_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function setPendingDashboardRedirect() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(PDPA_DASHBOARD_REDIRECT_KEY, "true");
+  } catch {
+    // Ignore storage failures; the in-memory redirect state still handles this tab.
+  }
+}
+
+function clearPendingDashboardRedirect() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.sessionStorage.removeItem(PDPA_DASHBOARD_REDIRECT_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
 export default function PDPAConsent() {
   const navigate = useNavigate();
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, markPdpaAccepted } = useAuth();
   const [accepted, setAccepted] = useState(false);
   const [termsExpanded, setTermsExpanded] = useState(false);
   const [privacyExpanded, setPrivacyExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(readPendingDashboardRedirect);
 
   // If user already accepted PDPA, just show as read-only
-  const alreadyAccepted = profile?.pdpa_accepted_at;
+  const alreadyAccepted = profile?.pdpa_accepted_at ?? null;
+
+  useEffect(() => {
+    if (!isRedirecting) {
+      return;
+    }
+
+    if (profile && !alreadyAccepted) {
+      clearPendingDashboardRedirect();
+      setIsRedirecting(false);
+      return;
+    }
+
+    if (alreadyAccepted) {
+      clearPendingDashboardRedirect();
+      navigate("/", { replace: true });
+    }
+  }, [alreadyAccepted, isRedirecting, navigate, profile]);
 
   const handleAccept = async () => {
     if (!accepted) {
@@ -33,22 +89,53 @@ export default function PDPAConsent() {
 
     setIsLoading(true);
     try {
+      const acceptedAt = new Date().toISOString();
       const { error } = await supabase
         .from('profiles')
-        .update({ pdpa_accepted_at: new Date().toISOString() })
+        .update({ pdpa_accepted_at: acceptedAt })
         .eq('user_id', user.id);
 
       if (error) throw error;
 
-      await refreshProfile();
+      setPendingDashboardRedirect();
+      markPdpaAccepted(acceptedAt);
+      setIsRedirecting(true);
       toast.success("ยอมรับข้อกำหนดเรียบร้อยแล้ว");
       navigate("/", { replace: true });
     } catch (error) {
+      clearPendingDashboardRedirect();
+      setIsRedirecting(false);
       toast.error("เกิดข้อผิดพลาด กรุณาลองใหม่");
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isRedirecting) {
+    return (
+      <PageTransition>
+        <div className="min-h-dvh bg-gradient-hero flex flex-col">
+          <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="max-w-md mx-auto w-full"
+            >
+              <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <Loader2 className="w-10 h-10 text-primary animate-spin" />
+              </div>
+              <h1 className="text-2xl font-heading font-semibold text-foreground">
+                กำลังพาไปหน้าแดชบอร์ด
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                บันทึกความยินยอมเรียบร้อยแล้ว
+              </p>
+            </motion.div>
+          </div>
+        </div>
+      </PageTransition>
+    );
+  }
 
   return (
     <PageTransition>
