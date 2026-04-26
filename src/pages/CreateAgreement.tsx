@@ -363,7 +363,7 @@ export default function CreateAgreement() {
           try {
             await navigator.clipboard.writeText(inviteUrl);
             toast.success("สร้างข้อตกลงและคัดลอกลิงก์เชิญแล้ว", {
-              description: "ส่งลิงก์นี้ให้ผู้ยืมเพื่อผูกบัญชีและยืนยันข้อตกลง",
+              description: "ลงนามสัญญาก่อน แล้วส่งลิงก์นี้ให้ผู้ยืมรีวิวและยืนยัน",
             });
           } catch {
             toast.success("สร้างข้อตกลงสำเร็จ", {
@@ -371,9 +371,11 @@ export default function CreateAgreement() {
             });
           }
         } else {
-          toast.success("ส่งคำขอให้ผู้ยืมยืนยันสำเร็จ");
+          toast.success("สร้างข้อตกลงสำเร็จ", {
+            description: "กรุณาลงนามสัญญากู้ยืมก่อนส่งให้ผู้ยืมยืนยัน",
+          });
         }
-        navigate("/");
+        navigate(`/agreement/${result}/contract`);
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1458,7 +1460,7 @@ export default function CreateAgreement() {
             >
               <ReviewPanel
                 title="ตรวจสอบทั้งหมดก่อนส่ง"
-                description="ข้อมูลนี้จะถูกส่งให้ผู้ยืมยืนยันในขั้นถัดไป"
+                description="หลังจากสร้างรายการ ระบบจะพาคุณไปลงนามสัญญากู้ยืมก่อน ผู้ยืมจึงจะรีวิวและยืนยันต่อได้"
                 rows={reviewRows}
               />
             </motion.div>
@@ -1469,7 +1471,7 @@ export default function CreateAgreement() {
               <div className="text-sm text-muted-foreground">
                 {currentStep < stepDefinitions.length - 1
                   ? `ขั้นถัดไป: ${stepDefinitions[currentStep + 1].title}`
-                  : "พร้อมส่งให้ผู้ยืมยืนยัน"}
+                  : "พร้อมสร้างและลงนามสัญญา"}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -1505,7 +1507,7 @@ export default function CreateAgreement() {
                     ) : (
                       <>
                         <Send className="mr-2 h-4 w-4" />
-                        ส่งให้ผู้ยืมยืนยัน
+                        สร้างและไปลงนาม
                       </>
                     )}
                   </Button>
@@ -1578,9 +1580,9 @@ export default function CreateAgreement() {
           open={showPasswordConfirm}
           onOpenChange={setShowPasswordConfirm}
           onConfirm={handleConfirmedSubmit}
-          title="ยืนยันการส่งคำขอให้ผู้ยืม"
-          description="กรุณาใส่รหัสผ่านเพื่อยืนยันการสร้างข้อตกลงในฐานะผู้ให้ยืม"
-          confirmButtonText="ส่งให้ผู้ยืมยืนยัน"
+          title="ยืนยันการสร้างข้อตกลง"
+          description="กรุณาใส่รหัสผ่านเพื่อสร้างข้อตกลง จากนั้นระบบจะพาไปลงนามสัญญากู้ยืม"
+          confirmButtonText="สร้างข้อตกลง"
           isLoading={isSubmitting}
         />
       </div>

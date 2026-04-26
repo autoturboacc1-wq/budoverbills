@@ -64,6 +64,9 @@ export interface DebtAgreement {
   borrower_confirmed_ip?: string | null;
   borrower_confirmed_device?: string | null;
   borrower_confirmed_at?: string | null;
+  contract_finalized_at?: string | null;
+  contract_hash?: string | null;
+  contract_template_version?: string | null;
 }
 
 export interface CreateAgreementInstallmentInput {

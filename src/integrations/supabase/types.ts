@@ -307,6 +307,11 @@ export type Database = {
           borrower_id: string | null
           borrower_name: string | null
           borrower_phone: string | null
+          borrower_party_info: Json | null
+          contract_finalized_at: string | null
+          contract_hash: string | null
+          contract_html_snapshot: string | null
+          contract_template_version: string | null
           created_at: string
           description: string | null
           frequency: string
@@ -318,7 +323,10 @@ export type Database = {
           lender_confirmed_ip: string | null
           lender_confirmed_at: string | null
           lender_id: string
+          lender_party_info: Json | null
+          loan_purpose: string | null
           num_installments: number
+          place_of_signing: string | null
           principal_amount: number
           reschedule_fee_rate: number | null
           reschedule_interest_multiplier: number | null
@@ -343,6 +351,11 @@ export type Database = {
           borrower_id?: string | null
           borrower_name?: string | null
           borrower_phone?: string | null
+          borrower_party_info?: Json | null
+          contract_finalized_at?: string | null
+          contract_hash?: string | null
+          contract_html_snapshot?: string | null
+          contract_template_version?: string | null
           created_at?: string
           description?: string | null
           frequency?: string
@@ -354,7 +367,10 @@ export type Database = {
           lender_confirmed_ip?: string | null
           lender_confirmed_at?: string | null
           lender_id: string
+          lender_party_info?: Json | null
+          loan_purpose?: string | null
           num_installments?: number
+          place_of_signing?: string | null
           principal_amount: number
           reschedule_fee_rate?: number | null
           reschedule_interest_multiplier?: number | null
@@ -379,6 +395,11 @@ export type Database = {
           borrower_id?: string | null
           borrower_name?: string | null
           borrower_phone?: string | null
+          borrower_party_info?: Json | null
+          contract_finalized_at?: string | null
+          contract_hash?: string | null
+          contract_html_snapshot?: string | null
+          contract_template_version?: string | null
           created_at?: string
           description?: string | null
           frequency?: string
@@ -390,7 +411,10 @@ export type Database = {
           lender_confirmed_ip?: string | null
           lender_confirmed_at?: string | null
           lender_id?: string
+          lender_party_info?: Json | null
+          loan_purpose?: string | null
           num_installments?: number
+          place_of_signing?: string | null
           principal_amount?: number
           reschedule_fee_rate?: number | null
           reschedule_interest_multiplier?: number | null
@@ -1227,6 +1251,9 @@ export type Database = {
           borrower_id: string | null
           borrower_name: string | null
           borrower_phone: string | null
+          contract_finalized_at: string | null
+          contract_hash: string | null
+          contract_template_version: string | null
           created_at: string | null
           description: string | null
           frequency: string | null
@@ -1263,6 +1290,9 @@ export type Database = {
           borrower_id?: string | null
           borrower_name?: never
           borrower_phone?: never
+          contract_finalized_at?: string | null
+          contract_hash?: string | null
+          contract_template_version?: string | null
           created_at?: string | null
           description?: string | null
           frequency?: string | null
@@ -1299,6 +1329,9 @@ export type Database = {
           borrower_id?: string | null
           borrower_name?: never
           borrower_phone?: never
+          contract_finalized_at?: string | null
+          contract_hash?: string | null
+          contract_template_version?: string | null
           created_at?: string | null
           description?: string | null
           frequency?: string | null

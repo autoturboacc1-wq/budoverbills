@@ -97,18 +97,20 @@ export const LoanContractTemplate = forwardRef<HTMLDivElement, { data: LoanContr
         className="contract-page mx-auto bg-white text-black"
         style={{
           width: "210mm",
-          minHeight: "297mm",
-          padding: "20mm 18mm",
+          height: "297mm",
+          overflow: "hidden",
+          boxSizing: "border-box",
+          padding: "12mm 14mm",
           fontFamily: APPLE_SYSTEM_FONT,
-          fontSize: "16px",
-          lineHeight: 1.7,
+          fontSize: "12px",
+          lineHeight: 1.42,
           color: "#000",
         }}
       >
-        <h1 style={{ textAlign: "center", fontSize: "22px", fontWeight: 700, marginBottom: "4px" }}>
+        <h1 style={{ textAlign: "center", fontSize: "18px", fontWeight: 700, marginBottom: "2px" }}>
           หนังสือสัญญากู้ยืมเงิน
         </h1>
-        <p style={{ textAlign: "center", fontSize: "13px", color: "#444", marginBottom: "24px" }}>
+        <p style={{ textAlign: "center", fontSize: "10px", color: "#444", margin: "0 0 10px" }}>
           (ตามประมวลกฎหมายแพ่งและพาณิชย์ มาตรา 653)
         </p>
 
@@ -117,12 +119,12 @@ export const LoanContractTemplate = forwardRef<HTMLDivElement, { data: LoanContr
           {" "}วันที่ <span style={{ borderBottom: "1px dotted #000", padding: "0 8px" }}>{formatThaiDate(data.contractDateISO)}</span>
         </p>
 
-        <p style={{ marginTop: "16px" }}>
+        <p style={{ marginTop: "8px" }}>
           สัญญานี้ทำขึ้นระหว่างคู่สัญญาทั้งสองฝ่าย ดังต่อไปนี้
         </p>
 
-        <ol style={{ paddingLeft: "20px", marginTop: "8px" }}>
-          <li style={{ marginBottom: "12px" }}>
+        <ol style={{ paddingLeft: "18px", marginTop: "6px", marginBottom: 0 }}>
+          <li style={{ marginBottom: "6px" }}>
             <strong>ผู้ให้กู้</strong>{" "}
             <span style={{ borderBottom: "1px dotted #000", padding: "0 6px" }}>{data.lender.fullName || "—"}</span>{" "}
             เลขประจำตัวประชาชน{" "}
@@ -142,26 +144,26 @@ export const LoanContractTemplate = forwardRef<HTMLDivElement, { data: LoanContr
           </li>
         </ol>
 
-        <p style={{ marginTop: "16px" }}>
+        <p style={{ marginTop: "8px" }}>
           คู่สัญญาทั้งสองฝ่ายตกลงกันมีข้อความดังต่อไปนี้
         </p>
 
-        <p style={{ marginTop: "12px", textIndent: "24px" }}>
-          <strong>ข้อ 1.</strong> ผู้กู้ได้รับเงินกู้จากผู้ให้กู้เป็นจำนวน{" "}
+        <p style={{ marginTop: "8px", textIndent: "18px" }}>
+          <strong>ข้อ 1.</strong> ผู้ให้กู้ตกลงให้ผู้กู้กู้ยืมเงินเป็นจำนวน{" "}
           <strong>{data.principalAmount.toLocaleString("en-US")} บาท</strong>{" "}
           (<em>{thaiBahtText(data.principalAmount)}</em>){" "}
           เพื่อ<span style={{ borderBottom: "1px dotted #000", padding: "0 6px" }}>{data.loanPurpose || "—"}</span>{" "}
-          และผู้กู้ได้รับเงินจำนวนดังกล่าวจากผู้ให้กู้ครบถ้วนในวันทำสัญญานี้แล้ว
+          โดยการรับเงินจะสมบูรณ์เมื่อผู้กู้ยืนยันรับเงินตามหลักฐานการโอนในระบบแล้ว
         </p>
 
-        <p style={{ marginTop: "12px", textIndent: "24px" }}>
+        <p style={{ marginTop: "8px", textIndent: "18px" }}>
           <strong>ข้อ 2.</strong> ผู้กู้ตกลงชำระเงินกู้คืนให้แก่ผู้ให้กู้{" "}
           {interestClause} โดยมียอดรวมที่ต้องชำระทั้งสิ้น{" "}
           <strong>{data.totalAmount.toLocaleString("en-US")} บาท</strong>{" "}
           (<em>{thaiBahtText(data.totalAmount)}</em>)
         </p>
 
-        <p style={{ marginTop: "12px", textIndent: "24px" }}>
+        <p style={{ marginTop: "8px", textIndent: "18px" }}>
           <strong>ข้อ 3.</strong> ผู้กู้ตกลงผ่อนชำระเป็นจำนวน{" "}
           <strong>{data.numInstallments} งวด</strong>{" "}
           แบบ{FREQUENCY_LABEL[data.frequency]} งวดละ{" "}
@@ -170,34 +172,34 @@ export const LoanContractTemplate = forwardRef<HTMLDivElement, { data: LoanContr
           โดยเริ่มชำระงวดแรกในวันที่ <strong>{formatThaiDate(data.startDate)}</strong>
         </p>
 
-        <p style={{ marginTop: "12px", textIndent: "24px" }}>
+        <p style={{ marginTop: "8px", textIndent: "18px" }}>
           <strong>ข้อ 4.</strong> หากผู้กู้ผิดนัดชำระงวดใดงวดหนึ่ง ผู้กู้ยินยอมให้ผู้ให้กู้
           เรียกร้องให้ชำระเงินที่ค้างชำระทั้งหมดได้ทันที พร้อมดอกเบี้ยผิดนัดในอัตราที่กฎหมายกำหนด
           และผู้กู้ยินยอมรับผิดชอบค่าใช้จ่ายในการทวงถามหรือดำเนินคดีตามที่เกิดขึ้นจริง
         </p>
 
-        <p style={{ marginTop: "12px", textIndent: "24px" }}>
+        <p style={{ marginTop: "8px", textIndent: "18px" }}>
           <strong>ข้อ 5.</strong> สัญญานี้จัดทำในรูปแบบอิเล็กทรอนิกส์ผ่านแอปพลิเคชัน Budoverbills
           คู่สัญญาทั้งสองฝ่ายตกลงให้ลายมือชื่ออิเล็กทรอนิกส์
           (โดยการพิมพ์ชื่อยืนยันพร้อมการบันทึกข้อมูลการเข้าใช้งาน)
           มีผลผูกพันตามพระราชบัญญัติว่าด้วยธุรกรรมทางอิเล็กทรอนิกส์ พ.ศ. 2544
         </p>
 
-        <p style={{ marginTop: "12px", textIndent: "24px" }}>
+        <p style={{ marginTop: "8px", textIndent: "18px" }}>
           <strong>ข้อ 6.</strong> คู่สัญญาทั้งสองฝ่ายได้อ่านและเข้าใจข้อความในสัญญานี้โดยตลอดแล้ว
           เห็นว่าถูกต้องตรงตามเจตนา จึงได้ลงลายมือชื่ออิเล็กทรอนิกส์ไว้เป็นหลักฐานต่อหน้ากันและกัน
         </p>
 
         {/* Signature blocks */}
-        <div style={{ display: "flex", gap: "24px", marginTop: "48px" }}>
+        <div style={{ display: "flex", gap: "20px", marginTop: "22px" }}>
           <SignatureBlock label="ผู้ให้กู้" expectedName={data.lender.fullName} signature={data.lenderSignature} />
           <SignatureBlock label="ผู้กู้" expectedName={data.borrower.fullName} signature={data.borrowerSignature} />
         </div>
 
-        <p style={{ marginTop: "32px", fontSize: "12px", color: "#555", textAlign: "center" }}>
+        <p style={{ marginTop: "14px", fontSize: "9px", color: "#555", textAlign: "center" }}>
           เอกสารฉบับนี้ออกโดยระบบ Budoverbills (เอกสารหมายเลข {data.agreementId})
         </p>
-        <p style={{ fontSize: "11px", color: "#777", textAlign: "center", marginTop: "4px" }}>
+        <p style={{ fontSize: "8px", color: "#777", textAlign: "center", marginTop: "2px" }}>
           Budoverbills เป็นเครื่องมือบันทึกข้อตกลง ไม่ใช่คู่สัญญา
           ข้อพิพาทใดๆ ให้คู่สัญญาทั้งสองฝ่ายเป็นผู้รับผิดชอบโดยตรง
         </p>
@@ -220,29 +222,29 @@ function SignatureBlock({
     <div style={{ flex: 1, textAlign: "center" }}>
       <div
         style={{
-          height: "56px",
+          height: "38px",
           borderBottom: "1px solid #000",
-          marginBottom: "6px",
+          marginBottom: "4px",
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "center",
           fontFamily: APPLE_SYSTEM_FONT,
-          fontSize: "22px",
-          paddingBottom: "4px",
+          fontSize: "16px",
+          paddingBottom: "2px",
         }}
       >
         {signature?.typedName ?? ""}
       </div>
-      <p style={{ margin: 0, fontWeight: 600 }}>(ลงชื่อ) {label}</p>
-      <p style={{ margin: 0, fontSize: "13px" }}>{expectedName || "—"}</p>
+      <p style={{ margin: 0, fontWeight: 600, fontSize: "11px" }}>(ลงชื่อ) {label}</p>
+      <p style={{ margin: 0, fontSize: "10px" }}>{expectedName || "—"}</p>
       {signature ? (
-        <p style={{ margin: "6px 0 0", fontSize: "11px", color: "#444" }}>
+        <p style={{ margin: "4px 0 0", fontSize: "8px", color: "#444" }}>
           ลงนามอิเล็กทรอนิกส์ {formatThaiDateTime(signature.signedAtISO)}
           <br />
           IP: {signature.ipAddress ?? "—"} | Device: {signature.deviceId ?? "—"}
         </p>
       ) : (
-        <p style={{ margin: "6px 0 0", fontSize: "11px", color: "#999" }}>(ยังไม่ได้ลงนาม)</p>
+        <p style={{ margin: "4px 0 0", fontSize: "8px", color: "#999" }}>(ยังไม่ได้ลงนาม)</p>
       )}
     </div>
   );

@@ -58,8 +58,10 @@ export default function AgreementInvite() {
 
         setStatus("success");
         setMessage("ผูกบัญชีผู้ยืมสำเร็จ");
-        toast.success("ผูกบัญชีผู้ยืมสำเร็จ");
-        navigate(`/agreement/${result.agreement_id}/confirm`, { replace: true });
+        toast.success("ผูกบัญชีผู้ยืมสำเร็จ", {
+          description: "กรุณารีวิวและลงนามสัญญากู้ยืมก่อนยืนยันข้อตกลง",
+        });
+        navigate(`/agreement/${result.agreement_id}/contract`, { replace: true });
       } catch (error) {
         if (cancelled) {
           return;

@@ -40,6 +40,9 @@ type DebtAgreementSecureRow = Tables<'debt_agreements_secure'> & {
   borrower_confirmed_ip?: string | null;
   borrower_confirmed_device?: string | null;
   borrower_confirmed_at?: string | null;
+  contract_finalized_at?: string | null;
+  contract_hash?: string | null;
+  contract_template_version?: string | null;
 };
 
 type ProfileMap = Record<string, { avatar_url: string | null; display_name: string | null }>;
@@ -129,6 +132,9 @@ function mapAgreementRow(row: DebtAgreementSecureRow, profileMap: ProfileMap): D
     borrower_confirmed_ip: row.borrower_confirmed_ip ?? null,
     borrower_confirmed_device: row.borrower_confirmed_device ?? null,
     borrower_confirmed_at: row.borrower_confirmed_at ?? null,
+    contract_finalized_at: row.contract_finalized_at ?? null,
+    contract_hash: row.contract_hash ?? null,
+    contract_template_version: row.contract_template_version ?? null,
   };
 }
 

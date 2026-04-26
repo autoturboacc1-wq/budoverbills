@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { renderToStaticMarkup } from "react-dom/server";
 import { motion } from "framer-motion";
-import { ArrowLeft, FileSignature, Printer, ShieldCheck, Loader2, AlertCircle, Eye, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Download, FileSignature, Printer, ShieldCheck, Loader2, AlertCircle, Eye, ShieldAlert } from "lucide-react";
+import { jsPDF } from "jspdf";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -127,8 +128,10 @@ export default function AgreementContract() {
   const [showPreview, setShowPreview] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [isGrantingPdpa, setIsGrantingPdpa] = useState(false);
   const [loading, setLoading] = useState(true);
+  const contractRef = useRef<HTMLDivElement | null>(null);
   const [snapshotVerification, setSnapshotVerification] =
     useState<"unknown" | "verified" | "mismatch">("unknown");
 
@@ -204,7 +207,7 @@ export default function AgreementContract() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, user?.id]);
 
   // Re-hash the stored snapshot and compare against the stored hash so we
   // can show a "verified" badge once both parties have signed.  Mismatch
@@ -379,7 +382,7 @@ export default function AgreementContract() {
 
       const partyInfo = isLender ? lenderParty : borrowerParty;
 
-      const { error } = await supabase.rpc("sign_agreement_contract" as never, {
+      const { data: signData, error } = await supabase.rpc("sign_agreement_contract" as never, {
         p_agreement_id: agreement.id,
         p_signer_role: role,
         p_typed_name: typedName.trim(),
@@ -399,8 +402,13 @@ export default function AgreementContract() {
       } as never);
 
       if (error) throw error;
+      const signResult = (signData ?? {}) as { fully_signed?: boolean };
 
-      toast.success("ลงนามสัญญาสำเร็จ");
+      toast.success("ลงนามสัญญาสำเร็จ", {
+        description: isBorrower && signResult.fully_signed
+          ? "กรุณายอมรับข้อตกลงเพื่อให้ผู้ให้ยืมโอนเงินต่อ"
+          : "รออีกฝ่ายรีวิวและลงนามสัญญา",
+      });
 
       // Refresh state
       const [agreementResp, signaturesResp] = await Promise.all([
@@ -423,6 +431,10 @@ export default function AgreementContract() {
 
       setShowPasswordConfirm(false);
       setTypedName("");
+
+      if (isBorrower && signResult.fully_signed) {
+        navigate(`/agreement/${agreement.id}/confirm`, { replace: true });
+      }
     } catch (err) {
       const message = (err as { message?: string })?.message ?? "ไม่สามารถลงนามได้";
       console.error("Sign contract error", err);
@@ -434,6 +446,39 @@ export default function AgreementContract() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!contractRef.current || !agreement) {
+      toast.error("ไม่พบเอกสารสัญญาสำหรับดาวน์โหลด");
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const element = contractRef.current;
+
+      await doc.html(element, {
+        x: 0,
+        y: 0,
+        width: 210,
+        windowWidth: element.scrollWidth,
+        autoPaging: false,
+        html2canvas: {
+          backgroundColor: "#ffffff",
+          scale: 2,
+          useCORS: true,
+        },
+      });
+
+      doc.save(`loan-contract-${agreement.id.slice(0, 8)}.pdf`);
+    } catch (err) {
+      console.error("Download contract PDF error", err);
+      toast.error("ไม่สามารถดาวน์โหลด PDF ได้");
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   // ---------- Render ----------
@@ -477,10 +522,20 @@ export default function AgreementContract() {
             </div>
 
             {fullySigned && (
-              <Button variant="outline" size="sm" onClick={handlePrint}>
-                <Printer className="w-4 h-4 mr-2" />
-                พิมพ์ / บันทึก PDF
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handlePrint}>
+                  <Printer className="w-4 h-4 mr-2" />
+                  พิมพ์
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={isDownloading}>
+                  {isDownloading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  ดาวน์โหลด PDF
+                </Button>
+              </div>
             )}
           </motion.header>
 
@@ -545,6 +600,7 @@ export default function AgreementContract() {
           {fullySigned && extras?.lender_party_info && extras?.borrower_party_info ? (
             <div className="bg-white rounded-2xl shadow-card overflow-x-auto print:rounded-none print:shadow-none print:overflow-visible">
               <LoanContractTemplate
+                ref={contractRef}
                 data={buildContractData({
                   agreement,
                   lenderParty: { ...EMPTY_PARTY, ...extras.lender_party_info },
@@ -568,7 +624,7 @@ export default function AgreementContract() {
                 <p>เพื่อจัดทำหนังสือสัญญากู้ยืมเงินให้สามารถใช้เป็นหลักฐานในชั้นศาลได้ Budoverbills จำเป็นต้องเก็บข้อมูลส่วนบุคคลของคุณดังนี้:</p>
                 <ul className="list-disc list-inside text-muted-foreground ml-2 space-y-1">
                   <li>ชื่อ-นามสกุลเต็ม</li>
-                  <li>เลขประจำตัวประชาชน 4 หลักท้าย</li>
+                  <li>เลขประจำตัวประชาชน 13 หลัก</li>
                   <li>ที่อยู่ตามทะเบียนบ้านหรือที่อยู่ปัจจุบัน</li>
                   <li>ลายมือชื่ออิเล็กทรอนิกส์ (พิมพ์ชื่อ + IP + อุปกรณ์ + เวลาลงนาม)</li>
                 </ul>
@@ -742,7 +798,7 @@ export default function AgreementContract() {
               {/* Render the live (form-driven) contract for everyone to see */}
               {previewData && (
                 <div className="bg-white rounded-2xl shadow-card overflow-x-auto print:rounded-none print:shadow-none print:overflow-visible">
-                  <LoanContractTemplate data={previewData} />
+                  <LoanContractTemplate ref={contractRef} data={previewData} />
                 </div>
               )}
             </>
@@ -799,4 +855,3 @@ export default function AgreementContract() {
     </PageTransition>
   );
 }
-
