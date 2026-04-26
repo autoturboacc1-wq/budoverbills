@@ -1,10 +1,30 @@
 import { forwardRef } from "react";
 import { thaiBahtText } from "@/utils/thaiNumber";
 
-export const CONTRACT_TEMPLATE_VERSION = "v1.0";
+// v1.1 — bundled Sarabun font + @font-face block embedded so html2canvas captures
+// Thai glyphs reliably across OSes (previously relied on system fonts which
+// fall back to Arial on Windows/Linux/Android).
+export const CONTRACT_TEMPLATE_VERSION = "v1.1";
 
-const APPLE_SYSTEM_FONT =
-  '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Sukhumvit Set", Thonburi, Arial, system-ui, sans-serif';
+const CONTRACT_FONT_STACK =
+  '"Sarabun", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Sukhumvit Set", Thonburi, Arial, system-ui, sans-serif';
+
+const SARABUN_FONT_FACE_CSS = `
+@font-face {
+  font-family: 'Sarabun';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Sarabun-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Sarabun';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/Sarabun-Bold.ttf') format('truetype');
+}
+`.trim();
 
 export interface ContractParty {
   fullName: string;
@@ -101,12 +121,13 @@ export const LoanContractTemplate = forwardRef<HTMLDivElement, { data: LoanContr
           overflow: "hidden",
           boxSizing: "border-box",
           padding: "12mm 14mm",
-          fontFamily: APPLE_SYSTEM_FONT,
+          fontFamily: CONTRACT_FONT_STACK,
           fontSize: "12px",
           lineHeight: 1.42,
           color: "#000",
         }}
       >
+        <style dangerouslySetInnerHTML={{ __html: SARABUN_FONT_FACE_CSS }} />
         <h1 style={{ textAlign: "center", fontSize: "18px", fontWeight: 700, marginBottom: "2px" }}>
           หนังสือสัญญากู้ยืมเงิน
         </h1>
@@ -228,7 +249,7 @@ function SignatureBlock({
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "center",
-          fontFamily: APPLE_SYSTEM_FONT,
+          fontFamily: CONTRACT_FONT_STACK,
           fontSize: "16px",
           paddingBottom: "2px",
         }}

@@ -31,6 +31,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { getUserRoleInAgreement } from "@/domains/debt";
 import { computeContractHash } from "@/utils/contractHash";
 import { getClientIP, getDeviceIdString } from "@/utils/deviceInfo";
+import { downloadPDF } from "@/utils/pdfExport";
+import { waitForSarabunFontReady } from "@/utils/pdfFont";
 
 interface SignatureRow {
   id: string;
@@ -458,14 +460,21 @@ export default function AgreementContract() {
 
     setIsDownloading(true);
     try {
+      // Wait for the bundled Sarabun font to be loaded into the DOM before
+      // html2canvas snapshots the contract — otherwise Thai glyphs render as
+      // boxes on systems without a Thai system font.
+      await waitForSarabunFontReady();
+
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const element = contractRef.current;
 
+      // 794 px === 210mm @ 96dpi. Pinning windowWidth removes layout drift
+      // caused by mobile viewports being narrower than A4.
       await doc.html(element, {
         x: 0,
         y: 0,
         width: 210,
-        windowWidth: element.scrollWidth,
+        windowWidth: 794,
         autoPaging: false,
         html2canvas: {
           backgroundColor: "#ffffff",
@@ -474,7 +483,8 @@ export default function AgreementContract() {
         },
       });
 
-      doc.save(`loan-contract-${agreement.id.slice(0, 8)}.pdf`);
+      const blob = doc.output("blob");
+      await downloadPDF(blob, `loan-contract-${agreement.id.slice(0, 8)}.pdf`);
     } catch (err) {
       console.error("Download contract PDF error", err);
       toast.error("ไม่สามารถดาวน์โหลด PDF ได้");

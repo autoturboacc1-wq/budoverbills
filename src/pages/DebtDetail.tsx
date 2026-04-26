@@ -339,7 +339,7 @@ export default function DebtDetail() {
       
       const blob = await generateAgreementPDF(pdfData);
       const filename = `agreement-${agreement.id.substring(0, 8)}-${format(new Date(), "yyyyMMdd")}.pdf`;
-      downloadPDF(blob, filename);
+      await downloadPDF(blob, filename);
       
       toast.success("ดาวน์โหลด PDF สำเร็จ!");
     } catch (error) {

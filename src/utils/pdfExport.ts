@@ -1,50 +1,7 @@
 import { jsPDF } from "jspdf";
 import { format, parseISO } from "date-fns";
 import { th } from "date-fns/locale";
-
-const SARABUN_REGULAR_URL =
-  "https://fonts.gstatic.com/s/sarabun/v15/DtVmJx26TKEr37c9aApx_g.ttf";
-const SARABUN_BOLD_URL =
-  "https://fonts.gstatic.com/s/sarabun/v15/DtVhJx26TKEr37c9YHZJmnAI_g.ttf";
-
-async function fetchFontAsBase64(url: string): Promise<string | null> {
-  try {
-    const response = await fetch(url, { cache: "force-cache" });
-    if (!response.ok) return null;
-
-    const buffer = await response.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i += 1) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-
-    return btoa(binary);
-  } catch {
-    return null;
-  }
-}
-
-async function registerThaiFont(doc: jsPDF): Promise<string> {
-  const [regularB64, boldB64] = await Promise.all([
-    fetchFontAsBase64(SARABUN_REGULAR_URL),
-    fetchFontAsBase64(SARABUN_BOLD_URL),
-  ]);
-
-  if (!regularB64) {
-    return "helvetica";
-  }
-
-  doc.addFileToVFS("Sarabun-Regular.ttf", regularB64);
-  doc.addFont("Sarabun-Regular.ttf", "Sarabun", "normal");
-
-  if (boldB64) {
-    doc.addFileToVFS("Sarabun-Bold.ttf", boldB64);
-    doc.addFont("Sarabun-Bold.ttf", "Sarabun", "bold");
-  }
-
-  return "Sarabun";
-}
+import { registerThaiFont } from "./pdfFont";
 
 interface PaymentBucketSummary {
   paid: number;
@@ -496,10 +453,11 @@ export async function generateAgreementPDF(data: AgreementPDFData): Promise<Blob
   drawTableHeader();
 
   data.installments.forEach((installment, index) => {
-    ensureSpace(8);
-    if (y > bottomLimit - 12) {
-      doc.addPage();
-      y = 18;
+    const rowHeight = installment.paidAt ? 7.9 : 4.5;
+    const beforeY = y;
+    ensureSpace(rowHeight);
+    if (y !== beforeY) {
+      // ensureSpace caused a page break — repeat the table header on the new page.
       drawSectionTitle("ตารางงวด (ต่อ)");
       drawTableHeader();
     }
@@ -526,9 +484,8 @@ export async function generateAgreementPDF(data: AgreementPDFData): Promise<Blob
         size: 6.5,
         color: 110,
       });
+      y += 3.4;
     }
-
-    y += 3.4;
   });
 
   drawRule();
@@ -575,28 +532,37 @@ export async function generateAgreementPDF(data: AgreementPDFData): Promise<Blob
   return doc.output("blob");
 }
 
-export function downloadPDF(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const userAgent = window.navigator.userAgent;
-  const isIosDevice =
-    /iPad|iPhone|iPod/.test(userAgent) ||
-    (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
+export async function downloadPDF(blob: Blob, filename: string): Promise<void> {
+  // Try the Web Share API first when running as an installed PWA on iOS — that is
+  // the only reliable way to surface a "save to Files" prompt from a standalone
+  // window. canShare() must be checked because not every iOS build supports
+  // sharing files.
   const isStandalonePwa =
-    window.matchMedia?.("(display-mode: standalone)").matches ||
-    ("standalone" in window.navigator &&
-      Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone));
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(display-mode: standalone)").matches ||
+      ("standalone" in window.navigator &&
+        Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone)));
 
-  if (isIosDevice || isStandalonePwa) {
-    window.open(url, "_blank", "noopener,noreferrer");
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    return;
+  if (isStandalonePwa && typeof navigator !== "undefined" && navigator.canShare && navigator.share) {
+    try {
+      const file = new File([blob], filename, { type: "application/pdf" });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      }
+    } catch {
+      // Fall through to the anchor-download path.
+    }
   }
 
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  link.rel = "noopener";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // Revoke after a tick so the browser has time to start the download.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
