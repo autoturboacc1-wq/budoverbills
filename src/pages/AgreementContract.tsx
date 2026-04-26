@@ -434,6 +434,8 @@ export default function AgreementContract() {
 
       if (isBorrower && signResult.fully_signed) {
         navigate(`/agreement/${agreement.id}/confirm`, { replace: true });
+      } else {
+        navigate("/", { replace: true });
       }
     } catch (err) {
       const message = (err as { message?: string })?.message ?? "ไม่สามารถลงนามได้";
